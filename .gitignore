@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Virtual environment
+.venv/
+
+# Environment variables
+.env
+
+# Filigree issue tracker
+.filigree/
+
+# AI tooling
+.claude/
+.agents/
+.mcp.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
