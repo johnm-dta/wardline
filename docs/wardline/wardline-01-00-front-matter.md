@@ -30,7 +30,7 @@ This document comprises two parts: Part I (the framework specification) and Part
 → Part II: A.7/B.7 (residual risks), A.10/B.10 (error handling and control law)
 
 **Citizen programmers** (reviewing or writing code in a wardline-annotated codebase, without developer tooling):
-→ Wardline Lite practical guide (separate companion document): five review questions, worked code examples, hot-path identification. This guide is not part of the formal specification — it translates the annotation vocabulary (§6) and pattern rules (§7) into questions a non-specialist can apply during code review.
+→ Wardline Lite practical guide (`wardline-lite.md`, separate companion document): five review questions, worked code examples, hot-path identification. This guide is not part of the formal specification — it translates the annotation vocabulary (§6) and pattern rules (§7) into questions a non-specialist can apply during code review.
 
 ---
 
@@ -47,9 +47,9 @@ This document comprises two parts: Part I (the framework specification) and Part
     - 5.1 Trust classification and validation status — 5.2 Transition semantics — 5.3 Trusted restoration boundaries — 5.4 Cross-language taint propagation
 6. [Annotation vocabulary](#6-annotation-vocabulary)
 7. [Pattern rules](#7-pattern-rules)
-    - 7.1 The rules — 7.2 Structural verification — 7.3 Severity matrix — 7.4 Worked examples — 7.5 Derivation principles — 7.6 Taint analysis scope
+    - 7.1 The rules — 7.2 Structural verification — 7.2.1 Structural-contract defaults and WL-001 — 7.3 Severity matrix — 7.4 Worked examples — 7.5 Derivation principles — 7.6 Taint analysis scope
 8. [Enforcement layers](#8-enforcement-layers)
-    - 8.1 Static analysis — 8.2 Type system — 8.3 Runtime structural — 8.4 Orthogonality principle
+    - 8.1 Static analysis — 8.2 Type system — 8.3 Runtime structural — 8.4 Orthogonality principle — 8.5 Pre-generation context projection (advisory)
 9. [Governance model](#9-governance-model)
     - 9.1 Exceptionability classes — 9.2 Governance mechanisms — 9.3 Scope of governance — 9.3.1 Artefact classification: policy and enforcement — 9.3.2 Manifest threat model — 9.4 Governance capacity — 9.5 Enforcement availability (control law)
 10. [Verification properties](#10-verification-properties)
@@ -57,7 +57,7 @@ This document comprises two parts: Part I (the framework specification) and Part
 11. [Language evaluation criteria](#11-language-evaluation-criteria)
 12. [Residual risks](#12-residual-risks)
 13. [Portability and manifest format](#13-portability-and-manifest-format)
-    - 13.1 Wardline manifest format
+    - 13.1 Wardline manifest format — 13.2 Scanner operational configuration (wardline.toml)
 14. [Conformance](#14-conformance)
     - 14.1 Conformance model — 14.2 Conformance criteria — 14.3 Conformance profiles (14.3.1 Enforcement profiles, 14.3.2 Governance profiles, 14.3.3 Graduation) — 14.4 Enforcement regimes — 14.5 Supplementary group enforcement scope — 14.6 Assessment procedure (14.6.1 Worked example: Phase 3 deployment, 14.6.2 Worked example: Lite governance deployment) — 14.7 Partial conformance
 15. [Document scope](#15-document-scope)
@@ -68,5 +68,15 @@ A. [Python Language Binding Reference](#part-ii-a-python-language-binding-refere
     - A.1 Design history — A.2 Python language evaluation — A.3 Interface contract (normative) — A.4 Annotation vocabulary — A.5 Type system and runtime enforcement — A.6 Regime composition matrix — A.7 Residual risks — A.8 Worked example — A.9 Adoption strategy — A.10 Error handling and control law
 B. [Java Language Binding Reference](#part-ii-b-java-language-binding-reference)
     - B.1 Design history — B.2 Java language evaluation — B.3 Interface contract (normative) — B.4 Annotation vocabulary — B.5 Type system and runtime enforcement — B.6 Regime composition matrix — B.7 Residual risks — B.8 Worked example — B.9 Adoption strategy — B.10 Error handling and control law
+
+**Companion Documents**
+
+- Wardline Lite practical guide (`wardline-lite.md`) — five review questions for non-specialist code reviewers
+- Implementation design: Wardline for Python (`../2026-03-21-wardline-python-design.md`) — reference implementation work packages and build order
+
+**Planned Companion Documents** (in preparation)
+
+- Implementer's Guide: Scanner Architecture — detailed guidance for building a Wardline-Core scanner
+- Agent Guidance — constraints and patterns for AI agents working in wardline-annotated codebases
 
 ---

@@ -84,6 +84,8 @@ WL-007 and WL-008 are structural verification rules (not pattern rules) and appl
 | **WL-008** | Semantic validation without shape validation | E/U | E/U | E/U | E/U | E/U | E/U | E/U | E/U |
 | | **Legend:** E = Error, W = Warning, Su = Suppress / U = Unconditional, St = Standard, R = Relaxed, T = Transparent | | | | | | | | |
 
+**Binding-level matrix deviations.** Language bindings MAY modify individual cells where the target language's type system structurally prevents a violation class. For example, the Java binding (Part II-B §B.4.4) changes WL-002 in SHAPE_VALIDATED from E/U to Su/T for records, because Java records guarantee complete construction. Such deviations must be documented in the binding's matrix with explicit rationale. See §11 (language evaluation criteria) for the general principle governing binding-level deviations.
+
 #### 7.4 Worked examples
 
 *Subsections 7.4 and 7.5 are non-normative. They explain the reasoning behind the severity matrix but do not impose additional requirements on implementations.*

@@ -2,6 +2,11 @@
 
 A wardline without governance is an honour system. The governance model defines how designated reviewers manage exceptions to wardline declarations, who may authorise them, and what evidence trail they leave.
 
+!!! tip "Start here: governance profiles"
+    This section describes the **full governance model**. Most teams should start with the **Wardline Lite governance profile** (§14.3.2), which requires a subset of these mechanisms. Lite defers full temporal separation, the complete golden corpus, and the structured fingerprint baseline — these are graduated into when the project reaches specific maturity triggers (§14.3.3). Read this section to understand the mechanisms available; consult §14.3.2 to determine which ones apply to your project today.
+
+    **If you are following the adopter reading path** and skipped §5–7: this section references concepts from those sections. The key concepts you need: a *restoration boundary* (§5.3) is a declared function that re-loads data your system previously stored, and the *evidence categories* are four things the governance model requires you to document when declaring such a boundary (structural checks, semantic checks, integrity verification, and institutional attestation of provenance). You can read §5.3 when you encounter restoration boundaries in practice.
+
 !!! info "For governance leads and CISOs"
     **What you own:** The wardline manifest (§13.1) is a policy artefact — you ratify it, set the review interval, and approve tier assignments for data sources. Exception grants require a designated reviewer with documented rationale and expiry (§9.1). You decide the governance profile — Lite or Assurance (§14.3.2) — and when to graduate (§14.3.3).
 

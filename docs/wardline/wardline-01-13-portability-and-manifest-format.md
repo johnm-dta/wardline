@@ -313,3 +313,54 @@ The `annotation_hash` is computed from the function's decorator set and argument
 #### 13.1.5 Manifest validation
 
 Enforcement tools MUST validate all manifest files against their respective JSON Schemas before consuming them. Validation failures are hard errors — the tool does not proceed with a malformed manifest. The JSON Schemas for all four file types are normative artefacts of the framework and are versioned alongside this specification. A binding's conformance (§14) includes manifest schema validation. Schema files are not yet published as of DRAFT v0.2.0; they will be co-located with the reference implementation and versioned to match the specification revision. At DRAFT v0.2.0, implementations MAY derive manifest schemas from the field specifications in §13.1.1–§13.1.4 pending publication of normative schemas. Conformance at v1.0 requires validation against published schemas.
+
+#### 13.2 Scanner operational configuration (`wardline.toml`)
+
+Scanner operational settings reside in `wardline.toml`. This file is **not** part of the manifest system — it is binding-specific enforcement configuration, not trust topology. However, because `wardline.toml` controls the enforcement perimeter and rule enablement, a modification that excludes a directory from scanning is functionally equivalent to a tier reassignment. Implementations SHOULD protect `wardline.toml` with CODEOWNERS review alongside other governance artefacts.
+
+**Artefact classification:** `wardline.toml` is an enforcement artefact (§9.3.1) — changes are subject to standard change management, not the policy artefact ratification process. However, changes to the enforcement perimeter (`[scanner.paths]`) and rule enablement (`[rules]`) SHOULD trigger a GOVERNANCE-level finding for reviewer visibility.
+
+**Required keys:**
+
+| Section | Key | Type | Default | Description |
+|---------|-----|------|---------|-------------|
+| `[scanner]` | `root` | string (path) | `"."` | Root directory for scanning (relative to `wardline.toml` location) |
+| `[scanner]` | `include` | array of strings | `["**/*.py"]` (Python), `["**/*.java"]` (Java) | Glob patterns for files to include |
+| `[scanner]` | `exclude` | array of strings | `["**/test_*", "**/tests/**", "**/.venv/**"]` | Glob patterns for files to exclude |
+| `[scanner]` | `follow_symlinks` | boolean | `false` | Whether to follow symbolic links to directories |
+| `[rules]` | `enabled` | array of strings | all rules | Rule IDs to enable (e.g., `["WL-001", "WL-002"]`). Unlisted rules are disabled |
+| `[rules]` | `disabled` | array of strings | `[]` | Rule IDs to disable. Overrides `enabled`. Disabling an UNCONDITIONAL rule emits a GOVERNANCE-level finding |
+| `[regime]` | `phase` | integer (1–5) | `2` | Declared adoption phase (§A.9/B.9). Phase transitions are governance events |
+| `[regime]` | `governance_profile` | string | `"lite"` | `"lite"` or `"assurance"` (§14.3.2) |
+| `[regime]` | `strict_registry` | boolean | `true` | Whether registry mismatch is a hard error or warning |
+| `[corpus]` | `path` | string (path) | `"corpus/"` | Path to the golden corpus directory |
+| `[output]` | `format` | string | `"sarif"` | Output format: `"sarif"`, `"json"`, or `"text"` |
+| `[output]` | `verification_mode` | boolean | `false` | Emit deterministic SARIF (omit volatile invocation metadata) |
+
+**Example `wardline.toml`:**
+
+```toml
+[scanner]
+root = "src/"
+include = ["**/*.py"]
+exclude = ["**/test_*", "**/tests/**", "**/.venv/**", "**/migrations/**"]
+follow_symlinks = false
+
+[rules]
+# All rules enabled by default; disable specific rules with documented rationale
+# disabled = ["WL-006"]  # Disabled: runtime type-checking is used extensively in migration layer
+
+[regime]
+phase = 3
+governance_profile = "lite"
+strict_registry = true
+
+[corpus]
+path = "corpus/"
+
+[output]
+format = "sarif"
+verification_mode = false
+```
+
+**Validation requirements:** Enforcement tools MUST validate `wardline.toml` at startup. Unknown keys MUST produce a structured error (exit code 2) — this prevents silent misconfiguration from typos. Invalid rule IDs, taint state tokens, or paths MUST produce structured errors. A missing `wardline.toml` is not an error — the tool runs with defaults (all groups enabled, all rules enabled, advisory mode).
