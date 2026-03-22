@@ -1,19 +1,31 @@
 """Manifest coherence checks — cross-reference code annotations against boundaries.
 
-Detects two classes of inconsistency:
+Detects multiple classes of inconsistency:
 - **Orphaned annotations**: functions with wardline decorators in code but no
   matching boundary declaration in any overlay.
 - **Undeclared boundaries**: overlay boundary entries whose function name does
   not appear as a decorated function in code.
+- **Governance anomalies**: tier distribution, tier downgrades, upgrade without
+  evidence, agent-originated policy changes, expired exceptions, and first-scan
+  perimeter detection.
 """
 
 from __future__ import annotations
 
+import datetime
+import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from wardline.manifest.models import BoundaryEntry
+    from pathlib import Path
+
+    from wardline.manifest.models import (
+        BoundaryEntry,
+        ExceptionEntry,
+        ModuleTierEntry,
+        TierEntry,
+    )
     from wardline.scanner.context import WardlineAnnotation
 
 
@@ -98,3 +110,294 @@ def check_undeclared_boundaries(
             )
 
     return issues
+
+
+# ── Governance anomaly checks ─────────────────────────────────────
+
+
+def check_tier_distribution(
+    tiers: tuple[TierEntry, ...],
+    module_tiers: tuple[ModuleTierEntry, ...],
+    *,
+    max_permissive_percent: float = 60.0,
+) -> list[CoherenceIssue]:
+    """Check if permissive tiers (3+4) exceed the allowed threshold.
+
+    Args:
+        tiers: Tier definitions from the manifest.
+        module_tiers: Module-tier assignments.
+        max_permissive_percent: Maximum allowed percentage of permissive
+            tiers (tier >= 3). Default 60%.
+
+    Returns:
+        A GOVERNANCE WARNING if the threshold is exceeded.
+    """
+    if not module_tiers or not tiers:
+        return []
+
+    # Build a map from tier id to tier number
+    tier_map: dict[str, int] = {t.id: t.tier for t in tiers}
+
+    total = len(module_tiers)
+    permissive = 0
+    for mt in module_tiers:
+        tier_num = tier_map.get(mt.default_taint)
+        if tier_num is not None and tier_num >= 3:
+            permissive += 1
+
+    pct = (permissive / total) * 100.0
+    if pct > max_permissive_percent:
+        return [
+            CoherenceIssue(
+                kind="GOVERNANCE WARNING",
+                function="",
+                file_path="",
+                detail=(
+                    f"Permissive tier distribution: {pct:.1f}% of modules are "
+                    f"tier 3+ (threshold: {max_permissive_percent}%)."
+                ),
+            )
+        ]
+    return []
+
+
+def check_tier_downgrades(
+    tiers: tuple[TierEntry, ...],
+    module_tiers: tuple[ModuleTierEntry, ...],
+    baseline_path: Path,
+) -> list[CoherenceIssue]:
+    """Detect tier downgrades compared to a baseline.
+
+    A downgrade is when a module's tier number increases (less restrictive).
+
+    Args:
+        tiers: Current tier definitions.
+        module_tiers: Current module-tier assignments.
+        baseline_path: Path to ``wardline.manifest.baseline.json``.
+
+    Returns:
+        GOVERNANCE WARNING for each downgraded module, or GOVERNANCE INFO
+        if the baseline file does not exist.
+    """
+    if not baseline_path.exists():
+        return []
+
+    baseline_data = json.loads(baseline_path.read_text())
+    baseline_modules: dict[str, str] = {
+        entry["path"]: entry["default_taint"]
+        for entry in baseline_data.get("module_tiers", [])
+    }
+    baseline_tiers: dict[str, int] = {
+        entry["id"]: entry["tier"]
+        for entry in baseline_data.get("tiers", [])
+    }
+
+    current_tier_map: dict[str, int] = {t.id: t.tier for t in tiers}
+
+    issues: list[CoherenceIssue] = []
+    for mt in module_tiers:
+        if mt.path in baseline_modules:
+            old_taint = baseline_modules[mt.path]
+            old_tier = baseline_tiers.get(old_taint)
+            new_tier = current_tier_map.get(mt.default_taint)
+            if old_tier is not None and new_tier is not None and new_tier > old_tier:
+                issues.append(
+                    CoherenceIssue(
+                        kind="GOVERNANCE WARNING",
+                        function="",
+                        file_path=mt.path,
+                        detail=(
+                            f"Tier downgrade: module '{mt.path}' changed from "
+                            f"tier {old_tier} to tier {new_tier}."
+                        ),
+                    )
+                )
+    return issues
+
+
+def check_tier_upgrade_without_evidence(
+    tiers: tuple[TierEntry, ...],
+    module_tiers: tuple[ModuleTierEntry, ...],
+    boundaries: tuple[BoundaryEntry, ...],
+    baseline_path: Path,
+) -> list[CoherenceIssue]:
+    """Detect tier upgrades (stricter) without overlay boundary evidence.
+
+    An upgrade is when a module's tier number decreases (more restrictive).
+    If no boundary entry covers the upgraded module, a warning fires.
+
+    Args:
+        tiers: Current tier definitions.
+        module_tiers: Current module-tier assignments.
+        boundaries: All boundary entries from loaded overlays.
+        baseline_path: Path to ``wardline.manifest.baseline.json``.
+
+    Returns:
+        GOVERNANCE WARNING for each upgrade without evidence.
+    """
+    if not baseline_path.exists():
+        return []
+
+    baseline_data = json.loads(baseline_path.read_text())
+    baseline_modules: dict[str, str] = {
+        entry["path"]: entry["default_taint"]
+        for entry in baseline_data.get("module_tiers", [])
+    }
+    baseline_tiers: dict[str, int] = {
+        entry["id"]: entry["tier"]
+        for entry in baseline_data.get("tiers", [])
+    }
+
+    current_tier_map: dict[str, int] = {t.id: t.tier for t in tiers}
+
+    # Collect boundary function names as evidence
+    boundary_functions = frozenset(b.function for b in boundaries)
+
+    issues: list[CoherenceIssue] = []
+    for mt in module_tiers:
+        if mt.path in baseline_modules:
+            old_taint = baseline_modules[mt.path]
+            old_tier = baseline_tiers.get(old_taint)
+            new_tier = current_tier_map.get(mt.default_taint)
+            if old_tier is not None and new_tier is not None and new_tier < old_tier:
+                # Check if any boundary covers this module path
+                has_evidence = any(
+                    bf.startswith(mt.path.rstrip("/"))
+                    for bf in boundary_functions
+                )
+                if not has_evidence:
+                    issues.append(
+                        CoherenceIssue(
+                            kind="GOVERNANCE WARNING",
+                            function="",
+                            file_path=mt.path,
+                            detail=(
+                                f"Tier upgrade without evidence: module "
+                                f"'{mt.path}' changed from tier {old_tier} to "
+                                f"tier {new_tier} but no overlay boundary "
+                                f"covers this module."
+                            ),
+                        )
+                    )
+    return issues
+
+
+def check_agent_originated_exceptions(
+    exceptions: tuple[ExceptionEntry, ...],
+) -> list[CoherenceIssue]:
+    """Detect exceptions with unknown agent provenance.
+
+    An exception with ``agent_originated=None`` (provenance unknown) fires
+    a warning. Explicit ``True`` or ``False`` values are accepted.
+
+    Args:
+        exceptions: All exception entries from the manifest.
+
+    Returns:
+        GOVERNANCE WARNING for each exception with unknown provenance.
+    """
+    issues: list[CoherenceIssue] = []
+    for exc in exceptions:
+        if exc.agent_originated is None:
+            issues.append(
+                CoherenceIssue(
+                    kind="GOVERNANCE WARNING",
+                    function="",
+                    file_path=exc.location,
+                    detail=(
+                        f"Exception '{exc.id}' has unknown agent provenance "
+                        f"(agent_originated is null)."
+                    ),
+                )
+            )
+    return issues
+
+
+def check_expired_exceptions(
+    exceptions: tuple[ExceptionEntry, ...],
+    *,
+    max_exception_duration_days: int = 365,
+    now: datetime.date | None = None,
+) -> list[CoherenceIssue]:
+    """Detect expired exceptions and far-future expiry dates.
+
+    An exception fires a warning if:
+    - Its ``expires`` date is in the past relative to ``now``.
+    - Its ``expires`` date exceeds ``max_exception_duration_days`` from today,
+      indicating a far-future expiry that circumvents the duration policy.
+
+    Args:
+        exceptions: All exception entries.
+        max_exception_duration_days: Maximum allowed exception duration.
+        now: Current date for clock injection (defaults to today).
+
+    Returns:
+        GOVERNANCE WARNING for each expired or far-future exception.
+    """
+    if now is None:
+        now = datetime.date.today()
+
+    max_expiry = now + datetime.timedelta(days=max_exception_duration_days)
+
+    issues: list[CoherenceIssue] = []
+    for exc in exceptions:
+        if exc.expires is None:
+            continue
+
+        try:
+            expiry_date = datetime.date.fromisoformat(exc.expires)
+        except ValueError:
+            continue
+
+        if expiry_date < now:
+            issues.append(
+                CoherenceIssue(
+                    kind="GOVERNANCE WARNING",
+                    function="",
+                    file_path=exc.location,
+                    detail=(
+                        f"Exception '{exc.id}' expired on {exc.expires}."
+                    ),
+                )
+            )
+        elif expiry_date > max_expiry:
+            issues.append(
+                CoherenceIssue(
+                    kind="GOVERNANCE WARNING",
+                    function="",
+                    file_path=exc.location,
+                    detail=(
+                        f"Exception '{exc.id}' has far-future expiry "
+                        f"{exc.expires} exceeding max_exception_duration_days "
+                        f"({max_exception_duration_days})."
+                    ),
+                )
+            )
+
+    return issues
+
+
+def check_first_scan_perimeter(
+    perimeter_baseline_path: Path,
+) -> list[CoherenceIssue]:
+    """Emit GOVERNANCE INFO when no perimeter baseline exists (first scan).
+
+    Args:
+        perimeter_baseline_path: Path to ``wardline.perimeter.baseline.json``.
+
+    Returns:
+        GOVERNANCE INFO if the baseline file does not exist.
+    """
+    if not perimeter_baseline_path.exists():
+        return [
+            CoherenceIssue(
+                kind="GOVERNANCE INFO",
+                function="",
+                file_path=str(perimeter_baseline_path),
+                detail=(
+                    "No perimeter baseline found. This appears to be a "
+                    "first scan — perimeter listing will be generated."
+                ),
+            )
+        ]
+    return []

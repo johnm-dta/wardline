@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import ast
+import logging
 import textwrap
+from typing import TYPE_CHECKING
 
 from wardline.scanner.discovery import (
     _build_import_table,
     _collect_type_checking_lines,
     discover_annotations,
 )
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def _parse(source: str) -> ast.Module:
@@ -333,3 +338,120 @@ class TestDiscoverAnnotations:
         result = discover_annotations(tree, "empty.py")
 
         assert result == {}
+
+    def test_alias_import_resolves(self) -> None:
+        """``from wardline import external_boundary as eb`` → ``eb`` resolves."""
+        tree = _parse("""\
+            from wardline import external_boundary as eb
+            @eb
+            def handler(): pass
+        """)
+        result = discover_annotations(tree, "test.py")
+
+        key = ("test.py", "handler")
+        assert key in result
+        ann = next(iter(result[key]))
+        assert ann.canonical_name == "external_boundary"
+
+    def test_nested_function_decorator_discovered(self) -> None:
+        """Decorators on nested functions are discovered with correct qualname."""
+        tree = _parse("""\
+            from wardline import external_boundary, validates_shape
+            @external_boundary
+            def outer():
+                @validates_shape
+                def inner(): pass
+        """)
+        result = discover_annotations(tree, "test.py")
+
+        assert ("test.py", "outer") in result
+        assert result[("test.py", "outer")][0].canonical_name == "external_boundary"
+
+        assert ("test.py", "outer.inner") in result
+        assert result[("test.py", "outer.inner")][0].canonical_name == "validates_shape"
+
+
+# ── Edge cases: warnings ─────────────────────────────────────────
+
+
+class TestEdgeCaseWarnings:
+    """Edge case handling: star imports, dynamic imports, unresolved decorators."""
+
+    def test_star_import_warns(self, caplog: pytest.LogCaptureFixture) -> None:
+        """``from wardline import *`` logs a WARNING."""
+        tree = _parse("""\
+            from wardline import *
+        """)
+        with caplog.at_level(logging.WARNING, logger="wardline.scanner.discovery"):
+            _build_import_table(tree, frozenset())
+
+        assert any("Star import" in r.message for r in caplog.records)
+
+    def test_star_import_non_wardline_no_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """``from os import *`` does NOT log a warning."""
+        tree = _parse("""\
+            from os import *
+        """)
+        with caplog.at_level(logging.WARNING, logger="wardline.scanner.discovery"):
+            _build_import_table(tree, frozenset())
+
+        assert not any("Star import" in r.message for r in caplog.records)
+
+    def test_dynamic_import_importlib_warns(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """``importlib.import_module("wardline")`` logs a WARNING."""
+        tree = _parse("""\
+            import importlib
+            mod = importlib.import_module("wardline")
+        """)
+        with caplog.at_level(logging.WARNING, logger="wardline.scanner.discovery"):
+            discover_annotations(tree, "test.py")
+
+        assert any("importlib.import_module" in r.message for r in caplog.records)
+
+    def test_dynamic_import_dunder_warns(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """``__import__("wardline")`` logs a WARNING."""
+        tree = _parse("""\
+            mod = __import__("wardline")
+        """)
+        with caplog.at_level(logging.WARNING, logger="wardline.scanner.discovery"):
+            discover_annotations(tree, "test.py")
+
+        assert any("__import__" in r.message for r in caplog.records)
+
+    def test_dynamic_import_non_wardline_no_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Dynamic import of non-wardline module does NOT warn."""
+        tree = _parse("""\
+            import importlib
+            mod = importlib.import_module("json")
+            other = __import__("os")
+        """)
+        with caplog.at_level(logging.WARNING, logger="wardline.scanner.discovery"):
+            discover_annotations(tree, "test.py")
+
+        assert len(caplog.records) == 0
+
+    def test_unresolved_decorator_with_star_import_warns(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Decorator that looks wardline-related but can't be resolved warns."""
+        tree = _parse("""\
+            from wardline import *
+            @external_boundary
+            def handler(): pass
+        """)
+        with caplog.at_level(logging.WARNING, logger="wardline.scanner.discovery"):
+            discover_annotations(tree, "test.py")
+
+        warning_msgs = [r.message for r in caplog.records]
+        # Should have the star import warning
+        assert any("Star import" in m for m in warning_msgs)
+        # Should have the unresolved decorator warning
+        assert any("cannot be reliably resolved" in m for m in warning_msgs)

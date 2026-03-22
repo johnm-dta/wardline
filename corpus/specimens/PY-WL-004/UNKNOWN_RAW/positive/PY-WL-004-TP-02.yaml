@@ -1,0 +1,18 @@
+---
+specimen_id: "PY-WL-004-TP-02"
+description: "except Exception catches overly broad type, fires PY-WL-004"
+rule: "PY-WL-004"
+fragment: |
+  def safe_parse(text):
+      try:
+          return parse(text)
+      except Exception as e:
+          log.error("parse failed: %s", e)
+          return None
+taint_state: "UNKNOWN_RAW"
+expected_rules:
+  - "PY-WL-004"
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"

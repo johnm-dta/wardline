@@ -1,0 +1,15 @@
+---
+specimen_id: "PY-WL-003-TP-02"
+description: "'key in dict' existence check fires PY-WL-003"
+rule: "PY-WL-003"
+fragment: |
+  def check_config(config):
+      if "database" in config:
+          connect(config["database"])
+taint_state: "UNKNOWN_RAW"
+expected_rules:
+  - "PY-WL-003"
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"

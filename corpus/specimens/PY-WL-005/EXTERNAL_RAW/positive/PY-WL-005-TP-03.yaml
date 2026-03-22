@@ -1,0 +1,18 @@
+---
+specimen_id: "PY-WL-005-TP-03"
+description: "except* with continue in TryStar silently swallows, fires PY-WL-005"
+rule: "PY-WL-005"
+fragment: |
+  def process_batch(items):
+      for item in items:
+          try:
+              handle(item)
+          except* ValueError:
+              continue
+taint_state: "EXTERNAL_RAW"
+expected_rules:
+  - "PY-WL-005"
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"

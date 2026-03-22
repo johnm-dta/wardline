@@ -1,0 +1,18 @@
+---
+specimen_id: "PY-WL-003-TP-03"
+description: "match/case with mapping pattern fires PY-WL-003"
+rule: "PY-WL-003"
+fragment: |
+  def route(event):
+      match event:
+          case {"type": "click", "x": x, "y": y}:
+              handle_click(x, y)
+          case {"type": "scroll"}:
+              handle_scroll()
+taint_state: "EXTERNAL_RAW"
+expected_rules:
+  - "PY-WL-003"
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"

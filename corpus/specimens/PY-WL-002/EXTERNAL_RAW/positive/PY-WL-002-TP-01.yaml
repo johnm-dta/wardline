@@ -1,0 +1,14 @@
+---
+specimen_id: "PY-WL-002-TP-01"
+description: "3-arg getattr() with string default fires PY-WL-002"
+rule: "PY-WL-002"
+fragment: |
+  def read_config(obj):
+      value = getattr(obj, "timeout", 30)
+taint_state: "EXTERNAL_RAW"
+expected_rules:
+  - "PY-WL-002"
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"

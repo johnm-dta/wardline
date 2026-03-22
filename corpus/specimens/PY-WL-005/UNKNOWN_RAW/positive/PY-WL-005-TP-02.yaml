@@ -1,0 +1,17 @@
+---
+specimen_id: "PY-WL-005-TP-02"
+description: "except with ellipsis silently swallows exception, fires PY-WL-005"
+rule: "PY-WL-005"
+fragment: |
+  def load_plugin(name):
+      try:
+          import_module(name)
+      except ImportError:
+          ...
+taint_state: "UNKNOWN_RAW"
+expected_rules:
+  - "PY-WL-005"
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"

@@ -97,6 +97,8 @@ def _build_import_table(
     # e.g., import wardline → "wardline" is a qualified source
     qualified_modules: dict[str, str] = {}
 
+    has_star_import = False
+
     for node in ast.iter_child_nodes(tree):
         # Only process top-level imports (or those not in TC blocks)
         if not isinstance(node, (ast.Import, ast.ImportFrom)):
@@ -105,6 +107,17 @@ def _build_import_table(
             continue
 
         if isinstance(node, ast.ImportFrom):
+            # Detect star imports from wardline modules
+            if _is_wardline_module(node.module or ""):
+                for alias in node.names:
+                    if alias.name == "*":
+                        has_star_import = True
+                        logger.warning(
+                            "Star import from wardline module '%s' makes "
+                            "decorator tracking unreliable (line %d)",
+                            node.module,
+                            node.lineno,
+                        )
             _process_from_import(node, name_table)
         elif isinstance(node, ast.Import):
             _process_import(node, qualified_modules)
@@ -113,6 +126,9 @@ def _build_import_table(
     # so decorator matching can distinguish them
     for alias, module_path in qualified_modules.items():
         name_table[f"__qualified__:{alias}"] = module_path
+
+    if has_star_import:
+        name_table["__star_import__"] = "True"
 
     return name_table
 
@@ -167,6 +183,53 @@ def _is_wardline_module(module: str) -> bool:
     return False
 
 
+def _detect_dynamic_imports(tree: ast.Module) -> None:
+    """Scan AST for dynamic wardline imports and log warnings.
+
+    Detects two patterns:
+    - ``importlib.import_module("wardline...")``
+    - ``__import__("wardline...")``
+    """
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+
+        # Pattern: __import__("wardline...")
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id == "__import__"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+            and _is_wardline_module(node.args[0].value)
+        ):
+            logger.warning(
+                "Dynamic import of wardline module via __import__('%s') "
+                "makes decorator tracking unreliable (line %d)",
+                node.args[0].value,
+                node.lineno,
+            )
+
+        # Pattern: importlib.import_module("wardline...")
+        if (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr == "import_module"
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "importlib"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+            and _is_wardline_module(node.args[0].value)
+        ):
+            logger.warning(
+                "Dynamic import of wardline module via "
+                "importlib.import_module('%s') makes decorator tracking "
+                "unreliable (line %d)",
+                node.args[0].value,
+                node.lineno,
+            )
+
+
 # ── Phase 3: Decorator → annotation mapping ──────────────────────
 
 
@@ -193,6 +256,7 @@ def discover_annotations(
     path_str = str(file_path)
     tc_lines = _collect_type_checking_lines(tree)
     import_table = _build_import_table(tree, tc_lines)
+    _detect_dynamic_imports(tree)
     annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
 
     _walk_functions(tree, import_table, path_str, annotations, scope="")
@@ -247,20 +311,31 @@ def _match_decorators(
       qualified wardline import, then look up ``name`` in registry
     """
     found: list[WardlineAnnotation] = []
+    has_star = "__star_import__" in import_table
 
     for dec in func_node.decorator_list:
         canonical = _resolve_decorator(dec, import_table)
-        if canonical is None:
+        if canonical is not None:
+            entry = REGISTRY[canonical]
+            found.append(
+                WardlineAnnotation(
+                    canonical_name=canonical,
+                    group=entry.group,
+                    attrs=MappingProxyType({}),
+                )
+            )
             continue
 
-        entry = REGISTRY[canonical]
-        found.append(
-            WardlineAnnotation(
-                canonical_name=canonical,
-                group=entry.group,
-                attrs=MappingProxyType({}),
+        # If there's a star import and the decorator is an unresolved Name
+        # that exists in the registry, it could be wardline-related
+        if has_star and isinstance(dec, ast.Name) and dec.id in REGISTRY:
+            logger.warning(
+                "Decorator @%s on %s (line %d) may be wardline-related "
+                "but cannot be reliably resolved due to star import",
+                dec.id,
+                func_node.name,
+                dec.lineno,
             )
-        )
 
     return found
 

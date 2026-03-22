@@ -1,0 +1,17 @@
+---
+specimen_id: "PY-WL-004-TP-01"
+description: "bare except catches all exceptions, fires PY-WL-004"
+rule: "PY-WL-004"
+fragment: |
+  def fetch(url):
+      try:
+          return request(url)
+      except:
+          return None
+taint_state: "EXTERNAL_RAW"
+expected_rules:
+  - "PY-WL-004"
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"

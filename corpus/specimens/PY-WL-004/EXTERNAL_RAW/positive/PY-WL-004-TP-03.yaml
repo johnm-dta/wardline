@@ -1,0 +1,19 @@
+---
+specimen_id: "PY-WL-004-TP-03"
+description: "except* BaseException in TryStar fires PY-WL-004"
+rule: "PY-WL-004"
+fragment: |
+  def run_tasks(tasks):
+      try:
+          async with asyncio.TaskGroup() as tg:
+              for t in tasks:
+                  tg.create_task(t)
+      except* BaseException as eg:
+          log.error("task group failed: %s", eg)
+taint_state: "EXTERNAL_RAW"
+expected_rules:
+  - "PY-WL-004"
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"

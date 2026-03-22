@@ -1,0 +1,17 @@
+---
+specimen_id: "PY-WL-005-TP-01"
+description: "except with pass silently swallows exception, fires PY-WL-005"
+rule: "PY-WL-005"
+fragment: |
+  def try_connect(host):
+      try:
+          connect(host)
+      except ConnectionError:
+          pass
+taint_state: "EXTERNAL_RAW"
+expected_rules:
+  - "PY-WL-005"
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"

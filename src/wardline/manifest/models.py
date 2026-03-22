@@ -31,6 +31,7 @@ class ExceptionEntry:
     reviewer: str
     expires: str | None = None
     provenance: str | None = None
+    agent_originated: bool | None = None
 
 
 @dataclass(frozen=True)

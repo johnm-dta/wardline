@@ -1,0 +1,15 @@
+---
+specimen_id: "PY-WL-003-TP-01"
+description: "hasattr() existence check fires PY-WL-003"
+rule: "PY-WL-003"
+fragment: |
+  def dispatch(obj):
+      if hasattr(obj, "process"):
+          obj.process()
+taint_state: "EXTERNAL_RAW"
+expected_rules:
+  - "PY-WL-003"
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"
