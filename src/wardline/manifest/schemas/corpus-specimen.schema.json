@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wardline.dev/schemas/0.1/corpus-specimen.schema.json",
+  "title": "Wardline Corpus Specimen",
+  "description": "A test specimen for the wardline corpus verification system.",
+  "type": "object",
+  "properties": {
+    "$id": {
+      "type": "string",
+      "description": "Schema version identifier."
+    },
+    "specimen_id": {
+      "type": "string",
+      "description": "Unique specimen identifier."
+    },
+    "description": {
+      "type": "string",
+      "description": "What this specimen tests."
+    },
+    "fragment": {
+      "type": "string",
+      "description": "Python source fragment to be parsed by the scanner."
+    },
+    "taint_state": {
+      "type": "string",
+      "enum": [
+        "AUDIT_TRAIL", "PIPELINE", "SHAPE_VALIDATED",
+        "EXTERNAL_RAW", "UNKNOWN_RAW",
+        "UNKNOWN_SHAPE_VALIDATED", "UNKNOWN_SEM_VALIDATED",
+        "MIXED_RAW"
+      ],
+      "description": "Taint state context for this specimen."
+    },
+    "expected_rules": {
+      "type": "array",
+      "description": "Rules expected to fire on this specimen.",
+      "items": { "type": "string" }
+    },
+    "expected_severity": {
+      "type": ["string", "null"],
+      "enum": ["ERROR", "WARNING", "SUPPRESS", null],
+      "description": "Expected severity of the finding."
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["true_positive", "true_negative", "known_false_negative"],
+      "description": "Expected verdict for corpus verification."
+    },
+    "sha256": {
+      "type": "string",
+      "description": "SHA-256 hash of the fragment for integrity."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Categorisation tags for the specimen."
+    }
+  },
+  "required": ["specimen_id", "fragment", "verdict"],
+  "additionalProperties": false
+}

@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wardline.dev/schemas/0.1/wardline.schema.json",
+  "title": "Wardline Root Manifest",
+  "description": "Root trust topology and governance policy for a wardline-managed project.",
+  "type": "object",
+  "properties": {
+    "$id": {
+      "type": "string",
+      "description": "Schema version identifier."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Organisational and governance metadata.",
+      "properties": {
+        "organisation": { "type": "string" },
+        "ratified_by": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "role": { "type": "string" }
+          },
+          "required": ["name", "role"],
+          "additionalProperties": false
+        },
+        "ratification_date": {
+          "type": "string",
+          "format": "date",
+          "description": "ISO 8601 date of ratification."
+        },
+        "review_interval_days": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "tiers": {
+      "type": "array",
+      "description": "Named tier declarations.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "tier": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "description": { "type": "string" }
+        },
+        "required": ["id", "tier"],
+        "additionalProperties": false
+      }
+    },
+    "rules": {
+      "type": "object",
+      "description": "Rule configuration — overrides to the default severity matrix.",
+      "properties": {
+        "overrides": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "delegation": {
+      "type": "object",
+      "description": "Exception authority delegation.",
+      "properties": {
+        "default_authority": {
+          "type": "string",
+          "enum": ["NONE", "RELAXED", "STANDARD", "UNCONDITIONAL"]
+        },
+        "grants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": { "type": "string" },
+              "authority": {
+                "type": "string",
+                "enum": ["NONE", "RELAXED", "STANDARD", "UNCONDITIONAL"]
+              }
+            },
+            "required": ["path", "authority"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "module_tiers": {
+      "type": "array",
+      "description": "Module-level taint defaults.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "default_taint": {
+            "type": "string",
+            "enum": [
+              "AUDIT_TRAIL", "PIPELINE", "SHAPE_VALIDATED",
+              "EXTERNAL_RAW", "UNKNOWN_RAW",
+              "UNKNOWN_SHAPE_VALIDATED", "UNKNOWN_SEM_VALIDATED",
+              "MIXED_RAW"
+            ]
+          }
+        },
+        "required": ["path", "default_taint"],
+        "additionalProperties": false
+      }
+    },
+    "overlay_paths": {
+      "type": "array",
+      "description": "Allowed directories for overlay discovery. Use [\"*\"] for unrestricted.",
+      "items": { "type": "string" }
+    },
+    "max_exception_duration_days": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum allowed exception duration in days. Default: 365."
+    }
+  },
+  "additionalProperties": false
+}

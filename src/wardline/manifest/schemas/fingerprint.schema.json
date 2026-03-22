@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wardline.dev/schemas/0.1/fingerprint.schema.json",
+  "title": "Wardline Annotation Fingerprint",
+  "description": "Per-function annotation hash records for baseline tracking.",
+  "type": "object",
+  "properties": {
+    "$id": {
+      "type": "string",
+      "description": "Schema version identifier."
+    },
+    "fingerprints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "qualified_name": {
+            "type": "string",
+            "description": "Fully qualified function name."
+          },
+          "module": {
+            "type": "string",
+            "description": "Module containing the function."
+          },
+          "decorators": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Wardline decorator canonical names applied."
+          },
+          "annotation_hash": {
+            "type": "string",
+            "description": "SHA-256 hash of the normalised annotation."
+          },
+          "tier_context": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "Authority tier context of this function."
+          },
+          "boundary_transition": {
+            "type": ["string", "null"],
+            "description": "Boundary transition type, if any."
+          },
+          "last_changed": {
+            "type": ["string", "null"],
+            "format": "date",
+            "description": "Date of last annotation change."
+          }
+        },
+        "required": [
+          "qualified_name", "module", "decorators",
+          "annotation_hash", "tier_context"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["fingerprints"],
+  "additionalProperties": false
+}

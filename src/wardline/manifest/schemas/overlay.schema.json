@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wardline.dev/schemas/0.1/overlay.schema.json",
+  "title": "Wardline Overlay",
+  "description": "Local boundary declarations and rule tuning for a module directory.",
+  "type": "object",
+  "properties": {
+    "$id": {
+      "type": "string",
+      "description": "Schema version identifier."
+    },
+    "overlay_for": {
+      "type": "string",
+      "description": "Directory path this overlay governs."
+    },
+    "boundaries": {
+      "type": "array",
+      "description": "Boundary declarations — where tier transitions happen.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "function": { "type": "string" },
+          "transition": {
+            "type": "string",
+            "enum": [
+              "shape_validation", "semantic_validation",
+              "combined_validation", "construction", "restoration"
+            ]
+          },
+          "from_tier": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "to_tier": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "restored_tier": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "structural": { "type": "boolean" },
+              "semantic": { "type": "boolean" },
+              "integrity": {
+                "type": ["string", "null"],
+                "enum": ["checksum", "signature", "hmac", null]
+              },
+              "institutional": { "type": ["string", "null"] }
+            },
+            "additionalProperties": false
+          },
+          "bounded_context": {
+            "type": "object",
+            "properties": {
+              "contracts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string" },
+                    "data_tier": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": ["inbound", "outbound"]
+                    },
+                    "description": { "type": "string" },
+                    "preconditions": { "type": "string" }
+                  },
+                  "required": ["name", "data_tier", "direction"],
+                  "additionalProperties": false
+                }
+              },
+              "description": { "type": "string" }
+            },
+            "required": ["contracts"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["function", "transition"],
+        "additionalProperties": false
+      }
+    },
+    "rule_overrides": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "optional_fields": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "contract_bindings": {
+      "type": "array",
+      "description": "Maps named contracts to implementing functions.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "contract": { "type": "string" },
+          "functions": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["contract", "functions"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["overlay_for"],
+  "additionalProperties": false
+}
