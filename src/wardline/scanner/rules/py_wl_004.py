@@ -29,7 +29,7 @@ class RulePyWl004(RuleBase):
     RULE_ID = RuleId.PY_WL_004
 
     def __init__(self, *, file_path: str = "", taint_state: str = "") -> None:
-        self.findings: list[Finding] = []
+        super().__init__()
         self._file_path = file_path
         self._taint_state = taint_state
 

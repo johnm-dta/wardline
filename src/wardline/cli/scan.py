@@ -295,15 +295,21 @@ def scan(
     # --- Merge governance findings ---
     all_findings = governance_findings + result.findings
 
+    # --- Compute run-level counts ---
+    from wardline.core.taints import TaintState
+
+    unknown_raw_count = sum(
+        1 for f in result.findings
+        if f.taint_state == TaintState.UNKNOWN_RAW
+    )
+    unresolved_decorator_count = sum(
+        1 for f in result.findings
+        if f.rule_id == RuleId.WARDLINE_UNRESOLVED_DECORATOR
+    )
+
     # --- Check max_unknown_raw_percent ---
     exceeded_pct = False
     if effective_max_pct is not None and result.files_scanned > 0:
-        from wardline.core.taints import TaintState
-
-        unknown_raw_count = sum(
-            1 for f in result.findings
-            if f.taint_state == TaintState.UNKNOWN_RAW
-        )
         pct = (unknown_raw_count / result.files_scanned) * 100
         if pct > effective_max_pct:
             exceeded_pct = True
@@ -318,6 +324,8 @@ def scan(
         findings=all_findings,
         verification_mode=verification_mode,
         implemented_rule_ids=loaded_rule_ids,
+        unknown_raw_count=unknown_raw_count,
+        unresolved_decorator_count=unresolved_decorator_count,
     )
 
     sarif_text = report.to_json_string() + "\n"

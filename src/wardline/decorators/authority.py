@@ -18,19 +18,19 @@ external_boundary = wardline_decorator(
 validates_shape = wardline_decorator(
     1,
     "validates_shape",
-    _wardline_transition=("EXTERNAL_RAW", "SHAPE_VALIDATED"),
+    _wardline_transition=(TaintState.EXTERNAL_RAW, TaintState.SHAPE_VALIDATED),
 )
 
 validates_semantic = wardline_decorator(
     1,
     "validates_semantic",
-    _wardline_transition=("SHAPE_VALIDATED", "PIPELINE"),
+    _wardline_transition=(TaintState.SHAPE_VALIDATED, TaintState.PIPELINE),
 )
 
 validates_external = wardline_decorator(
     1,
     "validates_external",
-    _wardline_transition=("EXTERNAL_RAW", "PIPELINE"),
+    _wardline_transition=(TaintState.EXTERNAL_RAW, TaintState.PIPELINE),
 )
 
 tier1_read = wardline_decorator(
@@ -49,5 +49,5 @@ audit_writer = wardline_decorator(
 authoritative_construction = wardline_decorator(
     1,
     "authoritative_construction",
-    _wardline_transition=("PIPELINE", "AUDIT_TRAIL"),
+    _wardline_transition=(TaintState.PIPELINE, TaintState.AUDIT_TRAIL),
 )

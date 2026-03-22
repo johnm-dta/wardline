@@ -65,12 +65,10 @@ def _run_rules_on_fragment(
     tree = ast.parse(source)
     fired: set[str] = set()
     for rule in rules:
-        if hasattr(rule, "_file_path"):
-            rule._file_path = "<specimen>"
-        if hasattr(rule, "findings"):
-            rule.findings.clear()
+        rule._file_path = "<specimen>"
+        rule.findings.clear()
         rule.visit(tree)
-        if hasattr(rule, "findings") and rule.findings:
+        if rule.findings:
             fired.add(str(rule.RULE_ID))
     return fired
 

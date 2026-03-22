@@ -12,6 +12,7 @@ from wardline.scanner.context import WardlineAnnotation
 from wardline.scanner.taint.function_level import (
     DECORATOR_TAINT_MAP,
     assign_function_taints,
+    resolve_module_default,
 )
 
 
@@ -359,3 +360,37 @@ class TestEdgeCases:
         result = assign_function_taints(tree, "constants.py", {})
 
         assert result == {}
+
+
+# ── Most-specific module tier wins ───────────────────────────────
+
+
+class TestMostSpecificModuleTier:
+    """When multiple module_tiers match, longest path (most specific) wins."""
+
+    def test_most_specific_module_tier_wins(self) -> None:
+        """When multiple module_tiers match, longest path wins."""
+        manifest = WardlineManifest(
+            module_tiers=(
+                ModuleTierEntry(path="src/app", default_taint="AUDIT_TRAIL"),
+                ModuleTierEntry(path="src/app/external", default_taint="EXTERNAL_RAW"),
+            ),
+        )
+        # File under src/app/external should get EXTERNAL_RAW, not AUDIT_TRAIL
+        result = resolve_module_default("src/app/external/client.py", manifest)
+        assert result == TaintState.EXTERNAL_RAW
+
+        # File under src/app (but not external) should get AUDIT_TRAIL
+        result2 = resolve_module_default("src/app/core/model.py", manifest)
+        assert result2 == TaintState.AUDIT_TRAIL
+
+    def test_most_specific_wins_regardless_of_order(self) -> None:
+        """Specificity wins even if broader entry is listed second."""
+        manifest = WardlineManifest(
+            module_tiers=(
+                ModuleTierEntry(path="src/app/external", default_taint="EXTERNAL_RAW"),
+                ModuleTierEntry(path="src/app", default_taint="AUDIT_TRAIL"),
+            ),
+        )
+        result = resolve_module_default("src/app/external/client.py", manifest)
+        assert result == TaintState.EXTERNAL_RAW

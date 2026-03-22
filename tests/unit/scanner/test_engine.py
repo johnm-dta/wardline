@@ -22,6 +22,7 @@ class _CountingRule(RuleBase):
     RULE_ID: ClassVar[RuleId] = RuleId.TOOL_ERROR
 
     def __init__(self) -> None:
+        super().__init__()
         self.visited: list[tuple[str, str]] = []
 
     def visit_function(

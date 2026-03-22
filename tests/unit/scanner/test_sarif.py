@@ -198,6 +198,20 @@ class TestSarifPropertyBags:
         assert "wardline.unknownRawFunctionCount" in props
         assert "wardline.unresolvedDecoratorCount" in props
 
+    def test_unknown_raw_count_defaults_to_zero(self) -> None:
+        report = SarifReport(findings=[])
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.unknownRawFunctionCount"] == 0
+        assert props["wardline.unresolvedDecoratorCount"] == 0
+
+    def test_unknown_raw_count_wired(self) -> None:
+        report = SarifReport(
+            findings=[], unknown_raw_count=5, unresolved_decorator_count=3
+        )
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.unknownRawFunctionCount"] == 5
+        assert props["wardline.unresolvedDecoratorCount"] == 3
+
     def test_property_bag_version(self) -> None:
         report = SarifReport(findings=[])
         props = report.to_dict()["runs"][0]["properties"]

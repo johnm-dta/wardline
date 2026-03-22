@@ -91,8 +91,8 @@ def resolve_module_default(
     """Find the module_tiers default taint for a file path.
 
     Uses proper path-prefix matching: ``entry.path`` must be a prefix
-    of ``file_path`` at a directory boundary. Entries are checked in
-    declaration order (first match wins).
+    of ``file_path`` at a directory boundary. When multiple entries
+    match, the most-specific (longest path) wins.
 
     Returns ``None`` if no manifest or no matching module_tiers entry.
     """
@@ -103,23 +103,32 @@ def resolve_module_default(
 
     file_p = PurePosixPath(file_path)
 
+    # Collect all matching entries
+    matches: list[tuple[int, str]] = []
     for entry in manifest.module_tiers:
         entry_p = PurePosixPath(entry.path)
         try:
             file_p.relative_to(entry_p)
         except ValueError:
             continue
-        try:
-            return TaintState(entry.default_taint)
-        except ValueError:
-            logger.warning(
-                "Invalid taint state '%s' in module_tiers for path '%s'",
-                entry.default_taint,
-                entry.path,
-            )
-            return None
+        matches.append((len(entry.path), entry.default_taint))
 
-    return None
+    if not matches:
+        return None
+
+    # Most-specific match wins (longest path)
+    matches.sort(key=lambda x: x[0], reverse=True)
+    best_taint = matches[0][1]
+
+    try:
+        return TaintState(best_taint)
+    except ValueError:
+        logger.warning(
+            "Invalid taint state '%s' in module_tiers for file '%s'",
+            best_taint,
+            file_path,
+        )
+        return None
 
 
 def taint_from_annotations(

@@ -11,6 +11,11 @@ Three-phase process:
 3. **Annotation map** — walk decorated function definitions, match
    decorators against the import table, produce ``WardlineAnnotation``
    entries keyed by ``(file_path, qualname)``.
+
+.. note:: **Known limitation (Level 1):** Import table construction
+   only scans top-level statements. Imports inside ``try/except``,
+   conditional blocks (except ``if TYPE_CHECKING``), or nested scopes
+   are not discovered. See ``_build_import_table`` for details.
 """
 
 from __future__ import annotations
@@ -83,6 +88,13 @@ def _build_import_table(
     Scans ``import`` and ``from … import`` statements, filtering out
     any that fall inside TYPE_CHECKING blocks. Cross-references
     imported names against the registry.
+
+    .. note:: **Level-1 limitation** — only top-level import statements
+       are scanned (via ``ast.iter_child_nodes(tree)``). Imports nested
+       inside ``try/except`` blocks, conditional branches (other than
+       ``if TYPE_CHECKING``), function bodies, or class bodies are not
+       discovered. This is intentional for Level 1: deeper import
+       tracking requires control-flow analysis (Level 2+).
 
     Returns:
         Dict mapping local names to canonical decorator names.
@@ -256,6 +268,10 @@ def discover_annotations(
         is used deliberately: decorator ordering is meaningful for taint
         assignment (Group 1 before Group 2, and within a group the order
         of decorator application determines the final taint state).
+
+    .. note:: Import discovery is limited to top-level statements.
+       See ``_build_import_table`` for the full Level-1 limitation
+       description.
     """
     path_str = str(file_path)
     tc_lines = _collect_type_checking_lines(tree)

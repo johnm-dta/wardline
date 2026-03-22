@@ -289,7 +289,7 @@ class TestGroup1Decorators:
         def f() -> int:
             return 1
 
-        assert f._wardline_transition == ("EXTERNAL_RAW", "SHAPE_VALIDATED")  # type: ignore[attr-defined]
+        assert f._wardline_transition == (TaintState.EXTERNAL_RAW, TaintState.SHAPE_VALIDATED)  # type: ignore[attr-defined]
 
     def test_validates_shape_callable(self) -> None:
         @validates_shape
@@ -310,7 +310,7 @@ class TestGroup1Decorators:
         def f() -> int:
             return 1
 
-        assert f._wardline_transition == ("SHAPE_VALIDATED", "PIPELINE")  # type: ignore[attr-defined]
+        assert f._wardline_transition == (TaintState.SHAPE_VALIDATED, TaintState.PIPELINE)  # type: ignore[attr-defined]
 
     def test_validates_semantic_callable(self) -> None:
         @validates_semantic
@@ -331,7 +331,7 @@ class TestGroup1Decorators:
         def f() -> int:
             return 1
 
-        assert f._wardline_transition == ("EXTERNAL_RAW", "PIPELINE")  # type: ignore[attr-defined]
+        assert f._wardline_transition == (TaintState.EXTERNAL_RAW, TaintState.PIPELINE)  # type: ignore[attr-defined]
 
     def test_validates_external_callable(self) -> None:
         @validates_external
@@ -395,7 +395,7 @@ class TestGroup1Decorators:
         def f() -> int:
             return 1
 
-        assert f._wardline_transition == ("PIPELINE", "AUDIT_TRAIL")  # type: ignore[attr-defined]
+        assert f._wardline_transition == (TaintState.PIPELINE, TaintState.AUDIT_TRAIL)  # type: ignore[attr-defined]
 
     def test_authoritative_construction_callable(self) -> None:
         @authoritative_construction

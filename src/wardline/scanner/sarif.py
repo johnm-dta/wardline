@@ -133,6 +133,8 @@ class SarifReport:
     tool_version: str = "0.1.0"
     verification_mode: bool = False
     implemented_rule_ids: frozenset[RuleId] | None = None
+    unknown_raw_count: int = 0
+    unresolved_decorator_count: int = 0
 
     def _implemented_rules(self) -> list[str]:
         """Return sorted list of canonical rule ID values (excludes pseudo-IDs).
@@ -179,8 +181,8 @@ class SarifReport:
                 "wardline.conformanceGaps": [],
                 "wardline.implementedRules": self._implemented_rules(),
                 "wardline.propertyBagVersion": "1",
-                "wardline.unknownRawFunctionCount": 0,
-                "wardline.unresolvedDecoratorCount": 0,
+                "wardline.unknownRawFunctionCount": self.unknown_raw_count,
+                "wardline.unresolvedDecoratorCount": self.unresolved_decorator_count,
             },
             "results": results,
             "tool": {

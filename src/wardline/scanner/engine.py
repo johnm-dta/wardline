@@ -158,16 +158,13 @@ class ScanEngine:
         """Execute a single rule, catching crashes as TOOL-ERROR findings."""
         try:
             # Set file context and reset findings for this file
-            if hasattr(rule, "_file_path"):
-                rule._file_path = str(file_path)
-            if hasattr(rule, "findings"):
-                rule.findings.clear()
+            rule._file_path = str(file_path)
+            rule.findings.clear()
 
             rule.visit(tree)
 
             # Collect findings from the rule into the result
-            if hasattr(rule, "findings"):
-                result.findings.extend(rule.findings)
+            result.findings.extend(rule.findings)
         except Exception as exc:
             logger.error(
                 "Rule %s crashed on %s: %s",
