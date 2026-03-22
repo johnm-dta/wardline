@@ -1,10 +1,12 @@
-# wardline.yaml — Self-hosting manifest (comment-only draft, T-0.2)
-# Machine-validated version created in T-6.4a.
+# wardline.yaml — Self-hosting manifest (machine-validated, T-6.4a)
 #
-# This file documents the intended tier assignment for every
-# src/wardline/ sub-package, with rationale for Tier 3/4 assignments.
+# This file documents the tier assignment for every src/wardline/
+# sub-package, with rationale for Tier 3/4 assignments.
 
-$schema: "wardline/v0.1"
+$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"
+
+metadata:
+  organisation: "wardline"
 
 # ── Tier definitions ──────────────────────────────────────────
 tiers:

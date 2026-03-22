@@ -1,0 +1,24 @@
+[wardline]
+# Scanner configuration for self-hosting scan.
+# Calibrated from T-0.2 distribution sketch (42% permissive).
+
+target_paths = ["src/wardline"]
+exclude_paths = [".venv", "__pycache__"]
+
+# Tier distribution: 42% permissive (T3+T4). Set threshold at 50%
+# to give headroom while still catching regressions.
+# max_permissive_percent is checked by coherence, not scanner config.
+
+# UNKNOWN_RAW ceiling: self-hosted code should have near-zero
+# unknown functions since all modules are declared in wardline.yaml.
+max_unknown_raw_percent = 5.0
+
+# No disabled rules — all 5 MVP rules active.
+# disabled_rules = []
+
+# Allow registry mismatch: PY-WL-006 through PY-WL-009 are defined
+# in RuleId but not yet implemented (post-MVP rules). The bidirectional
+# sync check flags these as mismatches. This is expected and produces
+# GOVERNANCE findings rather than exit code 2.
+allow_registry_mismatch = true
+allow_permissive_distribution = false
