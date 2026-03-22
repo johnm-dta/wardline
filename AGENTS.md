@@ -135,6 +135,124 @@ context needed to pick up where the previous session left off.
 
 ---
 
+## Wardline — Project Guide
+
+Wardline is a semantic boundary enforcement framework for Python. It defines
+trust tiers for a codebase and statically verifies that data flows respect those
+boundaries — catching trust-boundary violations before they reach production.
+
+### Development Setup
+
+```bash
+uv sync --all-extras          # Install all dependencies (including dev + scanner)
+uv run pytest                 # Run unit tests (default: excludes integration/network)
+uv run ruff check src/ tests/ # Lint
+uv run mypy src/              # Type-check (strict mode)
+```
+
+### Project Structure
+
+```
+src/wardline/
+├── core/          # Tier registry, severity levels, taint matrix
+├── decorators/    # @audit, @authority, schema annotations
+├── runtime/       # Descriptor-based boundary enforcement
+├── manifest/      # YAML manifest loading, merging, coherence checks
+│   └── schemas/   # JSON schemas for wardline.yaml validation
+├── scanner/       # AST scanner engine
+│   ├── rules/     # PY-WL-001 through PY-WL-005
+│   └── taint/     # Function-level taint analysis
+└── cli/           # Click-based CLI (scan, explain, manifest, corpus)
+
+tests/
+├── unit/          # Mirrors src/ structure (core/, scanner/, manifest/, etc.)
+├── integration/   # End-to-end CLI tests, self-hosting scan, corpus verify
+├── fixtures/      # Shared test fixtures (sample projects, configs)
+└── conftest.py    # Shared fixtures
+
+corpus/
+└── specimens/     # Test specimens per rule (PY-WL-NNN/{scenario}/pos|neg/)
+```
+
+### Code Conventions
+
+- **Python 3.12+** — use modern syntax (`type` statements, `|` unions, etc.)
+- **Strict mypy** — all code must pass `mypy --strict`; type annotations required
+- **Ruff** — enforces pycodestyle (E/W), pyflakes (F), isort (I), pyupgrade (UP),
+  bugbear (B), simplify (SIM), type-checking (TCH)
+- **Zero runtime dependencies** — the core library has no required dependencies;
+  `pyyaml`, `jsonschema`, and `click` are optional extras under `[scanner]`
+
+### Testing
+
+Three pytest markers control which tests run:
+
+| Marker | When it runs | Use for |
+|--------|-------------|---------|
+| *(none)* | Every PR, every push | Unit tests — fast, no I/O |
+| `integration` | Push to `main` only | CLI end-to-end, self-hosting scan |
+| `network` | Weekly (Sunday 02:00 UTC) | Tests requiring network access |
+
+Mark tests appropriately:
+
+```python
+import pytest
+
+@pytest.mark.integration
+def test_full_scan_pipeline(): ...
+
+@pytest.mark.network
+def test_fetch_remote_schema(): ...
+```
+
+Default `pytest` invocation excludes `integration` and `network` markers
+(configured in `pyproject.toml`).
+
+### CI Pipeline
+
+| Job | Trigger | Steps |
+|-----|---------|-------|
+| Unit Tests + Lint | Every push and PR | ruff → mypy → pytest (unit only) |
+| Integration Tests | Push to `main` | pytest -m integration |
+| Network Tests | Weekly schedule | pytest -m network |
+
+All three must pass. Ensure `uv run ruff check src/ tests/` and `uv run mypy src/`
+pass locally before pushing.
+
+### Adding a Scanner Rule
+
+1. Create `src/wardline/scanner/rules/py_wl_NNN.py` — subclass the base from `rules/base.py`
+2. Register the rule in `rules/__init__.py`
+3. Add corpus specimens to `corpus/specimens/PY-WL-NNN/{scenario}/{positive|negative}/`
+4. Add unit tests in `tests/unit/scanner/test_py_wl_NNN.py`
+5. Cover true positives, true negatives, and known false negatives (KFN)
+
+### Security Considerations
+
+These areas require extra care:
+
+- **YAML deserialization** — always use `yaml.safe_load()`, never `yaml.load()`.
+  Wardline manifests must not allow `!!python/object` or similar unsafe tags.
+- **Path traversal** — file discovery and manifest loading must not follow symlinks
+  or resolve paths outside the project root.
+- **Corpus specimens** — contain deliberately malformed code. Never execute specimen
+  content; only parse it via AST.
+
+Report vulnerabilities via GitHub's
+[private vulnerability reporting](https://github.com/tachyon-beep/wardline/security/advisories/new),
+not public issues.
+
+### Pull Requests
+
+A PR template exists at `.github/PULL_REQUEST_TEMPLATE.md`. PRs should include:
+
+- Summary of what and why
+- Notable changes (bullet list)
+- Testing checklist (unit tests added, pytest passes, ruff + mypy pass)
+- Related issue links
+
+---
+
 ## Wardline Filing System
 
 This project uses filigree's full type system. Read `docs/2026-03-22-filigree-filing-system.md` for the complete design. Key points below.
