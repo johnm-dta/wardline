@@ -90,24 +90,34 @@ def _resolve_module_default(
 ) -> TaintState | None:
     """Find the module_tiers default taint for a file path.
 
+    Uses proper path-prefix matching: ``entry.path`` must be a prefix
+    of ``file_path`` at a directory boundary. Entries are checked in
+    declaration order (first match wins).
+
     Returns ``None`` if no manifest or no matching module_tiers entry.
     """
     if manifest is None:
         return None
 
+    from pathlib import PurePosixPath
+
+    file_p = PurePosixPath(file_path)
+
     for entry in manifest.module_tiers:
-        # Match if the file path contains the declared module path
-        # This handles both exact matches and subdirectory matches
-        if entry.path in file_path:
-            try:
-                return TaintState(entry.default_taint)
-            except ValueError:
-                logger.warning(
-                    "Invalid taint state '%s' in module_tiers for path '%s'",
-                    entry.default_taint,
-                    entry.path,
-                )
-                return None
+        entry_p = PurePosixPath(entry.path)
+        try:
+            file_p.relative_to(entry_p)
+        except ValueError:
+            continue
+        try:
+            return TaintState(entry.default_taint)
+        except ValueError:
+            logger.warning(
+                "Invalid taint state '%s' in module_tiers for path '%s'",
+                entry.default_taint,
+                entry.path,
+            )
+            return None
 
     return None
 

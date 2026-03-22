@@ -144,6 +144,23 @@ class TestModuleTiersTaint:
 
         assert result["nested"] == TaintState.AUDIT_TRAIL
 
+    def test_partial_name_does_not_match(self) -> None:
+        """Path 'api' must NOT match 'api_v2/handler.py'."""
+        tree = _parse("def handler(): pass\n")
+        manifest = WardlineManifest(
+            module_tiers=(
+                ModuleTierEntry(
+                    path="api",
+                    default_taint="EXTERNAL_RAW",
+                ),
+            ),
+        )
+        result = assign_function_taints(
+            tree, "api_v2/handler.py", {}, manifest=manifest
+        )
+
+        assert result["handler"] == TaintState.UNKNOWN_RAW
+
 
 # ── Source 3: UNKNOWN_RAW fallback ───────────────────────────────
 
