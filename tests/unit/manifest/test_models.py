@@ -1,0 +1,270 @@
+"""Tests for manifest data models — construction, immutability, from_toml."""
+
+from __future__ import annotations
+
+from dataclasses import FrozenInstanceError
+from pathlib import Path
+
+import pytest
+
+from wardline.core.severity import RuleId
+from wardline.core.taints import TaintState
+from wardline.manifest.models import (
+    BoundaryEntry,
+    ContractBinding,
+    DelegationConfig,
+    DelegationGrant,
+    ExceptionEntry,
+    FingerprintEntry,
+    ManifestMetadata,
+    ModuleTierEntry,
+    ScannerConfig,
+    TierEntry,
+    WardlineManifest,
+    WardlineOverlay,
+)
+
+# ── ExceptionEntry ────────────────────────────────────────────────
+
+
+class TestExceptionEntry:
+    def test_construction(self) -> None:
+        e = ExceptionEntry(
+            id="EXC-001",
+            rule="PY-WL-004",
+            taint_state="EXTERNAL_RAW",
+            location="src/adapters.py:42",
+            exceptionability="STANDARD",
+            severity_at_grant="WARNING",
+            rationale="Intentional broad catch for logging",
+            reviewer="jsmith",
+        )
+        assert e.id == "EXC-001"
+        assert e.rule == "PY-WL-004"
+
+    def test_frozen(self) -> None:
+        e = ExceptionEntry(
+            id="EXC-001",
+            rule="PY-WL-004",
+            taint_state="EXTERNAL_RAW",
+            location="src/a.py:1",
+            exceptionability="STANDARD",
+            severity_at_grant="WARNING",
+            rationale="reason",
+            reviewer="r",
+        )
+        with pytest.raises(FrozenInstanceError):
+            e.id = "EXC-002"  # type: ignore[misc]
+
+    def test_optional_fields(self) -> None:
+        e = ExceptionEntry(
+            id="E1",
+            rule="R",
+            taint_state="T",
+            location="L",
+            exceptionability="S",
+            severity_at_grant="W",
+            rationale="R",
+            reviewer="R",
+            expires="2026-12-31",
+            provenance="manual",
+        )
+        assert e.expires == "2026-12-31"
+        assert e.provenance == "manual"
+
+
+# ── FingerprintEntry ──────────────────────────────────────────────
+
+
+class TestFingerprintEntry:
+    def test_construction(self) -> None:
+        f = FingerprintEntry(
+            qualified_name="mymod.handler",
+            module="mymod",
+            decorators=("external_boundary",),
+            annotation_hash="abc123",
+            tier_context=4,
+        )
+        assert f.qualified_name == "mymod.handler"
+        assert f.decorators == ("external_boundary",)
+
+    def test_frozen(self) -> None:
+        f = FingerprintEntry(
+            qualified_name="x",
+            module="m",
+            decorators=(),
+            annotation_hash="h",
+            tier_context=1,
+        )
+        with pytest.raises(FrozenInstanceError):
+            f.tier_context = 2  # type: ignore[misc]
+
+
+# ── WardlineManifest ──────────────────────────────────────────────
+
+
+class TestWardlineManifest:
+    def test_construction_with_defaults(self) -> None:
+        m = WardlineManifest()
+        assert m.tiers == ()
+        assert m.module_tiers == ()
+
+    def test_construction_with_data(self) -> None:
+        m = WardlineManifest(
+            tiers=(
+                TierEntry(id="db", tier=1, description="Database"),
+                TierEntry(id="api", tier=4, description="External API"),
+            ),
+            module_tiers=(
+                ModuleTierEntry(path="audit/", default_taint="AUDIT_TRAIL"),
+            ),
+            metadata=ManifestMetadata(
+                organisation="TestOrg",
+                ratification_date="2026-01-15",
+                review_interval_days=180,
+            ),
+        )
+        assert len(m.tiers) == 2
+        assert m.tiers[0].tier == 1
+        assert m.metadata.organisation == "TestOrg"
+
+    def test_frozen(self) -> None:
+        m = WardlineManifest()
+        with pytest.raises(FrozenInstanceError):
+            m.tiers = ()  # type: ignore[misc]
+
+
+# ── WardlineOverlay ───────────────────────────────────────────────
+
+
+class TestWardlineOverlay:
+    def test_construction(self) -> None:
+        o = WardlineOverlay(
+            overlay_for="adapters/",
+            boundaries=(
+                BoundaryEntry(
+                    function="mymod.check_shape",
+                    transition="shape_validation",
+                    from_tier=4,
+                    to_tier=3,
+                ),
+            ),
+            contract_bindings=(
+                ContractBinding(
+                    contract="landscape_recording",
+                    functions=("mymod.record",),
+                ),
+            ),
+        )
+        assert o.overlay_for == "adapters/"
+        assert len(o.boundaries) == 1
+        assert o.boundaries[0].transition == "shape_validation"
+        assert len(o.contract_bindings) == 1
+
+    def test_frozen(self) -> None:
+        o = WardlineOverlay(overlay_for="x/")
+        with pytest.raises(FrozenInstanceError):
+            o.overlay_for = "y/"  # type: ignore[misc]
+
+    def test_boundary_restoration(self) -> None:
+        b = BoundaryEntry(
+            function="mymod.load_audit",
+            transition="restoration",
+            restored_tier=1,
+            provenance={
+                "structural": True,
+                "semantic": True,
+                "integrity": "checksum",
+                "institutional": "internal_db",
+            },
+        )
+        assert b.restored_tier == 1
+        assert b.from_tier is None
+        assert b.provenance is not None
+
+
+# ── DelegationConfig ──────────────────────────────────────────────
+
+
+class TestDelegationConfig:
+    def test_defaults(self) -> None:
+        d = DelegationConfig()
+        assert d.default_authority == "RELAXED"
+        assert d.grants == ()
+
+    def test_with_grants(self) -> None:
+        d = DelegationConfig(
+            default_authority="STANDARD",
+            grants=(
+                DelegationGrant(path="audit/", authority="NONE"),
+            ),
+        )
+        assert d.grants[0].authority == "NONE"
+
+    def test_frozen(self) -> None:
+        d = DelegationConfig()
+        with pytest.raises(FrozenInstanceError):
+            d.default_authority = "NONE"  # type: ignore[misc]
+
+
+# ── ScannerConfig ─────────────────────────────────────────────────
+
+
+class TestScannerConfig:
+    def test_defaults(self) -> None:
+        c = ScannerConfig()
+        assert c.target_paths == ()
+        assert c.exclude_paths == ()
+        assert c.enabled_rules == ()
+        assert c.default_taint is None
+        assert c.analysis_level == 1
+
+    def test_frozen(self) -> None:
+        c = ScannerConfig()
+        with pytest.raises(FrozenInstanceError):
+            c.analysis_level = 2  # type: ignore[misc]
+
+    def test_from_toml(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "wardline.toml"
+        toml_file.write_text("""\
+[wardline]
+target_paths = ["src/", "lib/"]
+exclude_paths = ["src/vendor/"]
+enabled_rules = ["PY-WL-001", "PY-WL-004"]
+default_taint = "EXTERNAL_RAW"
+analysis_level = 2
+""")
+        config = ScannerConfig.from_toml(toml_file)
+        assert config.target_paths == (Path("src/"), Path("lib/"))
+        assert config.exclude_paths == (Path("src/vendor/"),)
+        assert config.enabled_rules == (
+            RuleId.PY_WL_001,
+            RuleId.PY_WL_004,
+        )
+        assert config.default_taint is TaintState.EXTERNAL_RAW
+        assert config.analysis_level == 2
+
+    def test_from_toml_minimal(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "wardline.toml"
+        toml_file.write_text("[wardline]\n")
+        config = ScannerConfig.from_toml(toml_file)
+        assert config.target_paths == ()
+        assert config.enabled_rules == ()
+        assert config.default_taint is None
+        assert config.analysis_level == 1
+
+    def test_from_toml_uses_binary_mode(self, tmp_path: Path) -> None:
+        """Verify from_toml works with UTF-8 content (binary mode)."""
+        toml_file = tmp_path / "wardline.toml"
+        toml_file.write_bytes(
+            b'[wardline]\ntarget_paths = ["src/m\xc3\xb6dule/"]\n'
+        )
+        config = ScannerConfig.from_toml(toml_file)
+        assert config.target_paths == (Path("src/mödule/"),)
+
+    def test_from_toml_result_is_frozen(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "wardline.toml"
+        toml_file.write_text("[wardline]\n")
+        config = ScannerConfig.from_toml(toml_file)
+        with pytest.raises(FrozenInstanceError):
+            config.analysis_level = 3  # type: ignore[misc]
