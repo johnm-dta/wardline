@@ -1,0 +1,121 @@
+{
+  "schema_version": "0.1",
+  "specimens": {
+    "PY-WL-001-KFN-01": {
+      "path": "specimens/PY-WL-001/EXTERNAL_RAW/negative/PY-WL-001-KFN-01.yaml",
+      "sha256": "53aa8fff1c629a35d539a77b003626f9353788c2d20be317649be5b7748f1046"
+    },
+    "PY-WL-001-TN-01": {
+      "path": "specimens/PY-WL-001/EXTERNAL_RAW/negative/PY-WL-001-TN-01.yaml",
+      "sha256": "e32a7a05619471256f0fd952576e21a72ff3f5952c687fc782626247ca798e19"
+    },
+    "PY-WL-001-TN-02": {
+      "path": "specimens/PY-WL-001/EXTERNAL_RAW/negative/PY-WL-001-TN-02.yaml",
+      "sha256": "a1b2cd704802a9e44b5424b692522a07b85a5f78745f41b1af0af21881110b52"
+    },
+    "PY-WL-001-TN-03": {
+      "path": "specimens/PY-WL-001/UNKNOWN_RAW/negative/PY-WL-001-TN-03.yaml",
+      "sha256": "e32a7a05619471256f0fd952576e21a72ff3f5952c687fc782626247ca798e19"
+    },
+    "PY-WL-001-TN-04": {
+      "path": "specimens/PY-WL-001/UNKNOWN_RAW/negative/PY-WL-001-TN-04.yaml",
+      "sha256": "a1b2cd704802a9e44b5424b692522a07b85a5f78745f41b1af0af21881110b52"
+    },
+    "PY-WL-001-TP-01": {
+      "path": "specimens/PY-WL-001/EXTERNAL_RAW/positive/PY-WL-001-TP-01.yaml",
+      "sha256": "fde5ab3dd8c9e06f9da8a26d1cfe64280ee6e33d25e69bfa541b06a4764517b5"
+    },
+    "PY-WL-001-TP-02": {
+      "path": "specimens/PY-WL-001/UNKNOWN_RAW/positive/PY-WL-001-TP-02.yaml",
+      "sha256": "902f8fffbad84067ca2795805b87790a666d416214acee8288d3c4c56ac81283"
+    },
+    "PY-WL-001-TP-03": {
+      "path": "specimens/PY-WL-001/EXTERNAL_RAW/positive/PY-WL-001-TP-03.yaml",
+      "sha256": "ccb173df358aeafa7ecbc085e4673f03f0bb90029843948e80c80dcff41f30f8"
+    },
+    "PY-WL-002-TN-01": {
+      "path": "specimens/PY-WL-002/EXTERNAL_RAW/negative/PY-WL-002-TN-01.yaml",
+      "sha256": "1970dc85fea70d8a183f420151271333aef99e01453c47c0ffa9ea39f2a4d738"
+    },
+    "PY-WL-002-TN-02": {
+      "path": "specimens/PY-WL-002/EXTERNAL_RAW/negative/PY-WL-002-TN-02.yaml",
+      "sha256": "fe78861432b00236a885f6c25210bf04aa5cc6f108bbf0a2a943b3c399bc735d"
+    },
+    "PY-WL-002-TP-01": {
+      "path": "specimens/PY-WL-002/EXTERNAL_RAW/positive/PY-WL-002-TP-01.yaml",
+      "sha256": "75414996f8a7b8d8b24c527101611cad2268f27f46d1175f2d09caa058b0f0a0"
+    },
+    "PY-WL-002-TP-02": {
+      "path": "specimens/PY-WL-002/UNKNOWN_RAW/positive/PY-WL-002-TP-02.yaml",
+      "sha256": "5b04adbca8a6fddca368dae498fa3581c320e8f85c562198d9ce81b3ee64a857"
+    },
+    "PY-WL-003-TN-01": {
+      "path": "specimens/PY-WL-003/EXTERNAL_RAW/negative/PY-WL-003-TN-01.yaml",
+      "sha256": "a43943b04406c66c44dd0ed5a086c08de51811e6ec0a6d8ae05c64c3c17727c4"
+    },
+    "PY-WL-003-TN-02": {
+      "path": "specimens/PY-WL-003/EXTERNAL_RAW/negative/PY-WL-003-TN-02.yaml",
+      "sha256": "8d2d1c3b8859273f76c01b8259eeed11419110b2d48c197bab62222bd65d283f"
+    },
+    "PY-WL-003-TP-01": {
+      "path": "specimens/PY-WL-003/EXTERNAL_RAW/positive/PY-WL-003-TP-01.yaml",
+      "sha256": "d22c0a8e0d51dd489a179948970fc87ccb8c7ac9303122f9f39a2b8854707071"
+    },
+    "PY-WL-003-TP-02": {
+      "path": "specimens/PY-WL-003/UNKNOWN_RAW/positive/PY-WL-003-TP-02.yaml",
+      "sha256": "a02df1f433fba6a9dfd0bc67d7b0bd3270491a61bb66e48c81965ea55c0dd937"
+    },
+    "PY-WL-003-TP-03": {
+      "path": "specimens/PY-WL-003/EXTERNAL_RAW/positive/PY-WL-003-TP-03.yaml",
+      "sha256": "922008b78dbc817889d0a1f9872c6bb6c08badab7b52e6da62100497161ea0af"
+    },
+    "PY-WL-004-KFN-01": {
+      "path": "specimens/PY-WL-004/EXTERNAL_RAW/negative/PY-WL-004-KFN-01.yaml",
+      "sha256": "57dbd059c0c8eebe3847d842727ed99530bd473e4a60faeb0bb16d3670838c55"
+    },
+    "PY-WL-004-TN-01": {
+      "path": "specimens/PY-WL-004/EXTERNAL_RAW/negative/PY-WL-004-TN-01.yaml",
+      "sha256": "64d34174871f2415ba5569ceb906fd1ddf03df2f5a2ed5b0ed663aa44fe84766"
+    },
+    "PY-WL-004-TN-02": {
+      "path": "specimens/PY-WL-004/EXTERNAL_RAW/negative/PY-WL-004-TN-02.yaml",
+      "sha256": "001b8e862074c3b197b1e346ee3e0b5a92e4678da886961a1ed6505e63fabb23"
+    },
+    "PY-WL-004-TN-03": {
+      "path": "specimens/PY-WL-004/UNKNOWN_RAW/negative/PY-WL-004-TN-03.yaml",
+      "sha256": "64d34174871f2415ba5569ceb906fd1ddf03df2f5a2ed5b0ed663aa44fe84766"
+    },
+    "PY-WL-004-TP-01": {
+      "path": "specimens/PY-WL-004/EXTERNAL_RAW/positive/PY-WL-004-TP-01.yaml",
+      "sha256": "4faebf5b026b3067802d158cadab56620c5173740e5fe2f0a7349bf633d9cfe1"
+    },
+    "PY-WL-004-TP-02": {
+      "path": "specimens/PY-WL-004/UNKNOWN_RAW/positive/PY-WL-004-TP-02.yaml",
+      "sha256": "65836bc8405fcc98e6f9d9e116db47a0fceee9decc11c25eeacc2fdc08cc30de"
+    },
+    "PY-WL-004-TP-03": {
+      "path": "specimens/PY-WL-004/EXTERNAL_RAW/positive/PY-WL-004-TP-03.yaml",
+      "sha256": "a17cd4168852b246dbb1fbd2038ba7336a726e04304e55d4dad77eea62257280"
+    },
+    "PY-WL-005-TN-01": {
+      "path": "specimens/PY-WL-005/EXTERNAL_RAW/negative/PY-WL-005-TN-01.yaml",
+      "sha256": "5692e70a9bef747558a86d9994a7c6a2b681c92c573b81cd933c94fcb482aace"
+    },
+    "PY-WL-005-TN-02": {
+      "path": "specimens/PY-WL-005/EXTERNAL_RAW/negative/PY-WL-005-TN-02.yaml",
+      "sha256": "d942500631710f76d37f5675163e670f9252efd30228230be24212db0c372283"
+    },
+    "PY-WL-005-TP-01": {
+      "path": "specimens/PY-WL-005/EXTERNAL_RAW/positive/PY-WL-005-TP-01.yaml",
+      "sha256": "355e12e80997b1be42991387b46766e8911daa6761c0a0ce6f91e60527eb6f7d"
+    },
+    "PY-WL-005-TP-02": {
+      "path": "specimens/PY-WL-005/UNKNOWN_RAW/positive/PY-WL-005-TP-02.yaml",
+      "sha256": "90e8b83322a1cf9855cf4db0ea8b85d473844be01a26a6b1c9703ad591476105"
+    },
+    "PY-WL-005-TP-03": {
+      "path": "specimens/PY-WL-005/EXTERNAL_RAW/positive/PY-WL-005-TP-03.yaml",
+      "sha256": "76d47ad85f56add02d39f01052a223706baee42405a660f2e6a7355d5ffeac35"
+    }
+  }
+}

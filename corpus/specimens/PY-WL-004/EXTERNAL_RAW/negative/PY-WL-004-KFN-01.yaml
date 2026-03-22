@@ -14,4 +14,5 @@ expected_rules: []
 expected_severity: null
 expected_exceptionability: null
 expected_match: false
+sha256: "57dbd059c0c8eebe3847d842727ed99530bd473e4a60faeb0bb16d3670838c55"
 verdict: "known_false_negative"

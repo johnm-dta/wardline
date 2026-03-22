@@ -26,7 +26,7 @@ class TestCorpusSkeleton:
         assert CORPUS_ROOT.is_dir()
 
     def test_corpus_manifest_exists(self) -> None:
-        assert (CORPUS_ROOT / "corpus_manifest.yaml").is_file()
+        assert (CORPUS_ROOT / "corpus_manifest.json").is_file()
 
     def test_specimens_directory_exists(self) -> None:
         assert (CORPUS_ROOT / "specimens").is_dir()
@@ -44,16 +44,17 @@ class TestCorpusSkeleton:
         assert (rule_dir / "UNKNOWN_RAW" / "positive").is_dir()
         assert (rule_dir / "UNKNOWN_RAW" / "negative").is_dir()
 
-    def test_template_validates_against_schema(self) -> None:
+    def test_specimen_validates_against_schema(self) -> None:
         jsonschema = pytest.importorskip("jsonschema")
 
-        template_path = (
+        # Use an actual specimen instead of the template
+        specimen_path = (
             CORPUS_ROOT / "specimens" / "PY-WL-001"
-            / "EXTERNAL_RAW" / "positive" / "_template.yaml"
+            / "EXTERNAL_RAW" / "positive" / "PY-WL-001-TP-01.yaml"
         )
-        assert template_path.is_file()
+        assert specimen_path.is_file()
 
-        with open(template_path) as f:
+        with open(specimen_path) as f:
             specimen = yaml.safe_load(f)
 
         with open(SCHEMA_PATH) as f:
@@ -62,9 +63,11 @@ class TestCorpusSkeleton:
         # Should not raise
         jsonschema.validate(specimen, schema)
 
-    def test_corpus_manifest_is_valid_yaml(self) -> None:
-        manifest_path = CORPUS_ROOT / "corpus_manifest.yaml"
+    def test_corpus_manifest_is_valid_json(self) -> None:
+        manifest_path = CORPUS_ROOT / "corpus_manifest.json"
         with open(manifest_path) as f:
-            data = yaml.safe_load(f)
+            data = json.load(f)
         assert isinstance(data, dict)
         assert "schema_version" in data
+        assert "specimens" in data
+        assert len(data["specimens"]) > 0

@@ -12,4 +12,5 @@ expected_rules:
 expected_severity: "ERROR"
 expected_exceptionability: "STANDARD"
 expected_match: true
+sha256: "a02df1f433fba6a9dfd0bc67d7b0bd3270491a61bb66e48c81965ea55c0dd937"
 verdict: "true_positive"
