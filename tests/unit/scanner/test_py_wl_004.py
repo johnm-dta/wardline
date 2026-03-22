@@ -197,6 +197,20 @@ except (TypeError, ValueError):
 
         assert len(rule.findings) == 0
 
+    def test_except_tuple_with_broad_member_fires(self) -> None:
+        """except (Exception, ValueError) fires — tuple contains broad."""
+        rule = _run_rule(
+            """\
+try:
+    pass
+except (Exception, ValueError):
+    pass
+"""
+        )
+
+        assert len(rule.findings) == 1
+        assert "Exception" in rule.findings[0].message
+
     def test_except_key_error_as_e_silent(self) -> None:
         rule = _run_rule(
             """\

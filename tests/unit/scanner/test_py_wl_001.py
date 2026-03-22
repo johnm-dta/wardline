@@ -103,11 +103,18 @@ class TestDefaultdict:
 
         assert len(rule.findings) == 1
 
-    def test_defaultdict_no_args_fires(self) -> None:
-        """Even no-arg defaultdict registers a None factory."""
+    def test_defaultdict_no_args_silent(self) -> None:
+        """No-arg defaultdict has None factory (raises KeyError, no fabrication)."""
         rule = _run_rule("defaultdict()\n")
 
+        assert len(rule.findings) == 0
+
+    def test_collections_defaultdict_fires(self) -> None:
+        """collections.defaultdict(list) fires."""
+        rule = _run_rule("collections.defaultdict(list)\n")
+
         assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001
 
 
 # ── schema_default() suppression ─────────────────────────────────

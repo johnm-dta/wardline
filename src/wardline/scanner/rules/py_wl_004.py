@@ -69,11 +69,24 @@ class RulePyWl004(RuleBase):
 
     @staticmethod
     def _resolve_broad_name(node: ast.expr) -> str | None:
-        """Return the broad exception name if node resolves to one, else None."""
+        """Return the broad exception name if node resolves to one, else None.
+
+        Handles single names, qualified names (builtins.Exception),
+        and tuples containing a broad member: ``except (Exception, ValueError):``.
+        """
         if isinstance(node, ast.Name) and node.id in _BROAD_NAMES:
             return node.id
         if isinstance(node, ast.Attribute) and node.attr in _BROAD_NAMES:
             return node.attr
+        if isinstance(node, ast.Tuple):
+            for elt in node.elts:
+                if isinstance(elt, ast.Name) and elt.id in _BROAD_NAMES:
+                    return elt.id
+                if (
+                    isinstance(elt, ast.Attribute)
+                    and elt.attr in _BROAD_NAMES
+                ):
+                    return elt.attr
         return None
 
     def _emit_finding(

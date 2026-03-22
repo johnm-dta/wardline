@@ -83,8 +83,20 @@ class RulePyWl001(RuleBase):
 
     @staticmethod
     def _is_defaultdict_call(call: ast.Call) -> bool:
-        """Check if call is ``defaultdict(...)``."""
-        return isinstance(call.func, ast.Name) and call.func.id == "defaultdict"
+        """Check if call is ``defaultdict(factory)`` with a factory arg.
+
+        ``defaultdict()`` with no args has a None factory that raises
+        KeyError (no value fabrication), so we require >= 1 arg.
+        Also matches ``collections.defaultdict(factory)``.
+        """
+        if len(call.args) < 1:
+            return False
+        if isinstance(call.func, ast.Name) and call.func.id == "defaultdict":
+            return True
+        return (
+            isinstance(call.func, ast.Attribute)
+            and call.func.attr == "defaultdict"
+        )
 
     @staticmethod
     def _is_schema_default_arg(node: ast.expr) -> bool:
