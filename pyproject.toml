@@ -61,3 +61,9 @@ warn_return_any = true
 warn_unused_configs = true
 mypy_path = "src"
 packages = ["wardline"]
+
+[dependency-groups]
+dev = [
+    "types-jsonschema>=4.26.0.20260202",
+    "types-pyyaml>=6.0.12.20250915",
+]
