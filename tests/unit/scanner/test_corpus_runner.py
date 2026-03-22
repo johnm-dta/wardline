@@ -142,9 +142,9 @@ class TestSpecimenLoading:
         assert result.exit_code == 0
         assert "Lite bootstrap: 1 specimens" in result.output
 
-    def test_missing_source_handled(self, tmp_path: Path) -> None:
-        """Specimen missing 'source' field is handled gracefully."""
-        specimen = tmp_path / "nosource.yaml"
+    def test_missing_fragment_handled(self, tmp_path: Path) -> None:
+        """Specimen missing 'fragment' field is handled gracefully."""
+        specimen = tmp_path / "nofragment.yaml"
         specimen.write_text(
             'rule_id: "TEST-003"\n'
             'verdict: "true_positive"\n'
@@ -156,7 +156,7 @@ class TestSpecimenLoading:
             cli, ["corpus", "verify", "--corpus-dir", str(tmp_path)]
         )
         assert result.exit_code == 1
-        assert "no 'source' field" in result.stderr
+        assert "no 'fragment' field" in result.stderr
 
     def test_no_specimens_found(self, tmp_path: Path) -> None:
         """Empty corpus directory produces error."""
@@ -186,3 +186,196 @@ class TestSpecimenLoading:
         )
         assert result.exit_code == 1
         assert "syntax error" in result.stderr
+
+
+class TestVerdictEvaluation:
+    """Test specimen verdict evaluation against scanner results."""
+
+    def test_true_positive_rule_fires(self, tmp_path: Path) -> None:
+        """TP specimen where expected rule fires."""
+        source = (
+            "def f():\n"
+            "    try:\n"
+            "        pass\n"
+            "    except Exception:\n"
+            "        pass\n"
+        )
+        sha = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        specimen = tmp_path / "tp.yaml"
+        specimen.write_text(
+            f'rule: "PY-WL-004"\n'
+            f'verdict: "true_positive"\n'
+            f'sha256: "{sha}"\n'
+            f"fragment: |\n"
+            f"  def f():\n"
+            f"      try:\n"
+            f"          pass\n"
+            f"      except Exception:\n"
+            f"          pass\n"
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["corpus", "verify", "--corpus-dir", str(tmp_path)],
+        )
+        assert result.exit_code == 0
+        assert "1 TP" in result.output
+
+    def test_true_negative_no_rule_fires(
+        self, tmp_path: Path
+    ) -> None:
+        """TN specimen where no rule fires."""
+        source = "x = 1\n"
+        sha = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        specimen = tmp_path / "tn.yaml"
+        specimen.write_text(
+            f'rule: "PY-WL-004"\n'
+            f'verdict: "true_negative"\n'
+            f'sha256: "{sha}"\n'
+            f"fragment: |\n"
+            f"  x = 1\n"
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["corpus", "verify", "--corpus-dir", str(tmp_path)],
+        )
+        assert result.exit_code == 0
+        assert "1 TN" in result.output
+
+    def test_known_false_negative_tracked(
+        self, tmp_path: Path
+    ) -> None:
+        """KFN specimen is tracked separately."""
+        source = "x = 1\n"
+        sha = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        specimen = tmp_path / "kfn.yaml"
+        specimen.write_text(
+            f'rule: "PY-WL-004"\n'
+            f'verdict: "known_false_negative"\n'
+            f'sha256: "{sha}"\n'
+            f"fragment: |\n"
+            f"  x = 1\n"
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["corpus", "verify", "--corpus-dir", str(tmp_path)],
+        )
+        assert result.exit_code == 0
+        assert "1 KFN" in result.output
+
+    def test_false_negative_detected(self, tmp_path: Path) -> None:
+        """TP specimen where rule does NOT fire → counted as FN."""
+        source = "x = 1\n"
+        sha = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        specimen = tmp_path / "fn.yaml"
+        specimen.write_text(
+            f'rule: "PY-WL-004"\n'
+            f'verdict: "true_positive"\n'
+            f'sha256: "{sha}"\n'
+            f"fragment: |\n"
+            f"  x = 1\n"
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["corpus", "verify", "--corpus-dir", str(tmp_path)],
+        )
+        assert result.exit_code == 0
+        assert "1 FN" in result.output
+
+
+class TestPrecisionRecall:
+    """Test precision/recall calculation and output."""
+
+    def _make_tp_specimen(
+        self, tmp_path: Path, idx: int
+    ) -> None:
+        """Create a TP specimen for PY-WL-004."""
+        source = (
+            f"def f{idx}():\n"
+            f"    try:\n"
+            f"        pass\n"
+            f"    except Exception:\n"
+            f"        pass\n"
+        )
+        sha = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        specimen = tmp_path / f"tp_{idx}.yaml"
+        specimen.write_text(
+            f'rule: "PY-WL-004"\n'
+            f'verdict: "true_positive"\n'
+            f'sha256: "{sha}"\n'
+            f"fragment: |\n"
+            f"  def f{idx}():\n"
+            f"      try:\n"
+            f"          pass\n"
+            f"      except Exception:\n"
+            f"          pass\n"
+        )
+
+    def test_precision_recall_printed_when_ge_5(
+        self, tmp_path: Path
+    ) -> None:
+        """Precision/recall printed for rules with >= 5 specimens."""
+        for i in range(5):
+            self._make_tp_specimen(tmp_path, i)
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["corpus", "verify", "--corpus-dir", str(tmp_path)],
+        )
+        assert result.exit_code == 0
+        assert "PY-WL-004" in result.output
+        assert "precision=" in result.output
+
+    def test_precision_recall_skipped_when_lt_5(
+        self, tmp_path: Path
+    ) -> None:
+        """Precision/recall NOT printed for < 5 specimens."""
+        self._make_tp_specimen(tmp_path, 0)
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["corpus", "verify", "--corpus-dir", str(tmp_path)],
+        )
+        assert result.exit_code == 0
+        assert "precision=" not in result.output
+
+    def test_kfn_excluded_from_recall(
+        self, tmp_path: Path
+    ) -> None:
+        """KFN excluded from recall denominator."""
+        # 3 TP specimens
+        for i in range(3):
+            self._make_tp_specimen(tmp_path, i)
+        # 2 KFN specimens (total=5 but recall denom stays 3)
+        for i in range(2):
+            source = f"y{i} = 1\n"
+            sha = hashlib.sha256(
+                source.encode("utf-8")
+            ).hexdigest()
+            specimen = tmp_path / f"kfn_{i}.yaml"
+            specimen.write_text(
+                f'rule: "PY-WL-004"\n'
+                f'verdict: "known_false_negative"\n'
+                f'sha256: "{sha}"\n'
+                f"fragment: |\n"
+                f"  y{i} = 1\n"
+            )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["corpus", "verify", "--corpus-dir", str(tmp_path)],
+        )
+        assert result.exit_code == 0
+        assert "2 KFN" in result.output
+        # With 3 TP and 0 FN, recall should be 100%
+        assert "recall=100.0%" in result.output

@@ -1,0 +1,6 @@
+rule: "PY-WL-004"
+verdict: "true_negative"
+sha256: "81f3c0a7ecc79aadbe435ce65a0b4f7db891cb568e983790340cb8b2f7d01fed"
+fragment: |
+  def clean():
+      return 42

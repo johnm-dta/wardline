@@ -1,0 +1,5 @@
+rule: "PY-WL-004"
+verdict: "known_false_negative"
+sha256: "9e26bf369911c45c243c684147b23fc9e1dcfcf257d299a1c632016a6fcd33f4"
+fragment: |
+  x = 1

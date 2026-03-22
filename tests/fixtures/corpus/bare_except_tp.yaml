@@ -1,7 +1,7 @@
-rule_id: "PY-WL-004"
+rule: "PY-WL-004"
 verdict: "true_positive"
 sha256: "6f8b5d84b6c006c525c815d2e1252e48f232eccd77e4ce802540074d3eb364f7"
-source: |
+fragment: |
   def target():
       try:
           pass
