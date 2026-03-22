@@ -121,13 +121,13 @@ def merge(
     merged_overrides = tuple(base_overrides_by_rule.values())
     merged_rules = RulesConfig(overrides=merged_overrides)
 
-    # -- Merge boundaries ----------------------------------------------------
-    merged_boundaries = overlay.boundaries
+    # -- Resolve boundaries (overlays are the sole source of boundaries) -----
+    resolved_boundaries = overlay.boundaries
 
     return ResolvedManifest(
         tiers=base.tiers,
         rules=merged_rules,
-        boundaries=merged_boundaries,
+        boundaries=resolved_boundaries,
         governance_signals=tuple(governance_signals),
     )
 

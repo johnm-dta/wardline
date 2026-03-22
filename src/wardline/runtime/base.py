@@ -67,7 +67,7 @@ def _validate_decorator_attr(
     """Validate a wardline attribute is from a registered decorator.
 
     Checks that the attribute name appears in at least one registry
-    entry's attrs contract. Logs but does not raise — registration
+    entry's attrs contract. Silent no-op if unrecognised — registration
     mismatches are caught at decorator construction time.
     """
     for entry in REGISTRY.values():

@@ -11,7 +11,7 @@ taint_state: "EXTERNAL_RAW"  # REQUIRED: taint state context
 expected_rules:
   - "PY-WL-001"
 expected_severity: "ERROR"
-expected_exceptionability: "UNCONDITIONAL"
+expected_exceptionability: "STANDARD"
 expected_match: true
 verdict: "true_positive"  # REQUIRED: true_positive | true_negative | known_false_negative
 # sha256 is computed during verification, not set manually

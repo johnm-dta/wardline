@@ -87,25 +87,37 @@ class TestSuperOrdering:
     """WardlineBase calls super() BEFORE its own checks."""
 
     def test_super_called_before_checks(self) -> None:
-        """The cooperative super() is called first in __init_subclass__.
+        """Verify super().__init_subclass__() fires BEFORE wardline checks.
 
-        This is verified by checking that a base class with its own
-        __init_subclass__ has its hook called even when combined with
-        WardlineBase. If super() were called AFTER, the MRO chain
-        could break.
+        We instrument both the MRO chain hook and the wardline check
+        to record call order, then assert the sequence.
         """
+        import unittest.mock
+
         call_order: list[str] = []
 
         class OrderTracker:
             def __init_subclass__(cls, **kwargs: object) -> None:
                 super().__init_subclass__(**kwargs)
-                call_order.append("tracker")
+                call_order.append("mro_hook")
 
-        class MyBase(WardlineBase, OrderTracker):
-            pass
+        original_check = __import__(
+            "wardline.runtime.base", fromlist=["_check_decorated_methods"]
+        )._check_decorated_methods
 
-        # OrderTracker's hook fires because WardlineBase calls super()
-        assert "tracker" in call_order
+        def tracking_check(cls: type) -> None:
+            call_order.append("wardline_check")
+            original_check(cls)
+
+        with unittest.mock.patch(
+            "wardline.runtime.base._check_decorated_methods",
+            side_effect=tracking_check,
+        ):
+            class MyBase(WardlineBase, OrderTracker):
+                pass
+
+        # MRO hook fires BEFORE wardline check
+        assert call_order == ["mro_hook", "wardline_check"]
 
 
 # ── Decorated method detection ────────────────────────────────────

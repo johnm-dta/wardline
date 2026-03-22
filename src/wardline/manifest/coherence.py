@@ -261,8 +261,11 @@ def check_tier_upgrade_without_evidence(
             new_tier = current_tier_map.get(mt.default_taint)
             if old_tier is not None and new_tier is not None and new_tier < old_tier:
                 # Check if any boundary covers this module path
+                module_prefix = mt.path.rstrip("/")
                 has_evidence = any(
-                    bf.startswith(mt.path.rstrip("/"))
+                    bf == module_prefix
+                    or bf.startswith(module_prefix + "/")
+                    or bf.startswith(module_prefix + ".")
                     for bf in boundary_functions
                 )
                 if not has_evidence:

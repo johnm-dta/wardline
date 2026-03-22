@@ -189,6 +189,10 @@ def _detect_dynamic_imports(tree: ast.Module) -> None:
     Detects two patterns:
     - ``importlib.import_module("wardline...")``
     - ``__import__("wardline...")``
+
+    Only literal string arguments are checked. Non-literal arguments
+    (variables, f-strings) are silently skipped — they cannot be
+    statically resolved.
     """
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
