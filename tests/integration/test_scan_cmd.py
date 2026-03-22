@@ -226,22 +226,53 @@ class TestMaxUnknownRawPercent:
         ])
         assert result.exit_code == 0
 
-    def test_above_limit_exits_1(self, tmp_path: Path) -> None:
+    def test_above_limit_exits_1(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Above limit → exit 1."""
+        from unittest.mock import patch
+
+        from wardline.core.severity import Exceptionability, RuleId, Severity
+        from wardline.core.taints import TaintState
+        from wardline.scanner.context import Finding
+        from wardline.scanner.engine import ScanResult
+
         manifest = _minimal_manifest(tmp_path)
-        runner = CliRunner()
-        # Set limit to 0% — any UNKNOWN_RAW finding exceeds it.
-        # But with clean code there are no findings, so this should pass.
-        # We need a file that produces UNKNOWN_RAW findings.
-        # For now, verify the flag is accepted and works at boundary.
-        result = runner.invoke(cli, [
-            "scan", str(tmp_path),
-            "--manifest", str(manifest),
-            "--allow-registry-mismatch",
-            "--max-unknown-raw-percent", "0.0",
-        ])
-        # Clean code with no UNKNOWN_RAW findings → passes even at 0%
-        assert result.exit_code == 0
+
+        # Patch ScanEngine.scan to return a result with UNKNOWN_RAW
+        fake_result = ScanResult(
+            findings=[
+                Finding(
+                    rule_id=RuleId.PY_WL_001,
+                    file_path="fake.py",
+                    line=1,
+                    col=0,
+                    end_line=None,
+                    end_col=None,
+                    message="test",
+                    severity=Severity.ERROR,
+                    exceptionability=Exceptionability.STANDARD,
+                    taint_state=TaintState.UNKNOWN_RAW,
+                    analysis_level=1,
+                    source_snippet=None,
+                ),
+            ],
+            files_scanned=1,
+        )
+
+        with patch(
+            "wardline.scanner.engine.ScanEngine.scan",
+            return_value=fake_result,
+        ):
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                "scan", str(tmp_path),
+                "--manifest", str(manifest),
+                "--allow-registry-mismatch",
+                "--max-unknown-raw-percent", "0.0",
+            ])
+        # 100% UNKNOWN_RAW > 0.0% limit → exit 1
+        assert result.exit_code == 1
 
 
 @pytest.mark.integration
@@ -402,10 +433,10 @@ class TestDisabledRules:
         assert len(gov_disabled) == 1
         assert "PY-WL-001" in gov_disabled[0]["message"]["text"]
 
-    def test_disabled_unconditional_rule_is_error_severity(
+    def test_disabled_standard_rule_is_warning_severity(
         self, tmp_path: Path
     ) -> None:
-        """Disabling an UNCONDITIONAL rule produces ERROR-level GOVERNANCE."""
+        """Disabling a STANDARD rule produces WARNING-level GOVERNANCE."""
         manifest = _minimal_manifest(tmp_path)
         config = tmp_path / "wardline.toml"
         config.write_text(
@@ -426,7 +457,7 @@ class TestDisabledRules:
             r for r in results
             if r["ruleId"] == "GOVERNANCE-RULE-DISABLED"
         ]
-        assert gov_disabled[0]["level"] == "error"
+        assert gov_disabled[0]["level"] == "warning"
 
 
 @pytest.mark.integration

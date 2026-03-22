@@ -127,17 +127,23 @@ def _disabled_rule_findings(
     """Emit GOVERNANCE findings for disabled rules.
 
     WARNING for standard disablement; ERROR for UNCONDITIONAL rules.
+    A rule is UNCONDITIONAL if its DEFAULT_EXCEPTIONABILITY is
+    UNCONDITIONAL (meaning all its findings are non-exceptable).
     """
     findings: list[Finding] = []
-    # Build map of rule_id -> exceptionability from loaded rules
-    # For now, all MVP rules are UNCONDITIONAL at the rule level
-    unconditional_ids = frozenset(r.RULE_ID for r in all_rules)
+    # Build set of rules whose default exceptionability is UNCONDITIONAL
+    unconditional_ids = frozenset(
+        r.RULE_ID for r in all_rules
+        if getattr(r, "DEFAULT_EXCEPTIONABILITY", Exceptionability.STANDARD)
+        == Exceptionability.UNCONDITIONAL
+    )
 
     for rid in disabled_rules:
         if rid in unconditional_ids:
             severity = Severity.ERROR
             msg = (
-                f"UNCONDITIONAL rule {rid} has been disabled by configuration"
+                f"UNCONDITIONAL rule {rid} has been disabled "
+                "by configuration"
             )
         else:
             severity = Severity.WARNING
