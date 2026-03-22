@@ -141,7 +141,10 @@ class SarifReport:
         Otherwise falls back to all canonical RuleId members.
         """
         if self.implemented_rule_ids is not None:
-            return sorted(r.value for r in self.implemented_rule_ids)
+            return sorted(
+                r.value for r in self.implemented_rule_ids
+                if r not in _PSEUDO_RULE_IDS
+            )
         return sorted(
             r.value for r in RuleId if r not in _PSEUDO_RULE_IDS
         )
