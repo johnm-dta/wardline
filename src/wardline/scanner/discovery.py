@@ -183,6 +183,12 @@ def discover_annotations(
     Returns:
         Dict mapping ``(file_path, qualname)`` to lists of
         ``WardlineAnnotation`` for each decorated function.
+
+    Note:
+        The spec calls for ``set[WardlineAnnotation]`` values, but ``list``
+        is used deliberately: decorator ordering is meaningful for taint
+        assignment (Group 1 before Group 2, and within a group the order
+        of decorator application determines the final taint state).
     """
     path_str = str(file_path)
     tc_lines = _collect_type_checking_lines(tree)

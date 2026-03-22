@@ -114,7 +114,7 @@ def _make_governance_finding(
         message=message,
         severity=severity,
         exceptionability=Exceptionability.UNCONDITIONAL,
-        taint_state=None,  # type: ignore[arg-type]
+        taint_state=None,
         analysis_level=0,
         source_snippet=None,
     )

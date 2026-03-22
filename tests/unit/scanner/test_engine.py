@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from wardline.core.severity import RuleId, Severity
 from wardline.scanner.engine import ScanEngine
@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 class _CountingRule(RuleBase):
     """Counts function visits — used to verify the engine runs rules."""
 
+    RULE_ID: ClassVar[RuleId] = RuleId.TOOL_ERROR
+
     def __init__(self) -> None:
         self.visited: list[tuple[str, str]] = []
 
@@ -33,6 +35,8 @@ class _CountingRule(RuleBase):
 
 class _CrashingRule(RuleBase):
     """Always raises RuntimeError — used to test TOOL-ERROR handling."""
+
+    RULE_ID: ClassVar[RuleId] = RuleId.TOOL_ERROR
 
     def visit_function(
         self,

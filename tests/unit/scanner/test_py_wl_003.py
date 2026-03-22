@@ -153,3 +153,31 @@ class TestNoFalsePositives:
         rule = _run_rule("x == y\n")
 
         assert len(rule.findings) == 0
+
+    def test_match_value_silent(self) -> None:
+        """MatchValue (``case 42:``) is NOT an existence check."""
+        source = '''\
+        def target():
+            match x:
+                case 42:
+                    pass
+                case "hello":
+                    pass
+        '''
+        rule = _run_rule_match(source)
+
+        assert len(rule.findings) == 0
+
+    def test_match_sequence_silent(self) -> None:
+        """MatchSequence (``case [a, b]:``) is NOT an existence check."""
+        source = '''\
+        def target():
+            match x:
+                case [a, b]:
+                    pass
+                case [1, 2, 3]:
+                    pass
+        '''
+        rule = _run_rule_match(source)
+
+        assert len(rule.findings) == 0

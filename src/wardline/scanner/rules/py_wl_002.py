@@ -78,7 +78,7 @@ class RulePyWl002(RuleBase):
                 ),
                 severity=Severity.ERROR,
                 exceptionability=Exceptionability.STANDARD,
-                taint_state=None,  # type: ignore[arg-type]
+                taint_state=None,
                 analysis_level=1,
                 source_snippet=None,
             )

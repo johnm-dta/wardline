@@ -32,7 +32,7 @@ class Finding:
     message: str
     severity: Severity
     exceptionability: Exceptionability
-    taint_state: TaintState
+    taint_state: TaintState | None
     analysis_level: int
     source_snippet: str | None
 

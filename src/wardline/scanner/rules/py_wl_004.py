@@ -40,8 +40,22 @@ class RulePyWl004(RuleBase):
         is_async: bool,
     ) -> None:
         """Walk the function body looking for PY-WL-004 patterns."""
+        # Collect handlers from TryStar nodes to avoid double-counting
+        # (TryStar.handlers are ExceptHandler nodes that ast.walk also yields).
+        _TryStar = getattr(ast, "TryStar", None)
+        trystar_handlers: set[int] = set()
+        if _TryStar is not None:
+            for child in ast.walk(node):
+                if isinstance(child, _TryStar):
+                    for handler in child.handlers:
+                        trystar_handlers.add(id(handler))
+                        self._check_handler(handler, node)
+
         for child in ast.walk(node):
-            if isinstance(child, ast.ExceptHandler):
+            if (
+                isinstance(child, ast.ExceptHandler)
+                and id(child) not in trystar_handlers
+            ):
                 self._check_handler(child, node)
 
     def _check_handler(
@@ -106,7 +120,7 @@ class RulePyWl004(RuleBase):
                 message=message,
                 severity=Severity.ERROR,
                 exceptionability=Exceptionability.STANDARD,
-                taint_state=None,  # type: ignore[arg-type]
+                taint_state=None,
                 analysis_level=1,
                 source_snippet=None,
             )

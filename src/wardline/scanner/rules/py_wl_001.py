@@ -127,7 +127,7 @@ class RulePyWl001(RuleBase):
                 ),
                 severity=Severity.ERROR,
                 exceptionability=Exceptionability.STANDARD,
-                taint_state=None,  # type: ignore[arg-type]
+                taint_state=None,
                 analysis_level=1,
                 source_snippet=None,
             )
@@ -154,7 +154,7 @@ class RulePyWl001(RuleBase):
                 ),
                 severity=Severity.WARNING,
                 exceptionability=Exceptionability.UNCONDITIONAL,
-                taint_state=None,  # type: ignore[arg-type]
+                taint_state=None,
                 analysis_level=1,
                 source_snippet=None,
             )
