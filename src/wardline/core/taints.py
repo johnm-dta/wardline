@@ -46,10 +46,10 @@ def taint_join(a: TaintState, b: TaintState) -> TaintState:
     MIXED_RAW is the absorbing element: join(MIXED_RAW, X) == MIXED_RAW for all X.
     Self-joins are identity: join(a, a) == a.
     """
-    if a is b:
+    if a == b:
         return a
 
-    if a is TaintState.MIXED_RAW or b is TaintState.MIXED_RAW:
+    if a == TaintState.MIXED_RAW or b == TaintState.MIXED_RAW:
         return TaintState.MIXED_RAW
 
     # Normalise order for lookup (by string value for determinism)

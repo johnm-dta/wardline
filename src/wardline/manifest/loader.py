@@ -65,7 +65,10 @@ def make_wardline_loader(
 
     class WardlineSafeLoader(yaml.SafeLoader):
         _alias_limit: int = effective_limit
-        _alias_count: int = 0
+
+        def __init__(self, stream: Any) -> None:
+            super().__init__(stream)
+            self._alias_count: int = 0
 
         def compose_node(
             self, parent: Any, index: Any

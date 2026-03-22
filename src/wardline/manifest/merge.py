@@ -75,11 +75,10 @@ def merge(
             (higher tier number = less strict).
     """
     # -- Tier consistency check (narrow-only) --------------------------------
-    base_tier_map: dict[str, int] = {t.id: t.tier for t in base.tiers}
-
-    for boundary in overlay.boundaries:
-        # Check from_tier against base tier for a referenced id
-        _check_boundary_tier(boundary, base_tier_map, overlay.overlay_for)
+    # Note: boundary-level tier widening checks are deferred to coherence
+    # checks (check_tier_downgrades) which compare against the manifest
+    # baseline. Boundary entries carry raw tier numbers, not tier IDs,
+    # so the narrow-only invariant is enforced at the manifest level.
 
     # -- Merge rule overrides ------------------------------------------------
     governance_signals: list[GovernanceSignal] = []

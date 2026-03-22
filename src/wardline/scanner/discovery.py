@@ -59,10 +59,12 @@ def _collect_type_checking_lines(tree: ast.Module) -> frozenset[int]:
         if not _is_type_checking_test(node.test):
             continue
 
-        # Collect all line numbers in the body of the if block
-        for child in ast.walk(node):
-            if hasattr(child, "lineno"):
-                lines.add(child.lineno)
+        # Collect line numbers in the if-true body only (NOT orelse).
+        # The else-branch contains runtime imports that must NOT be filtered.
+        for body_node in node.body:
+            for child in ast.walk(body_node):
+                if hasattr(child, "lineno"):
+                    lines.add(child.lineno)
 
     return frozenset(lines)
 

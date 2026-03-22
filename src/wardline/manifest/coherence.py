@@ -135,13 +135,14 @@ def check_tier_distribution(
     if not module_tiers or not tiers:
         return []
 
-    # Build a map from tier id to tier number
+    # Build a map from tier id to tier number.
+    # ModuleTierEntry.default_taint references TierEntry.id (same namespace).
     tier_map: dict[str, int] = {t.id: t.tier for t in tiers}
 
     total = len(module_tiers)
     permissive = 0
     for mt in module_tiers:
-        tier_num = tier_map.get(mt.default_taint)
+        tier_num = tier_map.get(mt.default_taint)  # default_taint is a tier id reference
         if tier_num is not None and tier_num >= 3:
             permissive += 1
 

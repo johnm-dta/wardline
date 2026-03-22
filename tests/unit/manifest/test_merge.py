@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from wardline.manifest.merge import (
-    ManifestWidenError,
     ResolvedManifest,
     merge,
 )
@@ -90,8 +89,13 @@ class TestTierNarrowOnly:
         result = merge(base, overlay)
         assert len(result.boundaries) == 1
 
-    def test_widen_tier_raises(self) -> None:
-        """Overlay that relaxes (raises) a tier number is rejected."""
+    def test_boundary_with_tier_accepted(self) -> None:
+        """Boundaries with from_tier/to_tier are accepted by merge.
+
+        Narrow-only enforcement for tier changes is handled by coherence
+        checks (check_tier_downgrades), not at merge time. Merge accepts
+        all valid boundary entries.
+        """
         base = _base_manifest(
             tiers=(TierEntry(id="process_payment", tier=1),),
         )
@@ -101,43 +105,13 @@ class TestTierNarrowOnly:
                 BoundaryEntry(
                     function="process_payment",
                     transition="TRUST_ELEVATION",
-                    from_tier=3,  # relaxes tier 1 -> 3
+                    from_tier=3,
                 ),
             ),
         )
 
-        with pytest.raises(ManifestWidenError) as exc_info:
-            merge(base, overlay)
-
-        err = exc_info.value
-        assert err.overlay_name == "payments-overlay"
-        assert err.field_name == "from_tier"
-        assert err.base_value == 1
-        assert err.attempted_value == 3
-
-    def test_widen_error_message_is_actionable(self) -> None:
-        """ManifestWidenError message includes overlay, field, and values."""
-        base = _base_manifest(
-            tiers=(TierEntry(id="handle_auth", tier=1),),
-        )
-        overlay = _overlay(
-            name="auth-overlay",
-            boundaries=(
-                BoundaryEntry(
-                    function="handle_auth",
-                    transition="TRUST_ELEVATION",
-                    to_tier=2,
-                ),
-            ),
-        )
-
-        with pytest.raises(ManifestWidenError, match="auth-overlay") as exc_info:
-            merge(base, overlay)
-
-        msg = str(exc_info.value)
-        assert "to_tier" in msg
-        assert "1" in msg  # base value
-        assert "2" in msg  # attempted value
+        result = merge(base, overlay)
+        assert len(result.boundaries) == 1
 
     def test_no_base_tier_allows_any_boundary(self) -> None:
         """Boundary referencing a function with no base tier entry passes."""
