@@ -8,6 +8,17 @@ import pytest
 
 from wardline.core.taints import TaintState
 from wardline.decorators._base import get_wardline_attrs, wardline_decorator
+from wardline.decorators.authority import (
+    audit_writer,
+    authoritative_construction,
+    tier1_read,
+    validates_external,
+    validates_semantic,
+    validates_shape,
+)
+from wardline.decorators.authority import (
+    external_boundary as eb_decorator,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers — real registry-based decorators
@@ -197,3 +208,160 @@ class TestCallableTypes:
         obj = MyClass()
         assert obj.my_method(5) == 6
         assert hasattr(MyClass.my_method, "_wardline_groups")
+
+
+# ---------------------------------------------------------------------------
+# TestGroup1Decorators
+# ---------------------------------------------------------------------------
+
+
+class TestGroup1Decorators:
+    """Group 1 (Authority Tier Flow) decorators from authority.py."""
+
+    def test_external_boundary_group(self) -> None:
+        @eb_decorator
+        def f() -> int:
+            return 1
+
+        assert 1 in f._wardline_groups  # type: ignore[attr-defined]
+
+    def test_external_boundary_attrs(self) -> None:
+        @eb_decorator
+        def f() -> int:
+            return 1
+
+        assert f._wardline_tier_source is TaintState.EXTERNAL_RAW  # type: ignore[attr-defined]
+
+    def test_external_boundary_callable(self) -> None:
+        @eb_decorator
+        def f() -> int:
+            return 42
+
+        assert f() == 42
+
+    def test_validates_shape_group(self) -> None:
+        @validates_shape
+        def f() -> int:
+            return 1
+
+        assert 1 in f._wardline_groups  # type: ignore[attr-defined]
+
+    def test_validates_shape_attrs(self) -> None:
+        @validates_shape
+        def f() -> int:
+            return 1
+
+        assert f._wardline_transition == ("EXTERNAL_RAW", "SHAPE_VALIDATED")  # type: ignore[attr-defined]
+
+    def test_validates_shape_callable(self) -> None:
+        @validates_shape
+        def f() -> int:
+            return 42
+
+        assert f() == 42
+
+    def test_validates_semantic_group(self) -> None:
+        @validates_semantic
+        def f() -> int:
+            return 1
+
+        assert 1 in f._wardline_groups  # type: ignore[attr-defined]
+
+    def test_validates_semantic_attrs(self) -> None:
+        @validates_semantic
+        def f() -> int:
+            return 1
+
+        assert f._wardline_transition == ("SHAPE_VALIDATED", "PIPELINE")  # type: ignore[attr-defined]
+
+    def test_validates_semantic_callable(self) -> None:
+        @validates_semantic
+        def f() -> int:
+            return 42
+
+        assert f() == 42
+
+    def test_validates_external_group(self) -> None:
+        @validates_external
+        def f() -> int:
+            return 1
+
+        assert 1 in f._wardline_groups  # type: ignore[attr-defined]
+
+    def test_validates_external_attrs(self) -> None:
+        @validates_external
+        def f() -> int:
+            return 1
+
+        assert f._wardline_transition == ("EXTERNAL_RAW", "PIPELINE")  # type: ignore[attr-defined]
+
+    def test_validates_external_callable(self) -> None:
+        @validates_external
+        def f() -> int:
+            return 42
+
+        assert f() == 42
+
+    def test_tier1_read_group(self) -> None:
+        @tier1_read
+        def f() -> int:
+            return 1
+
+        assert 1 in f._wardline_groups  # type: ignore[attr-defined]
+
+    def test_tier1_read_attrs(self) -> None:
+        @tier1_read
+        def f() -> int:
+            return 1
+
+        assert f._wardline_tier_source is TaintState.AUDIT_TRAIL  # type: ignore[attr-defined]
+
+    def test_tier1_read_callable(self) -> None:
+        @tier1_read
+        def f() -> int:
+            return 42
+
+        assert f() == 42
+
+    def test_audit_writer_group(self) -> None:
+        @audit_writer
+        def f() -> int:
+            return 1
+
+        assert 1 in f._wardline_groups  # type: ignore[attr-defined]
+
+    def test_audit_writer_attrs(self) -> None:
+        @audit_writer
+        def f() -> int:
+            return 1
+
+        assert f._wardline_tier_source is TaintState.AUDIT_TRAIL  # type: ignore[attr-defined]
+        assert f._wardline_audit_writer is True  # type: ignore[attr-defined]
+
+    def test_audit_writer_callable(self) -> None:
+        @audit_writer
+        def f() -> int:
+            return 42
+
+        assert f() == 42
+
+    def test_authoritative_construction_group(self) -> None:
+        @authoritative_construction
+        def f() -> int:
+            return 1
+
+        assert 1 in f._wardline_groups  # type: ignore[attr-defined]
+
+    def test_authoritative_construction_attrs(self) -> None:
+        @authoritative_construction
+        def f() -> int:
+            return 1
+
+        assert f._wardline_transition == ("PIPELINE", "AUDIT_TRAIL")  # type: ignore[attr-defined]
+
+    def test_authoritative_construction_callable(self) -> None:
+        @authoritative_construction
+        def f() -> int:
+            return 42
+
+        assert f() == 42
