@@ -1,0 +1,192 @@
+# wardline.yaml — Self-hosting manifest (comment-only draft, T-0.2)
+# Machine-validated version created in T-6.4a.
+#
+# This file documents the intended tier assignment for every
+# src/wardline/ sub-package, with rationale for Tier 3/4 assignments.
+
+$schema: "wardline/v0.1"
+
+# ── Tier definitions ──────────────────────────────────────────
+tiers:
+  - id: "AUDIT_TRAIL"
+    tier: 1
+    description: "Authoritative internal data — enums, registries, base classes"
+  - id: "PIPELINE"
+    tier: 2
+    description: "Validated data flowing through processing pipeline"
+  - id: "SHAPE_VALIDATED"
+    tier: 3
+    description: "Partially validated — shape-checked but not semantically verified"
+  - id: "EXTERNAL_RAW"
+    tier: 4
+    description: "Untrusted external input — CLI args, YAML files, filesystem"
+
+# ── Module tier assignments ───────────────────────────────────
+
+module_tiers:
+
+  # ─── Tier 1: Core definitions (pure internal) ──────────────
+
+  - path: "src/wardline/__init__.py"
+    default_taint: "AUDIT_TRAIL"
+    # Rationale: Package root, re-exports public API. Pure internal.
+
+  - path: "src/wardline/_version.py"
+    default_taint: "AUDIT_TRAIL"
+    # Rationale: Static version constant. No external data.
+
+  - path: "src/wardline/core"
+    default_taint: "AUDIT_TRAIL"
+    # Rationale: Enums (AuthorityTier, TaintState, Severity, RuleId),
+    # constants, severity matrix, and the canonical decorator registry.
+    # These ARE the trust model — no external data processing.
+    # Includes: __init__.py, matrix.py, registry.py, severity.py,
+    #           taints.py, tiers.py
+
+  - path: "src/wardline/runtime"
+    default_taint: "AUDIT_TRAIL"
+    # Rationale: WardlineBase cooperative base class and descriptors.
+    # Framework infrastructure that enforces invariants on user code.
+    # No external input processing.
+    # Includes: __init__.py, base.py, types.py, descriptors.py
+
+  - path: "src/wardline/decorators"
+    default_taint: "AUDIT_TRAIL"
+    # Rationale: wardline_decorator() factory + all decorator definitions
+    # (authority.py Group 1, audit.py Group 2, schema.py marker).
+    # These define boundary markers; they don't process external data.
+    # Includes: __init__.py, _base.py, authority.py, audit.py, schema.py
+
+  - path: "src/wardline/manifest/schemas"
+    default_taint: "AUDIT_TRAIL"
+    # Rationale: Static JSON Schema files — pure declarative definitions.
+    # wardline.schema.json, overlay.schema.json, exceptions.schema.json,
+    # fingerprint.schema.json, corpus-specimen.schema.json
+
+  - path: "src/wardline/scanner/context.py"
+    default_taint: "AUDIT_TRAIL"
+    # Rationale: Finding, ScanContext, WardlineAnnotation — frozen
+    # dataclasses that carry validated scan results. Pure data structures
+    # with no I/O or external data ingestion.
+
+  # ─── Tier 2: Validated pipeline data ────────────────────────
+
+  - path: "src/wardline/manifest/models.py"
+    default_taint: "PIPELINE"
+    # Rationale: Frozen dataclasses constructed from validated manifest
+    # data. By the time data reaches these models, the loader has already
+    # parsed and schema-validated the YAML. Post-validation structures.
+
+  - path: "src/wardline/manifest/merge.py"
+    default_taint: "PIPELINE"
+    # Rationale: Merges overlay manifests into base manifests with the
+    # narrow-only invariant. Operates exclusively on already-validated
+    # ManifestModel instances — no raw external input.
+
+  - path: "src/wardline/manifest/coherence.py"
+    default_taint: "PIPELINE"
+    # Rationale: Cross-references code annotations against manifest data
+    # to detect orphaned annotations and governance gaps. Both inputs
+    # (annotations and manifests) are validated before reaching this module.
+
+  - path: "src/wardline/scanner/sarif.py"
+    default_taint: "PIPELINE"
+    # Rationale: Serialises validated Finding objects to SARIF v2.1.0 JSON.
+    # Pure output transformation on already-validated internal data.
+
+  - path: "src/wardline/scanner/taint"
+    default_taint: "PIPELINE"
+    # Rationale: Level 1 taint assignment from decorators + manifest data.
+    # Operates on validated registry entries and loaded manifest models.
+    # Includes: __init__.py, function_level.py
+
+  # ─── Tier 3: Partially validated (AST / filesystem coordination) ──
+
+  - path: "src/wardline/scanner/engine.py"
+    default_taint: "SHAPE_VALIDATED"
+    # Rationale: Orchestrates the full scan pipeline including os.walk()
+    # over target directories. While it validates paths and delegates
+    # actual file parsing to the AST layer, it still handles filesystem
+    # input directly. Semi-trusted coordinator.
+
+  - path: "src/wardline/scanner/discovery.py"
+    default_taint: "SHAPE_VALIDATED"
+    # Rationale: Parses Python AST to locate wardline decorators and
+    # build annotation maps. Input is parsed AST (partially trusted —
+    # syntactically valid but semantically unchecked). Produces
+    # intermediate WardlineAnnotation structures for downstream rules.
+
+  - path: "src/wardline/scanner/rules"
+    default_taint: "SHAPE_VALIDATED"
+    # Rationale: AST visitor rules that walk parsed syntax trees to detect
+    # patterns (dict key fallback, attribute fallback, existence gates,
+    # broad/silent exception handlers). Input is parsed AST nodes — shape-
+    # validated by the Python parser but not semantically verified by
+    # wardline until findings are produced.
+    # Includes: __init__.py, base.py, py_wl_001.py, py_wl_002.py,
+    #           py_wl_003.py, py_wl_004.py, py_wl_005.py
+
+  # ─── Tier 4: External boundaries (untrusted input) ─────────
+
+  - path: "src/wardline/manifest/loader.py"
+    default_taint: "EXTERNAL_RAW"
+    # Rationale: Parses YAML files from disk using SafeLoader. This is a
+    # primary external boundary — the first code to touch user-supplied
+    # manifest YAML. Untrusted input enters here before schema validation.
+    # Data flow: disk file -> yaml.safe_load() -> schema validation ->
+    # ManifestModel (Tier 2). The loader itself sits at the raw boundary.
+
+  - path: "src/wardline/manifest/discovery.py"
+    default_taint: "EXTERNAL_RAW"
+    # Rationale: Walks filesystem paths (glob, os.walk) to locate manifest
+    # and overlay YAML files. Handles external filesystem input — user-
+    # controlled directory structures, symlinks, and file paths. The
+    # discovered paths are passed to loader.py for parsing.
+
+  - path: "src/wardline/cli"
+    default_taint: "EXTERNAL_RAW"
+    # Rationale: Click CLI entry points that accept user command-line
+    # arguments, environment variables, and file paths. The outermost
+    # boundary of the application. All external user input enters here.
+    # Includes: __init__.py, main.py, scan.py, corpus_cmds.py,
+    #           manifest_cmds.py, explain_cmd.py
+
+# ── Distribution sketch ───────────────────────────────────────
+#
+# Tier 1 (AUDIT_TRAIL):
+#   core/*            = 5 modules (matrix, registry, severity, taints, tiers)
+#   runtime/*         = 3 modules (base, types, descriptors)
+#   decorators/*      = 4 modules (_base, authority, audit, schema)
+#   manifest/schemas  = 1 package (5 JSON schema files)
+#   scanner/context   = 1 module
+#   __init__, _version = 2 modules
+#   Subtotal:         ~16 modules
+#
+# Tier 2 (PIPELINE):
+#   manifest/models   = 1 module
+#   manifest/merge    = 1 module
+#   manifest/coherence = 1 module
+#   scanner/sarif     = 1 module
+#   scanner/taint/*   = 1 module  (function_level)
+#   Subtotal:         ~5 modules
+#
+# Tier 3 (SHAPE_VALIDATED):
+#   scanner/engine    = 1 module
+#   scanner/discovery = 1 module
+#   scanner/rules/*   = 6 modules (base + 5 PY-WL rules)
+#   Subtotal:         ~8 modules
+#
+# Tier 4 (EXTERNAL_RAW):
+#   manifest/loader    = 1 module
+#   manifest/discovery = 1 module
+#   cli/*              = 5 modules (main, scan, corpus_cmds, manifest_cmds, explain_cmd)
+#   Subtotal:          ~7 modules
+#
+# Total: ~36 modules
+# Tier 3 + Tier 4 (permissive): 15/36 = ~42%
+# Well under 60% max_permissive_percent default threshold. ✓
+#
+# This confirms the 60% threshold is appropriate — wardline's own
+# codebase is predominantly Tier 1/2 (authoritative definitions and
+# validated pipeline), with external boundaries properly isolated at
+# Tier 4 and AST-processing modules at Tier 3.

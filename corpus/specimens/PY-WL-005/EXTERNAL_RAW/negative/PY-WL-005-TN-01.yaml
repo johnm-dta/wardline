@@ -1,0 +1,19 @@
+---
+specimen_id: "PY-WL-005-TN-01"
+description: "except with logging body does not fire PY-WL-005"
+rule: "PY-WL-005"
+fragment: |
+  import logging
+  log = logging.getLogger(__name__)
+
+  def process(data):
+      try:
+          x = int(data)
+      except ValueError:
+          log.error("Failed to parse: %s", data)
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "true_negative"

@@ -1,0 +1,13 @@
+---
+specimen_id: "PY-WL-002-TN-01"
+description: "getattr() with 2 args (no default) does not fire PY-WL-002"
+rule: "PY-WL-002"
+fragment: |
+  def process(obj):
+      x = getattr(obj, "name")
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "true_negative"

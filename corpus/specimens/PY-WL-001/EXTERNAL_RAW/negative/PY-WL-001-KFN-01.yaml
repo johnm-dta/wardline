@@ -1,0 +1,18 @@
+---
+specimen_id: "PY-WL-001-KFN-01"
+description: "Cross-function default hidden behind wrapper — L1 cannot see dict.get() with default"
+rule: "PY-WL-001"
+fragment: |
+  def safe_lookup(d, key):
+      """Wrapper that internally uses dict.get() with a default.
+      The L1 scanner sees only the call site, not the implementation."""
+      return d.get(key, "fallback")
+
+  def process(data):
+      x = safe_lookup(data, "key")
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "known_false_negative"

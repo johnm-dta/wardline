@@ -1,0 +1,16 @@
+---
+specimen_id: "PY-WL-005-TN-02"
+description: "except with re-raise does not fire PY-WL-005"
+rule: "PY-WL-005"
+fragment: |
+  def process(data):
+      try:
+          x = int(data)
+      except Exception:
+          raise
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "true_negative"

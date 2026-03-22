@@ -1,0 +1,14 @@
+---
+specimen_id: "PY-WL-003-TN-01"
+description: "Equality comparison is not an existence check, does not fire PY-WL-003"
+rule: "PY-WL-003"
+fragment: |
+  def process(data):
+      if data == "expected_value":
+          handle(data)
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "true_negative"

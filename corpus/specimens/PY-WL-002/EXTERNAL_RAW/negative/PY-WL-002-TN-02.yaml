@@ -1,0 +1,14 @@
+---
+specimen_id: "PY-WL-002-TN-02"
+description: "hasattr() is PY-WL-003 not PY-WL-002, should not fire PY-WL-002"
+rule: "PY-WL-002"
+fragment: |
+  def process(obj):
+      if hasattr(obj, "name"):
+          x = obj.name
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "true_negative"

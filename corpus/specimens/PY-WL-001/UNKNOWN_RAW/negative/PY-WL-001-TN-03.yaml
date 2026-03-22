@@ -1,0 +1,13 @@
+---
+specimen_id: "PY-WL-001-TN-03"
+description: "dict.get() without default in UNKNOWN_RAW context does not fire PY-WL-001"
+rule: "PY-WL-001"
+fragment: |
+  def process(data):
+      x = data.get("key")
+taint_state: "UNKNOWN_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "true_negative"

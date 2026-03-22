@@ -1,0 +1,16 @@
+---
+specimen_id: "PY-WL-004-TN-03"
+description: "except ValueError (specific exception) in UNKNOWN_RAW does not fire PY-WL-004"
+rule: "PY-WL-004"
+fragment: |
+  def process(data):
+      try:
+          x = int(data)
+      except ValueError:
+          x = 0
+taint_state: "UNKNOWN_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "true_negative"

@@ -1,0 +1,17 @@
+---
+specimen_id: "PY-WL-004-KFN-01"
+description: "Broad exception hidden in imported module — caller has no visible except clause"
+rule: "PY-WL-004"
+fragment: |
+  from utils import safe_call
+
+  def process(url):
+      # safe_call internally does 'try: ... except Exception: return None'
+      # but the L1 scanner only sees this file, where no broad handler exists
+      return safe_call(lambda: fetch(url))
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "known_false_negative"

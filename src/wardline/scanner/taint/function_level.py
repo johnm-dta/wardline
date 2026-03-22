@@ -71,7 +71,7 @@ def assign_function_taints(
         (sync and async) in the module.
     """
     path_str = str(file_path)
-    module_default = _resolve_module_default(path_str, manifest)
+    module_default = resolve_module_default(path_str, manifest)
     taint_map: dict[str, TaintState] = {}
 
     _walk_and_assign(
@@ -84,7 +84,7 @@ def assign_function_taints(
 # ── Internal helpers ─────────────────────────────────────────────
 
 
-def _resolve_module_default(
+def resolve_module_default(
     file_path: str,
     manifest: WardlineManifest | None,
 ) -> TaintState | None:
@@ -122,7 +122,7 @@ def _resolve_module_default(
     return None
 
 
-def _taint_from_annotations(
+def taint_from_annotations(
     file_path: str,
     qualname: str,
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
@@ -160,7 +160,7 @@ def _walk_and_assign(
             qualname = f"{scope}.{child.name}" if scope else child.name
 
             # Precedence: decorator > module_tiers > UNKNOWN_RAW
-            taint = _taint_from_annotations(file_path, qualname, annotations)
+            taint = taint_from_annotations(file_path, qualname, annotations)
             if taint is None:
                 taint = (
                     module_default
