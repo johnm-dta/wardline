@@ -1,0 +1,155 @@
+"""Tests for PY-WL-003: Existence-checking as structural gate."""
+
+from __future__ import annotations
+
+from wardline.core.severity import RuleId, Severity
+from wardline.scanner.rules.py_wl_003 import RulePyWl003
+
+from .conftest import parse_function_source, parse_module_source
+
+
+def _run_rule(source: str) -> RulePyWl003:
+    """Parse source inside a function and run PY-WL-003."""
+    tree = parse_function_source(source)
+    rule = RulePyWl003(file_path="test.py")
+    rule.visit(tree)
+    return rule
+
+
+def _run_rule_match(source: str) -> RulePyWl003:
+    """Parse source with match/case (must be module-level function)."""
+    tree = parse_module_source(source)
+    rule = RulePyWl003(file_path="test.py")
+    rule.visit(tree)
+    return rule
+
+
+# ── Positive: `in` operator ─────────────────────────────────────
+
+
+class TestInOperator:
+    """``in`` operator fires PY-WL-003."""
+
+    def test_key_in_dict_fires(self) -> None:
+        rule = _run_rule('"key" in d\n')
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_003
+        assert rule.findings[0].severity == Severity.ERROR
+        assert "'in' operator" in rule.findings[0].message
+
+    def test_key_in_dict_keys_fires(self) -> None:
+        rule = _run_rule("key in d.keys()\n")
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_003
+
+    def test_not_in_fires(self) -> None:
+        """``not in`` is still an existence check."""
+        rule = _run_rule('"key" not in d\n')
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_003
+        assert "'in' operator" in rule.findings[0].message
+
+
+# ── Positive: hasattr() ─────────────────────────────────────────
+
+
+class TestHasattr:
+    """``hasattr()`` fires PY-WL-003."""
+
+    def test_hasattr_string_attr_fires(self) -> None:
+        rule = _run_rule('hasattr(obj, "name")\n')
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_003
+        assert "hasattr()" in rule.findings[0].message
+
+    def test_hasattr_variable_attr_fires(self) -> None:
+        rule = _run_rule("hasattr(obj, attr_var)\n")
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_003
+
+
+# ── Positive: match/case ────────────────────────────────────────
+
+
+class TestMatchCase:
+    """Structural pattern matching fires PY-WL-003."""
+
+    def test_match_mapping_fires(self) -> None:
+        source = '''\
+        def target():
+            match d:
+                case {"key": value}:
+                    pass
+        '''
+        rule = _run_rule_match(source)
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_003
+        assert "mapping" in rule.findings[0].message
+
+    def test_match_class_fires(self) -> None:
+        source = '''\
+        def target():
+            match obj:
+                case MyClass(x=1):
+                    pass
+        '''
+        rule = _run_rule_match(source)
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_003
+        assert "class" in rule.findings[0].message
+
+
+# ── Positive: multiple patterns / async ─────────────────────────
+
+
+class TestMultipleAndAsync:
+    """Multiple patterns and async functions."""
+
+    def test_multiple_patterns_in_same_function(self) -> None:
+        rule = _run_rule('''\
+            "key" in d
+            hasattr(obj, "name")
+        ''')
+
+        assert len(rule.findings) == 2
+
+    def test_in_async_function(self) -> None:
+        source = '''\
+        async def target():
+            "key" in d
+            hasattr(obj, "name")
+        '''
+        rule = _run_rule_match(source)
+
+        assert len(rule.findings) == 2
+
+
+# ── Negative: should NOT fire ───────────────────────────────────
+
+
+class TestNoFalsePositives:
+    """Patterns that should NOT fire PY-WL-003."""
+
+    def test_getattr_with_default_silent(self) -> None:
+        """getattr() is NOT detected by this rule."""
+        rule = _run_rule('getattr(obj, "name", default)\n')
+
+        assert len(rule.findings) == 0
+
+    def test_no_existence_checks_silent(self) -> None:
+        rule = _run_rule("x = 1\n")
+
+        assert len(rule.findings) == 0
+
+    def test_regular_comparison_silent(self) -> None:
+        """``x == y`` is not an existence check."""
+        rule = _run_rule("x == y\n")
+
+        assert len(rule.findings) == 0
