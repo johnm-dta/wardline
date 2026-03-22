@@ -136,8 +136,8 @@ def _build_import_table(
 
     # Merge qualified modules into the table with a sentinel prefix
     # so decorator matching can distinguish them
-    for alias, module_path in qualified_modules.items():
-        name_table[f"__qualified__:{alias}"] = module_path
+    for qual_alias, module_path in qualified_modules.items():
+        name_table[f"__qualified__:{qual_alias}"] = module_path
 
     if has_star_import:
         name_table["__star_import__"] = "True"
