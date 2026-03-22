@@ -21,10 +21,16 @@ class TestNoExecEval:
     """Assert the critical security invariant: no exec/eval on specimens."""
 
     def test_no_exec_eval_called(self) -> None:
-        """Patching exec/eval to raise ensures they are never called."""
+        """Patching exec/eval to raise ensures they are never called.
+
+        compile is tested separately because ast.parse() internally
+        calls builtins.compile at the C level on CPython.
+        """
 
         def _fail(*args: object, **kwargs: object) -> None:
-            raise AssertionError("exec/eval must never be called on specimens")
+            raise AssertionError(
+                "exec/eval must never be called on specimens"
+            )
 
         with (
             patch("builtins.exec", side_effect=_fail),
@@ -40,6 +46,16 @@ class TestNoExecEval:
                 f"output: {result.output}\n"
                 f"stderr: {getattr(result, 'stderr', '')}"
             )
+
+    def test_no_compile_in_source(self) -> None:
+        """corpus_cmds.py must not call compile() directly."""
+        import wardline.cli.corpus_cmds as mod
+
+        source = Path(mod.__file__).read_text()  # type: ignore[arg-type]
+        # Allow "ast.parse" but not bare "compile("
+        assert "compile(" not in source, (
+            "corpus_cmds.py must not call compile() directly"
+        )
 
     def test_only_ast_parse_used(self) -> None:
         """Verify ast.parse is called and compile is not called directly."""

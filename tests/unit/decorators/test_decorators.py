@@ -174,14 +174,34 @@ class TestWrappedChain:
         assert "_wardline_tier_source" in attrs
         assert attrs["_wardline_tier_source"] is TaintState.EXTERNAL_RAW
 
-    def test_severed_chain_returns_none(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_plain_func_returns_none(self) -> None:
+        """Plain function with no wardline attrs returns None."""
         def plain_func() -> int:
             return 1
 
+        result = get_wardline_attrs(plain_func)
+        assert result is None
+
+    def test_severed_chain_warns(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Severed __wrapped__ chain logs WARNING and returns None."""
+        import functools
+
+        def inner() -> int:
+            return 1
+
+        @functools.wraps(inner)
+        def wrapper(*args: object, **kwargs: object) -> int:
+            return inner(*args, **kwargs)  # type: ignore[return-value]
+
+        # wrapper has __wrapped__ pointing to inner, but neither
+        # has _wardline_* attrs — this is the "severed chain" case
         with caplog.at_level(logging.WARNING):
-            result = get_wardline_attrs(plain_func)
+            result = get_wardline_attrs(wrapper)
 
         assert result is None
+        assert "Severed __wrapped__ chain" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +228,24 @@ class TestCallableTypes:
         obj = MyClass()
         assert obj.my_method(5) == 6
         assert hasattr(MyClass.my_method, "_wardline_groups")
+
+    def test_works_on_staticmethod(self) -> None:
+        class MyClass:
+            @external_boundary
+            @staticmethod
+            def my_static(x: int) -> int:
+                return x + 1
+
+        assert MyClass.my_static(5) == 6
+
+    def test_works_on_classmethod(self) -> None:
+        class MyClass:
+            @external_boundary
+            @classmethod
+            def my_cls(cls, x: int) -> int:
+                return x + 1
+
+        assert MyClass.my_cls(5) == 6
 
 
 # ---------------------------------------------------------------------------

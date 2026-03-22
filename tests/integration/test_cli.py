@@ -97,6 +97,67 @@ class TestCliExitCodes:
             f"stdout: {result.output}\n"
         )
 
+    def test_exit_3_tool_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """TOOL-ERROR finding exits 3."""
+        from unittest.mock import patch
+
+        from wardline.core.severity import (
+            Exceptionability,
+            RuleId,
+            Severity,
+        )
+        from wardline.scanner.context import Finding
+        from wardline.scanner.engine import ScanResult
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            "tiers:\n"
+            '  - id: "test"\n'
+            "    tier: 1\n"
+            '    description: "test tier"\n'
+            "module_tiers: []\n"
+            "metadata:\n"
+            '  organisation: "TestOrg"\n'
+        )
+        (tmp_path / "x.py").write_text("x = 1\n")
+
+        fake_result = ScanResult(
+            findings=[
+                Finding(
+                    rule_id=RuleId.TOOL_ERROR,
+                    file_path="x.py",
+                    line=1,
+                    col=0,
+                    end_line=None,
+                    end_col=None,
+                    message="Rule crashed",
+                    severity=Severity.WARNING,
+                    exceptionability=Exceptionability.UNCONDITIONAL,
+                    taint_state=None,  # type: ignore[arg-type]
+                    analysis_level=0,
+                    source_snippet=None,
+                ),
+            ],
+            files_scanned=1,
+        )
+
+        with patch(
+            "wardline.scanner.engine.ScanEngine.scan",
+            return_value=fake_result,
+        ):
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                "scan", str(tmp_path),
+                "--manifest", str(manifest),
+                "--allow-registry-mismatch",
+            ])
+        assert result.exit_code == 3, (
+            f"Expected exit 3, got {result.exit_code}.\n"
+            f"stdout: {result.output}\n"
+        )
+
 
 @pytest.mark.integration
 class TestCliStructuredErrors:
@@ -156,6 +217,33 @@ class TestCliOptions:
             ]
         )
         # Verbose should produce INFO-level log messages on stderr
+        assert "INFO" in result.stderr
+
+    def test_debug_flag(self, tmp_path: Path) -> None:
+        """--debug produces DEBUG-level logging on stderr."""
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            "tiers:\n"
+            '  - id: "test"\n'
+            "    tier: 1\n"
+            '    description: "test tier"\n'
+            "module_tiers: []\n"
+            "metadata:\n"
+            '  organisation: "TestOrg"\n'
+        )
+        py_file = tmp_path / "clean.py"
+        py_file.write_text("x = 1\n")
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, [
+                "scan", str(tmp_path),
+                "--manifest", str(manifest),
+                "--allow-registry-mismatch",
+                "--debug",
+            ]
+        )
+        # Debug enables all logging levels including INFO
         assert "INFO" in result.stderr
 
     def test_help_flag(self) -> None:

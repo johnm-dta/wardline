@@ -1,8 +1,9 @@
 """Integration test: ScanEngine end-to-end with fixture project.
 
-Validates the seam between manifest loading, taint assignment, and
-rule execution. Runs ScanEngine directly (no CLI) on a fixture
-project with a wardline.yaml manifest.
+Validates rule execution end-to-end: ScanEngine discovers files,
+parses AST, and runs all 5 rules against a fixture project.
+Manifest loading and taint assignment are NOT wired into this
+test — that integration is deferred to T-6.4a.
 
 Marked ``@pytest.mark.integration`` — excluded from default
 ``uv run pytest`` via addopts in pyproject.toml.
