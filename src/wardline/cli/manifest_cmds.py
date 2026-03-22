@@ -94,11 +94,7 @@ def _baseline_update(*, approve: bool, manifest_file: str | None) -> None:
         sys.exit(1)
 
     # Locate manifest
-    manifest_path: Path | None = None
-    if manifest_file is not None:
-        manifest_path = Path(manifest_file)
-    else:
-        manifest_path = discover_manifest(Path.cwd())
+    manifest_path = Path(manifest_file) if manifest_file is not None else discover_manifest(Path.cwd())
 
     if manifest_path is None or not manifest_path.exists():
         click.echo("error: manifest not found", err=True)

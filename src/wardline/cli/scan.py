@@ -265,10 +265,7 @@ def scan(
 
     # --- Determine target paths ---
     scan_path = Path(path).resolve()
-    if cfg is not None and cfg.target_paths:
-        target_paths = cfg.target_paths
-    else:
-        target_paths = (scan_path,)
+    target_paths = cfg.target_paths if cfg is not None and cfg.target_paths else (scan_path,)
 
     exclude_paths: tuple[Path, ...] = ()
     if cfg is not None and cfg.exclude_paths:

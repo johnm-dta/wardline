@@ -105,12 +105,12 @@ def discover_overlays(
         # Unrestricted — find all overlays under root
         return _find_all_overlays(root)
 
-    # Build allowlist from overlay_paths or module_tiers
-    if overlay_paths is not None:
-        allowed_dirs = {root / p for p in overlay_paths}
-    else:
-        # Secure default: only module_tiers directories
-        allowed_dirs = {root / mt.path for mt in manifest.module_tiers}
+    # Build allowlist from overlay_paths or module_tiers (secure default)
+    allowed_dirs = (
+        {root / p for p in overlay_paths}
+        if overlay_paths is not None
+        else {root / mt.path for mt in manifest.module_tiers}
+    )
 
     found: list[Path] = []
     all_overlays = _find_all_overlays(root)

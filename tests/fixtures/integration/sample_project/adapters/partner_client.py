@@ -22,7 +22,7 @@ def parse_response(data):
 
 def retry_request(url):
     """PY-WL-004 + PY-WL-005: broad AND silent handler."""
-    try:
+    try:  # noqa: SIM105 — intentional test fixture for scanner rule detection
         pass
     except Exception:
         pass

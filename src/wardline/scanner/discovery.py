@@ -189,10 +189,7 @@ def _process_import(
 
 def _is_wardline_module(module: str) -> bool:
     """Check if a module path starts with a wardline prefix."""
-    for prefix in _WARDLINE_PREFIXES:
-        if module == prefix or module.startswith(f"{prefix}."):
-            return True
-    return False
+    return any(module == prefix or module.startswith(f"{prefix}.") for prefix in _WARDLINE_PREFIXES)
 
 
 def _detect_dynamic_imports(tree: ast.Module) -> None:

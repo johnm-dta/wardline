@@ -2,7 +2,7 @@
 
 import pytest
 
-from wardline.core.registry import REGISTRY, REGISTRY_VERSION, RegistryEntry
+from wardline.core.registry import REGISTRY, REGISTRY_VERSION
 
 
 def test_registry_version_present() -> None:

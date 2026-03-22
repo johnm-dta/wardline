@@ -42,13 +42,8 @@ def explain(qualname: str, manifest: str | None, scan_path: str) -> None:
     )
 
     # Load manifest
-    manifest_path: Path | None = None
     manifest_model = None
-
-    if manifest is not None:
-        manifest_path = Path(manifest)
-    else:
-        manifest_path = discover_manifest(Path(scan_path))
+    manifest_path = Path(manifest) if manifest is not None else discover_manifest(Path(scan_path))
 
     if manifest_path is not None and manifest_path.exists():
         try:

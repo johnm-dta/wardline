@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import textwrap
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from click.testing import CliRunner
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _extract_sarif(output: str) -> str:

@@ -6,7 +6,6 @@ import pytest
 
 from wardline.core.taints import TaintState, taint_join
 
-
 # --- TaintState enum tests ---
 
 
