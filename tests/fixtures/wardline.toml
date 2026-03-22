@@ -1,0 +1,5 @@
+[wardline]
+target_paths = ["src/"]
+exclude_paths = ["src/__pycache__/"]
+max_unknown_raw_percent = 50.0
+allow_registry_mismatch = true

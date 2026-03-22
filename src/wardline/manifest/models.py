@@ -139,6 +139,24 @@ class WardlineOverlay:
     contract_bindings: tuple[ContractBinding, ...] = ()
 
 
+class ScannerConfigError(Exception):
+    """Raised when wardline.toml contains invalid configuration."""
+
+
+# Known keys in the [wardline] section of wardline.toml.
+_KNOWN_KEYS: frozenset[str] = frozenset({
+    "target_paths",
+    "exclude_paths",
+    "enabled_rules",
+    "disabled_rules",
+    "default_taint",
+    "analysis_level",
+    "max_unknown_raw_percent",
+    "allow_registry_mismatch",
+    "allow_permissive_distribution",
+})
+
+
 @dataclass(frozen=True)
 class ScannerConfig:
     """Scanner configuration loaded from ``wardline.toml``.
@@ -153,8 +171,12 @@ class ScannerConfig:
     target_paths: tuple[Path, ...] = ()
     exclude_paths: tuple[Path, ...] = ()
     enabled_rules: tuple[RuleId, ...] = ()
+    disabled_rules: tuple[RuleId, ...] = ()
     default_taint: TaintState | None = None
     analysis_level: int = 1
+    max_unknown_raw_percent: float | None = None
+    allow_registry_mismatch: bool = False
+    allow_permissive_distribution: bool = False
 
     @classmethod
     def from_toml(cls, path: Path) -> ScannerConfig:
@@ -162,6 +184,7 @@ class ScannerConfig:
 
         Uses binary mode (``'rb'``) as required by ``tomllib``.
         Normalises paths, rule IDs, and taint state tokens.
+        Raises ``ScannerConfigError`` for unknown keys or invalid values.
         """
         from wardline.core.severity import RuleId
         from wardline.core.taints import TaintState
@@ -171,25 +194,78 @@ class ScannerConfig:
 
         wardline_section = data.get("wardline", data)
 
+        # Validate: reject unknown keys
+        unknown = set(wardline_section.keys()) - _KNOWN_KEYS
+        if unknown:
+            raise ScannerConfigError(
+                f"unknown keys in wardline.toml: {sorted(unknown)}"
+            )
+
+        # Parse and validate target_paths
         target_paths = tuple(
             Path(p) for p in wardline_section.get("target_paths", [])
         )
         exclude_paths = tuple(
             Path(p) for p in wardline_section.get("exclude_paths", [])
         )
-        enabled_rules = tuple(
-            RuleId(r) for r in wardline_section.get("enabled_rules", [])
-        )
 
+        # Parse and validate rule IDs
+        enabled_rules: tuple[RuleId, ...] = ()
+        for r in wardline_section.get("enabled_rules", []):
+            try:
+                enabled_rules = (*enabled_rules, RuleId(r))
+            except ValueError:
+                raise ScannerConfigError(
+                    f"invalid rule ID in enabled_rules: {r!r}"
+                ) from None
+
+        disabled_rules: tuple[RuleId, ...] = ()
+        for r in wardline_section.get("disabled_rules", []):
+            try:
+                disabled_rules = (*disabled_rules, RuleId(r))
+            except ValueError:
+                raise ScannerConfigError(
+                    f"invalid rule ID in disabled_rules: {r!r}"
+                ) from None
+
+        # Parse and validate default_taint
         raw_taint = wardline_section.get("default_taint")
-        default_taint = TaintState(raw_taint) if raw_taint else None
+        default_taint: TaintState | None = None
+        if raw_taint:
+            try:
+                default_taint = TaintState(raw_taint)
+            except ValueError:
+                raise ScannerConfigError(
+                    f"invalid taint state: {raw_taint!r}"
+                ) from None
 
         analysis_level = wardline_section.get("analysis_level", 1)
+
+        # Parse max_unknown_raw_percent
+        max_pct = wardline_section.get("max_unknown_raw_percent")
+        if max_pct is not None:
+            if not isinstance(max_pct, (int, float)):
+                raise ScannerConfigError(
+                    "max_unknown_raw_percent must be a number, "
+                    f"got {type(max_pct).__name__}"
+                )
+            if max_pct < 0 or max_pct > 100:
+                raise ScannerConfigError(
+                    f"max_unknown_raw_percent must be 0-100, got {max_pct}"
+                )
 
         return cls(
             target_paths=target_paths,
             exclude_paths=exclude_paths,
             enabled_rules=enabled_rules,
+            disabled_rules=disabled_rules,
             default_taint=default_taint,
             analysis_level=analysis_level,
+            max_unknown_raw_percent=max_pct,
+            allow_registry_mismatch=bool(
+                wardline_section.get("allow_registry_mismatch", False)
+            ),
+            allow_permissive_distribution=bool(
+                wardline_section.get("allow_permissive_distribution", False)
+            ),
         )

@@ -26,6 +26,8 @@ class RulePyWl004(RuleBase):
     The engine reads this list after rule execution.
     """
 
+    RULE_ID = RuleId.PY_WL_004
+
     def __init__(self, *, file_path: str = "", taint_state: str = "") -> None:
         self.findings: list[Finding] = []
         self._file_path = file_path

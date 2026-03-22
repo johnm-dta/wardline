@@ -36,7 +36,11 @@ class TestCliExitCodes:
         py_file.write_text("x = 1\n")
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["scan", "--manifest", str(manifest)])
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--allow-registry-mismatch",
+        ])
         assert result.exit_code == 0, (
             f"Expected exit 0, got {result.exit_code}.\n"
             f"stdout: {result.output}\n"
@@ -46,7 +50,11 @@ class TestCliExitCodes:
         """Scan fixture project with wardline patterns exits 1."""
         manifest = FIXTURE_PROJECT / "wardline.yaml"
         runner = CliRunner()
-        result = runner.invoke(cli, ["scan", "--manifest", str(manifest)])
+        result = runner.invoke(cli, [
+            "scan", str(FIXTURE_PROJECT),
+            "--manifest", str(manifest),
+            "--allow-registry-mismatch",
+        ])
         assert result.exit_code == 1, (
             f"Expected exit 1, got {result.exit_code}.\n"
             f"stdout: {result.output}\n"
@@ -140,7 +148,12 @@ class TestCliOptions:
 
         runner = CliRunner()
         result = runner.invoke(
-            cli, ["scan", "--manifest", str(manifest), "--verbose"]
+            cli, [
+                "scan", str(tmp_path),
+                "--manifest", str(manifest),
+                "--allow-registry-mismatch",
+                "--verbose",
+            ]
         )
         # Verbose should produce INFO-level log messages on stderr
         assert "INFO" in result.stderr

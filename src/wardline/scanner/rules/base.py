@@ -12,7 +12,10 @@ from __future__ import annotations
 
 import ast
 from abc import ABC, abstractmethod
-from typing import final
+from typing import TYPE_CHECKING, ClassVar, final
+
+if TYPE_CHECKING:
+    from wardline.core.severity import RuleId
 
 _GUARDED_METHODS = frozenset({"visit_FunctionDef", "visit_AsyncFunctionDef"})
 
@@ -22,9 +25,12 @@ class RuleBase(ast.NodeVisitor, ABC):
 
     Concrete rules must:
     - Subclass RuleBase directly
+    - Set ``RULE_ID`` class variable to the canonical ``RuleId``
     - Implement ``visit_function(node, is_async)``
     - NOT override ``visit_FunctionDef`` or ``visit_AsyncFunctionDef``
     """
+
+    RULE_ID: ClassVar[RuleId]
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         # Call super BEFORE our check — required for cooperative MRO

@@ -44,6 +44,10 @@ _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
     RuleId.GOVERNANCE_REGISTRY_MISMATCH_ALLOWED: (
         "Registry mismatch allowed (diagnostic)"
     ),
+    RuleId.GOVERNANCE_RULE_DISABLED: "Rule disabled by configuration (governance)",
+    RuleId.GOVERNANCE_PERMISSIVE_DISTRIBUTION: (
+        "Permissive distribution allowed (governance)"
+    ),
 }
 
 # Pseudo-rule-IDs that should NOT appear in implementedRules.
@@ -53,6 +57,8 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
         RuleId.WARDLINE_UNRESOLVED_DECORATOR,
         RuleId.TOOL_ERROR,
         RuleId.GOVERNANCE_REGISTRY_MISMATCH_ALLOWED,
+        RuleId.GOVERNANCE_RULE_DISABLED,
+        RuleId.GOVERNANCE_PERMISSIVE_DISTRIBUTION,
     }
 )
 
@@ -126,9 +132,16 @@ class SarifReport:
     findings: list[Finding] = field(default_factory=list)
     tool_version: str = "0.1.0"
     verification_mode: bool = False
+    implemented_rule_ids: frozenset[RuleId] | None = None
 
     def _implemented_rules(self) -> list[str]:
-        """Return sorted list of canonical rule ID values (excludes pseudo-IDs)."""
+        """Return sorted list of canonical rule ID values (excludes pseudo-IDs).
+
+        If ``implemented_rule_ids`` is set, uses that (from loaded rules).
+        Otherwise falls back to all canonical RuleId members.
+        """
+        if self.implemented_rule_ids is not None:
+            return sorted(r.value for r in self.implemented_rule_ids)
         return sorted(
             r.value for r in RuleId if r not in _PSEUDO_RULE_IDS
         )
