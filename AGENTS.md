@@ -132,3 +132,61 @@ context needed to pick up where the previous session left off.
 - P3: Low
 - P4: Backlog
 <!-- /filigree:instructions -->
+
+---
+
+## Wardline Filing System
+
+This project uses filigree's full type system. Read `docs/2026-03-22-filigree-filing-system.md` for the complete design. Key points below.
+
+### Issue Hierarchy
+
+```
+Milestone: "Wardline Python MVP"
+  └── Phase (Phase 0–6, sequence-ordered)
+       └── Work Package (T-x.y tasks — the assignable unit, PR-sized)
+            └── Step (created by implementing agent at execution time)
+
+Requirements (spec invariants, linked to WPs)
+  └── Acceptance Criteria (Given/When/Then)
+
+Release: v0.1.0
+  └── Release Items (one per Phase)
+```
+
+### How to Find and Do Work
+
+1. `get_ready` — shows unblocked Work Packages sorted by priority
+2. `get_issue <id>` — read acceptance criteria and description
+3. `claim_issue <id>` — claim the WP (multi-agent safe)
+4. `update_issue <id> --status=executing` — start work
+5. Read the linked execution sequence section: `docs/2026-03-22-execution-sequence.md § T-x.y`
+6. Create Steps within the WP for your sub-tasks as needed
+7. Implement, test, commit
+8. `close_issue <id> --reason="summary"` — delivers the WP
+9. Check if any Requirements are now unblocked and can be verified
+
+### Label System
+
+| Namespace | Purpose | Examples |
+|-----------|---------|----------|
+| `phase:` | Phase number | `phase:0`, `phase:4` |
+| `subsystem:` | Code area | `subsystem:core`, `subsystem:scanner`, `subsystem:manifest` |
+| `effort:` | T-shirt size | `effort:xs`, `effort:s`, `effort:m`, `effort:l` |
+| `spec:` | Spec section | `spec:taint-model`, `spec:governance` |
+
+**Note:** `area:` is a reserved auto-tag namespace — use `subsystem:` instead.
+
+### Dependency Directions
+
+- **WP → WP:** Execution ordering. WP B `blocked_by` WP A means B can't start until A is delivered.
+- **Requirement → WP:** Verification linkage. Requirement `blocked_by` WP means the requirement can't be verified until the WP delivers. The WP does NOT need the requirement to start.
+
+### Reference Documents
+
+| Document | Purpose |
+|----------|---------|
+| `docs/2026-03-22-execution-sequence.md` | Authoritative task definitions (Produces, Done When, deps) |
+| `docs/2026-03-21-wardline-python-design.md` | Implementation design |
+| `docs/2026-03-22-filigree-filing-system.md` | Filing system design |
+| `docs/wardline/` | Framework specification |

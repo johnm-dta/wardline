@@ -4,6 +4,8 @@
 **Source:** `docs/2026-03-21-wardline-python-design.md` (post-second-review revision)
 **Purpose:** Decomposed work packages in build order, each sized for a single agent session / PR
 
+> **Note:** This execution sequence is authoritative for file paths and task structure. The source layout in the design doc (`docs/2026-03-21-wardline-python-design.md`, Section 2) is indicative but materially stale — several test files and directories added by review fixes do not appear there. When in doubt, follow the file paths in this document's "Produces" sections.
+
 ---
 
 ## How to Read This Document
@@ -35,7 +37,7 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 - `tests/conftest.py` (register `integration` and `network` pytest marks; configure default `addopts = -m "not integration"`)
 - `tests/unit/` and `tests/integration/` directory structure
 - Remove orphaned `main.py` from repo root
-- CI enforcement: ruff rule or grep check that fails on `yaml.load(` without `Loader=SafeLoader` (must exclude `.venv/` and handle `Loader=SafeLoader` on same line via negative lookahead or two-pass grep)
+- CI enforcement: ruff rule or grep check that fails on `yaml.load(` without `Loader=` on the same line (must exclude `.venv/`; accepts any `SafeLoader` subclass such as `WardlineSafeLoader`, not just literal `Loader=SafeLoader`)
 
 **Done when:** `uv run pytest` runs successfully with an empty test. `uv run ruff check src/` passes. `uv run mypy src/` passes.
 
@@ -58,11 +60,11 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 
 **Depends on:** T-0.1
 **Produces:**
-- `.github/CODEOWNERS` protecting `wardline.yaml`, `wardline.toml`, `corpus/` from the start (T-6.4b extends this with baseline files created in later phases)
+- `.github/CODEOWNERS` protecting `wardline.yaml`, `wardline.toml`, `corpus/`, `**/wardline.overlay.yaml` from the start (T-6.4b extends this with baseline files created in later phases)
 - CI pipeline configuration (GitHub Actions or equivalent): `ruff check src/`, `mypy src/`, `uv run pytest -m "not integration" tests/` on every push
-- CI grep check for `yaml.load(` without `Loader=SafeLoader` (must exclude `.venv/` and handle `Loader=SafeLoader` on same line via negative lookahead or two-pass grep)
+- CI grep check for `yaml.load(` without `Loader=` on the same line (must exclude `.venv/`; accepts any `SafeLoader` subclass such as `WardlineSafeLoader`, not just literal `Loader=SafeLoader`)
 
-**Done when:** CODEOWNERS file exists and is active on the repository. CI pipeline runs on push and catches ruff/mypy/pytest failures. The `yaml.load` grep check runs in CI.
+**Done when:** CODEOWNERS file exists, is active on the repository, and has no blank-owner lines or syntax errors (validate with a CODEOWNERS linter or a test that parses the file and asserts all patterns have at least one owner). CI pipeline runs on push and catches ruff/mypy/pytest failures. The `yaml.load` grep check runs in CI.
 
 ---
 
@@ -74,18 +76,18 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 **Produces:**
 - `src/wardline/core/tiers.py` — `AuthorityTier` IntEnum (1-4)
 - `src/wardline/core/taints.py` — `TaintState` StrEnum (8 explicit uppercase values)
-- `src/wardline/core/severity.py` — `Severity` StrEnum, `Exceptionability` StrEnum, `RuleId` StrEnum
+- `src/wardline/core/severity.py` — `Severity` StrEnum, `Exceptionability` StrEnum, `RuleId` StrEnum (includes both canonical rule IDs and pseudo-rule-IDs: `PY_WL_001_UNVERIFIED_DEFAULT = "PY-WL-001-UNVERIFIED-DEFAULT"`, `WARDLINE_UNRESOLVED_DECORATOR = "WARDLINE-UNRESOLVED-DECORATOR"`, `TOOL_ERROR = "TOOL-ERROR"`, `GOVERNANCE_REGISTRY_MISMATCH_ALLOWED = "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED"`)
 - `tests/unit/core/test_tiers.py` — value assertions
 - `tests/unit/core/test_taints.py` — serialisation round-trip (`str(TaintState.AUDIT_TRAIL) == "AUDIT_TRAIL"`)
-- Round-trip test for `RuleId` (`str(RuleId.PY_WL_001) == "PY-WL-001"`)
+- Round-trip test for `RuleId` (`str(RuleId.PY_WL_001) == "PY-WL-001"`, `str(RuleId.TOOL_ERROR) == "TOOL-ERROR"`)
 
-**Done when:** All enums constructed, serialisation round-trip tests pass. `json.dumps` produces expected primitives for both IntEnum and StrEnum members.
+**Done when:** All enums constructed, serialisation round-trip tests pass. `json.dumps` produces expected primitives for both IntEnum and StrEnum members. All pseudo-rule-IDs are members of `RuleId` — `Finding.rule_id` is typed as `RuleId` (not `str | RuleId`).
 
 ---
 
 ### T-1.2: Canonical Decorator Registry
 
-**Depends on:** T-1.1
+**Depends on:** T-1.1, T-1.3 (shared write target `taints.py` — T-1.3 must complete before T-1.2 begins to avoid file-level merge conflicts)
 **Produces:**
 - `src/wardline/core/registry.py` — `REGISTRY_VERSION` module constant, frozen dataclass `RegistryEntry` with `canonical_name: str`, `group: int`, `args: dict[str, type | None]`, `attrs: dict[str, type]`; `args` and `attrs` wrapped in `MappingProxyType` via `object.__setattr__` in `__post_init__`
 - Registry dict mapping canonical names to `RegistryEntry` instances for all Group 1 + Group 2 decorators (minimum required for MVP)
@@ -128,7 +130,7 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 - `src/wardline/runtime/types.py` — `TierMarker` class, `Tier1`-`Tier4` Annotated aliases, `FailFast` annotation marker
 - `tests/unit/runtime/test_types.py` — marker construction, Annotated alias creation
 
-**Done when:** `Tier1` through `Tier4` produce valid `Annotated` types. `FailFast` is usable as an annotation.
+**Done when:** `Tier1` through `Tier4` produce valid `Annotated` types usable as bare annotations (e.g., `x: Tier1` type-checks cleanly). If implemented as `Annotated[Any, TierMarker(N)]`, confirm `Any` is the base type. If implemented as a generic alias with `TypeVar`, confirm subscript usage (`x: Tier1[str]`) is required and document that bare `Tier1` is not supported. `FailFast` is usable as an annotation.
 
 ---
 
@@ -187,7 +189,7 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 - Stacking: multiple wardline decorators compose (group flags accumulate, attrs merge)
 - `tests/unit/decorators/test_decorators.py` — decorated function callable, signature preserved, metadata exposed, stacking works, `functools.wraps` ordering (stacked attrs survive), `__wrapped__` chain traversal recovers attrs, severed chain returns None without raising, registry enforcement (unregistered name raises)
 
-**Done when:** Factory creates decorators that pass all tests. Registry enforcement blocks unregistered attributes. Severed `__wrapped__` chain logs at WARNING level.
+**Done when:** Factory creates decorators that pass all tests. Registry enforcement blocks unregistered attributes. Severed `__wrapped__` chain logs at WARNING level. Stacking test verifies `_wardline_groups` accumulation does not mutate the inner decorator's set (copy-on-accumulate pattern required: `wrapper._wardline_groups = set(getattr(wrapper, '_wardline_groups', set()))` AFTER `functools.wraps()`, before adding current group).
 
 ---
 
@@ -236,7 +238,7 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 
 ### T-3.2: Manifest Data Models
 
-> **Note:** Use `tomllib` from stdlib (Python 3.11+). Do not use `tomli` or `toml` packages.
+> **Note:** Use `tomllib` from stdlib (Python 3.11+). Do not use `tomli` or `toml` packages. **Important:** `tomllib.load()` requires binary file mode — use `open(path, 'rb')`. Unlike `json.load()` and `yaml.safe_load()`, text mode raises `TypeError`.
 
 **Depends on:** T-1.1
 **Produces:**
@@ -252,7 +254,7 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 
 **Depends on:** T-3.1, T-3.2
 **Produces:**
-- `src/wardline/manifest/loader.py` — `WardlineSafeLoader` (subclass of `yaml.SafeLoader`, overrides `compose_node` to count alias resolutions, raises at threshold 1000); `load_manifest(path) -> WardlineManifest` with file-size check (1MB), `yaml.safe_load()` via custom loader, `$id` version check, schema validation, dataclass construction; `load_overlay(path) -> WardlineOverlay`
+- `src/wardline/manifest/loader.py` — `WardlineSafeLoader` (subclass of `yaml.SafeLoader`, overrides `compose_node` to count alias resolutions on the `AliasEvent` branch only — do NOT count all node compositions; raises `yaml.YAMLError` subclass (e.g., `WardlineYAMLError`) at configurable threshold, default 1000 via factory function `make_wardline_loader(alias_limit: int = 1000) -> type[yaml.SafeLoader]` that returns a configured subclass with the limit as a class attribute (PyYAML's SafeLoader does not accept constructor kwargs — use a factory, not a constructor parameter); hard upper bound of 10000 to prevent threshold defeat; so CLI YAML error handler catches it uniformly at exit code 2); `load_manifest(path) -> WardlineManifest` with file-size check (1MB), `yaml.load(stream, Loader=WardlineSafeLoader)` (**NOT** `yaml.safe_load()` which does not accept a `Loader` parameter), `$id` version check, schema validation, dataclass construction; `load_overlay(path) -> WardlineOverlay`
 - `tests/unit/manifest/test_loader.py` — valid manifest loads, schema validation catches invalid fields, `$id` version mismatch produces structured error, YAML 1.1 coercion tests (Norway problem: `NO`/`YES`/`OFF`/`ON`, sexagesimal: `1:30`, float: `1e3`), alias bomb test (exceeds 1000 aliases → structured error), file over 1MB → structured error
 
 **Done when:** Loader handles all happy and error paths. Alias limiter raises on bomb input. Coercion tests confirm schema catches type mismatches. Alias bomb and 1MB file limit produce exit code 2. `$id` version mismatch structured error includes specific message format per design WP-3c.
@@ -267,7 +269,7 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 - Scan-time path validation: emit WARNING for `module_tiers` paths matching zero files
 - `tests/unit/manifest/test_discovery.py` — upward walk finds manifest, stops at `.git`, symlink cycle detection, overlay discovery respects `module_tiers`-only default, `"*"` sentinel enables all directories, undeclared overlay produces GOVERNANCE ERROR with guidance message
 
-**Done when:** Discovery handles all path and symlink edge cases. Secure overlay default enforced. Error messages include corrective guidance.
+**Done when:** Discovery handles all path and symlink edge cases. Symlink cycle detected: logs at WARNING level with cycle path and returns `None` (manifest not found via this path); test asserts WARNING is emitted. Secure overlay default enforced. GOVERNANCE ERROR for undeclared overlay is fatal: discovery raises `GovernanceError` (or equivalent), caller exits 2; test uses `pytest.raises`. Error messages include corrective guidance.
 
 ---
 
@@ -280,7 +282,7 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 - `src/wardline/manifest/merge.py` — `merge(base, overlay) -> ResolvedManifest`; enforces narrow-only invariant; raises `ManifestWidenError` with structured message (which overlay, which field, base vs attempted value)
 - `tests/unit/manifest/test_merge.py` — narrow-only passes, widen attempt raises with actionable message
 
-**Done when:** Merge correctly narrows. Widen produces clear error identifying overlay file, field, and values.
+**Done when:** Merge correctly narrows. Widen produces clear error identifying overlay file, field, and values. **Design decision (resolved):** Severity reduction through overlay (e.g., ERROR to WARNING) IS ALLOWED. Rationale: teams need a soft-adoption path — they can introduce rules at WARNING to assess impact before promoting to ERROR. The narrow-only invariant applies to tier changes (tier relaxation is always rejected) but NOT to severity changes. Test: overlay that reduces severity from ERROR to WARNING is accepted; overlay that relaxes a tier (e.g., Tier 1 to Tier 3) is rejected. A GOVERNANCE INFO signal is emitted when severity is reduced through overlay, to maintain visibility.
 
 ---
 
@@ -304,7 +306,7 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 - Synthetic baseline fixture file for unit tests (hand-crafted `wardline.manifest.baseline.json` for testing tier-change detection without requiring T-5.3 to run)
 - `tests/unit/manifest/test_coherence.py` (extend) — threshold boundary test (61% fires, 60% does not), tier downgrade detected, upgrade without evidence detected, first-scan behavior, manifest baseline comparison (added/removed modules)
 
-**Done when:** All governance signals fire correctly. Threshold boundary test passes. Baseline comparison handles tier changes, module additions, and module removals. Agent-originated policy change detection fires correctly.
+**Done when:** All governance signals fire correctly. Threshold boundary test passes. Baseline comparison handles tier changes, module additions, and module removals. Agent-originated policy change detection fires correctly. GOVERNANCE WARNING emitted for each exception entry with `agent_originated: null` (provenance unknown); test fixture: three entries (`agent_originated: true`, `false`, `null`) — WARNING fires only for null. Expired exception detection: exception past `max_exception_duration_days` from grant date fires GOVERNANCE WARNING; far-future expiry (e.g., `expires: 2099-12-31` with short `max_exception_duration_days`) rejected; clock injection mechanism documented for test isolation (e.g., pass `now` parameter or mock `datetime.date.today()`). First-scan GOVERNANCE INFO message emitted when `wardline.perimeter.baseline.json` does not exist; test: run coherence checks with no baseline file present, assert INFO level message.
 
 ---
 
@@ -316,7 +318,9 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 **Produces:**
 - `src/wardline/scanner/context.py` — `Finding` frozen dataclass (rule_id, file_path, line, col, end_line, end_col, message, severity, exceptionability, taint_state, analysis_level, source_snippet); `ScanContext` frozen dataclass with `function_level_taint_map` wrapped in `MappingProxyType` via `object.__setattr__` in `__post_init__`; construction timing documented (built once after pass 1)
 - `WardlineAnnotation` dataclass (or NamedTuple) — captures discovered decorator metadata per call site, consumed by T-4.4
-- Tests for immutability of both dataclasses; `MappingProxyType` raises on taint map mutation
+- `tests/unit/scanner/test_context.py` — immutability of both dataclasses; `MappingProxyType` raises on taint map mutation
+
+**Design decision (resolved):** `Finding.rule_id` is typed as `RuleId`. All pseudo-rule-IDs (`PY-WL-001-UNVERIFIED-DEFAULT`, `WARDLINE-UNRESOLVED-DECORATOR`, `TOOL-ERROR`, `GOVERNANCE-REGISTRY-MISMATCH-ALLOWED`) are members of the `RuleId` StrEnum, added in T-1.1.
 
 **Implementation note:** `object.__setattr__` in `__post_init__` pattern: direct assignment in frozen dataclass raises `FrozenInstanceError`. Use `object.__setattr__(self, 'field_name', MappingProxyType(self.field_name))`. Cross-reference: T-1.2 uses identical pattern.
 
@@ -348,7 +352,9 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 
 ### T-4.4: Decorator Discovery from AST — Core
 
-> **Note:** Must skip `if TYPE_CHECKING:` imports while building the import table — check for `ast.If` parent node with test `ast.Name(id='TYPE_CHECKING')`. Failure to do this causes false positive decorator matches in T-4.4's own tests. Do not defer this to T-4.5.
+> **Note:** Must skip `if TYPE_CHECKING:` imports while building the import table — check for `ast.If` whose test is either `ast.Name(id='TYPE_CHECKING')` (direct import: `from typing import TYPE_CHECKING`) or `ast.Attribute(attr='TYPE_CHECKING')` (qualified: `typing.TYPE_CHECKING`). Both import styles are common; missing the qualified form produces false positive decorator matches. Do not defer this to T-4.5.
+>
+> **Implementation note:** `ast.NodeVisitor` does not provide parent references natively. Use either a pre-pass with `ast.walk()` to collect `if TYPE_CHECKING:` block line ranges and filter imports by line range, or a custom visitor that maintains a parent stack.
 
 **Depends on:** T-1.2 (registry), T-4.1
 **Produces:**
@@ -356,7 +362,7 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 - Build map: `dict[tuple[str, str], set[WardlineAnnotation]]` keyed by `(module_path, qualname)`
 - `tests/unit/scanner/test_discovery.py` — all three core import patterns resolve correctly, `TYPE_CHECKING` guard imports excluded
 
-**Done when:** Core import patterns correctly discovered. Map built for fixture files. `TYPE_CHECKING` imports excluded from import table.
+**Done when:** Core import patterns correctly discovered. Map built for fixture files. `TYPE_CHECKING` imports excluded from import table — both `from typing import TYPE_CHECKING` (direct) and `import typing; if typing.TYPE_CHECKING:` (qualified) forms tested.
 
 ---
 
@@ -441,14 +447,14 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 
 ### T-4.INT: Integration Checkpoint — First Rule End-to-End
 
-**Depends on:** T-4.3, T-4.7 (first rule), T-3.3, T-3.4
+**Depends on:** T-4.3, T-4.7 (first rule), T-4.6 (taint assignment), T-3.3, T-3.4
 **Produces:**
 - A small fixture Python project (2-3 files with wardline decorators and PY-WL-004 patterns)
 - A fixture `wardline.yaml` manifest for the fixture project
-- Integration test that runs `ScanEngine` directly (no CLI) on the fixture project and validates SARIF output
-- Validates: manifest loading works end-to-end, taint assignment from manifest works, rule fires with correct severity, SARIF structure is valid, property bags are present
+- `tests/integration/test_scan_engine_integration.py` marked `@pytest.mark.integration` — runs `ScanEngine` directly (no CLI) on the fixture project and validates output
+- Validates: manifest loading works end-to-end, taint assignment from manifest works, rule fires with correct severity, output dict has correct keys and property bags
 
-**Done when:** ScanEngine produces valid SARIF with correct findings on the fixture project. This catches interface mismatches between manifest loading (T-3.3/T-3.4), taint assignment (T-4.6), and rule execution (T-4.7) before the CLI layer adds another dimension. Fixture project committed to `tests/fixtures/integration/`.
+**Done when:** ScanEngine returns findings with correct keys, severity, taint state, and property bags on the fixture project (dict-level key inspection — full SARIF schema validation deferred to T-5.2). This catches interface mismatches between manifest loading (T-3.3/T-3.4), taint assignment (T-4.6), and rule execution (T-4.7) before the CLI layer adds another dimension. Fixture project committed to `tests/fixtures/integration/`. `uv run pytest -m 'not integration'` does NOT execute this test.
 
 ---
 
@@ -478,13 +484,13 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 
 ### T-5.1: CLI Skeleton + Exit Code Handling
 
-**Depends on:** Nothing (can parallel with Phase 4, needs only Click)
+**Depends on:** T-0.1 (package scaffold — `src/wardline/cli/` must exist)
 **Produces:**
 - `src/wardline/cli/main.py` — Click group `cli()` with common options (`--manifest`, `--config`, `--output`, `--verbose`, `--debug`, `--verification-mode`)
 - Exit code handling: 0 (clean), 1 (findings), 2 (config error), 3 (tool error); priority: 3 > 1 > 0; 2 is exclusive
 - `--fail-on-unverified-default`, `--warnings-as-errors`, `--max-unknown-raw-percent` flags with `wardline.toml` integration
 - Structured error messages to stderr (not stack traces) for manifest not found, YAML parse error, schema validation failure
-- `tests/integration/test_cli.py` — exit code 0 (clean scan), exit code 1 (findings), exit code 2 (missing manifest), exit code 3 (TOOL-ERROR), error output assertions (structured, not stack traces)
+- `tests/integration/test_cli.py` — exit code 0 (clean scan), exit code 1 (findings), exit code 2 (missing manifest), exit code 2 (schema-invalid manifest — structured error to stderr, not Python traceback), exit code 3 (TOOL-ERROR), error output assertions (structured, not stack traces)
 
 **Done when:** CLI skeleton runs. All four exit codes tested. Flag subset relationship (`--warnings-as-errors` ⊃ `--fail-on-unverified-default`) verified. `--verbose` and `--debug` produce structured logging to stderr.
 
@@ -492,16 +498,17 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 
 ### T-5.2: `wardline scan` Command
 
-**Depends on:** T-5.1, T-4.3, T-4.13
+**Depends on:** T-5.1, T-4.3, T-4.13, T-4.INT (integration checkpoint must pass before CLI integration)
 **Produces:**
 - `src/wardline/cli/scan.py` — `wardline scan <path> [flags]`; wires ScanEngine to CLI; loads manifest + config, runs scan, writes SARIF, exits with correct code
 - `wardline.toml` validation at startup (known keys only, valid rule IDs, valid taint states, valid paths); malformed → exit 2
 - GOVERNANCE-level finding when `--allow-registry-mismatch` is active
 - GOVERNANCE-level finding when `--allow-permissive-distribution` is active
-- Runtime registry sync check at scan startup (bidirectional: every registry name in library exports, every library export in registry)
-- Tests: scan command produces valid SARIF, flags affect exit code
+- Runtime registry sync check at scan startup (bidirectional: every registry name in library exports, every library export in registry); registry mismatch without `--allow-registry-mismatch` exits 2 (config error); with flag active, emits GOVERNANCE finding and continues (exit 1 if any findings, else 0)
+- Fixture `tests/fixtures/wardline.toml` (minimal scanner config for integration tests — do NOT write to repo-root `wardline.toml`, which is produced by T-6.4a)
+- `tests/integration/test_scan_cmd.py` — scan produces valid SARIF, flags affect exit code, registry sync failure test (temporarily remove a registry entry → non-zero exit), `--max-unknown-raw-percent` boundary test (at limit passes, above limit exits 1), CLI flag overrides `wardline.toml` value, schema-invalid manifest causes exit 2 with structured message (not Python traceback)
 
-**Done when:** Full scan pipeline works end-to-end via CLI. `--max-unknown-raw-percent` ceiling enforced (exit 1 when exceeded). CLI flags override `wardline.toml` values. Runtime registry sync check runs at scan startup. GOVERNANCE WARNING emitted for each disabled rule (ERROR for UNCONDITIONAL rule disablement).
+**Done when:** Full scan pipeline works end-to-end via CLI. `--max-unknown-raw-percent` ceiling enforced (exit 1 when exceeded). CLI flags override `wardline.toml` values. Runtime registry sync check runs at scan startup; registry mismatch without `--allow-registry-mismatch` exits 2; with flag active emits GOVERNANCE finding. GOVERNANCE WARNING emitted for each disabled rule (ERROR for UNCONDITIONAL rule disablement). Schema-invalid manifest causes exit 2 with structured error to stderr.
 
 ---
 
@@ -512,18 +519,20 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 - `src/wardline/cli/manifest_cmds.py` — `wardline manifest validate [FILE]` (schema validation, exit 0/1); `wardline manifest baseline update [--approve]` (writes `wardline.manifest.baseline.json` + `wardline.perimeter.baseline.json`, requires `--approve`)
 - Tests: validate catches invalid manifest, baseline update requires `--approve`
 
-**Done when:** Both commands work. Baseline files written correctly.
+**Done when:** Baseline files written with correct JSON structure (validated against schema). `wardline manifest baseline update` without `--approve` exits non-zero. `wardline manifest validate` produces exit 0 for valid manifest, exit 1 for invalid manifest, exit 2 for file not found.
 
 ---
 
 ### T-5.4: `wardline corpus verify`
 
-**Depends on:** T-5.1, T-3.1 (schemas), T-3.3 (WardlineSafeLoader)
+**Depends on:** T-5.1, T-3.1 (schemas), T-3.3 (WardlineSafeLoader), T-4.3 (ScanEngine — corpus verify invokes the scanner to confirm specimens)
 **Produces:**
-- `src/wardline/cli/corpus_cmds.py` — `wardline corpus verify [--corpus-dir DIR]`; loads specimens via `yaml.safe_load()` (WardlineSafeLoader); `ast.parse()` only on fragments (never `exec`/`eval`); SHA-256 hash verification (mismatch → ERROR); per-rule precision/recall where sample ≥5; reports `known_false_negative` separately from true negatives; "Lite bootstrap" output format
+- `src/wardline/cli/corpus_cmds.py` — `wardline corpus verify [--corpus-dir DIR]`; loads specimens via `yaml.load(stream, Loader=WardlineSafeLoader)`; `ast.parse()` only on fragments (never `exec`/`eval`); SHA-256 hash verification (mismatch → ERROR); per-rule precision/recall where sample ≥5; reports `known_false_negative` separately from true negatives; "Lite bootstrap" output format
 - `tests/unit/scanner/test_corpus_runner.py` — mock `builtins.exec`, `builtins.eval`, `builtins.compile`, assert none called; hash mismatch produces ERROR; known_false_negative excluded from recall
+- Fixture specimen YAML file (minimal, valid, known hash) in `tests/fixtures/corpus/` for integration test
+- Integration test (in `test_corpus_runner.py` or separate `tests/integration/test_corpus_verify.py`): run `wardline corpus verify --corpus-dir tests/fixtures/corpus/`, capture output, assert output matches `Lite bootstrap: N specimens` format
 
-**Done when:** Corpus verify runs. exec/eval mock test passes. Hash integrity enforced. Output says 'Lite bootstrap: N specimens' not 'Wardline-Core corpus conformant'.
+**Done when:** Corpus verify runs. exec/eval mock test passes. Hash integrity enforced. Output says 'Lite bootstrap: N specimens' not 'Wardline-Core corpus conformant'. Integration test against real fixture specimen passes with correct output format.
 
 ---
 
@@ -534,7 +543,7 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 - `src/wardline/cli/explain_cmd.py` (new file, not in original design source layout) — `wardline explain <function_qualname> [--manifest FILE]`; prints resolved taint state + how determined (decorator/module_tiers/UNKNOWN_RAW), which module-tier entry matched, which rules evaluated at what severity; distinguishes "module not declared" from "decorator unresolved"
 - `tests/integration/test_explain.py` — explain output for decorated function, for undeclared module function, for unresolved decorator
 
-**Done when:** Explain correctly shows taint resolution path for all three categories.
+**Done when:** Explain correctly shows taint resolution path for all three categories. Verified by `tests/integration/test_explain.py` covering: decorated function, undeclared module function, and unresolved decorator.
 
 ---
 
@@ -587,21 +596,22 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 - SHA-256 hashes in corpus manifest
 - Total: 36-46 specimens across TN + KFN + TP
 
-**Done when:** All specimens authored and verified against running scanner. Hashes match.
+**Done when:** `wardline corpus verify` passes for the full specimen set (TN + KFN + TP). SHA-256 hashes in corpus manifest match computed values. All 5 rules have at least one TP specimen verified as detected.
 
 ---
 
 ### T-6.4a: Self-Hosting Gate — Scan Pass + Coverage
 
-**Depends on:** T-4.3, T-4.7, T-4.8, T-4.9, T-4.10, T-4.11, T-4.13, T-5.2, T-5.3, T-5.4, T-3.7, T-6.2b, T-6.3
+**Depends on:** T-4.3, T-4.7, T-4.8, T-4.9, T-4.10, T-4.11, T-4.12 (registry sync tests), T-4.13, T-5.2, T-5.3, T-5.4, T-3.7, T-6.2b, T-6.3
 **Produces:**
 - `wardline.yaml` at repo root (machine-validated — upgrade from T-0.2 comment-only version)
 - `wardline.toml` with scanner config (including `max_permissive_percent` calibrated from T-0.2 sketch, `max_unknown_raw_percent` set low)
 - `wardline scan src/` passes with zero ERROR findings (or documented exceptions)
-- 80% decorator coverage on Tier 1/4 modules
+- 80% decorator coverage on Tier 1/4 modules — measured by counting decorated vs. total functions in Tier 1/4 modules via `wardline explain` batch invocation or a coverage script committed as `scripts/coverage_check.py`
 - Tier-distribution check passes at configured threshold
+- `tests/integration/test_self_hosting_scan.py` — scan passes, coverage floor verified, tier-distribution threshold passes
 
-**Done when:** Scanner scans itself cleanly. Coverage floor met. Tier-distribution threshold passes.
+**Done when:** Scanner scans itself cleanly. Coverage floor met (measured by script or `wardline explain` output, not subjective assessment). Tier-distribution threshold passes. `test_self_hosting_scan.py` passes.
 
 ---
 
@@ -616,13 +626,15 @@ Tasks are grouped into phases matching the critical path. Within a phase, tasks 
 - Extend `.github/CODEOWNERS` (from T-0.3) to include: SARIF regression baseline, `wardline.manifest.baseline.json`, `wardline.perimeter.baseline.json`
 - CI jobs: `test-unit` (every commit, `-m "not integration"`), `test-integration` (every merge to main, `-m integration`), `test-network` (weekly schedule, `-m network`)
 
-**Done when:** All baselines committed. CI pipeline green with all three jobs configured. CODEOWNERS extended. `test_self_hosting.py` and `test_determinism.py` pass.
+**Done when:** All baselines committed. CI pipeline green with all three jobs configured. CODEOWNERS extended. `test_self_hosting.py` and `test_determinism.py` pass. CI comparison distinguishes finding-count decrease (suppression regression — requires human sign-off) from finding-count increase (new findings).
 
 ---
 
 ## Dependency Graph (Mermaid)
 
-> **WARNING:** T-1.3 and T-1.2 share write target `taints.py` — they should not be assigned to separate parallel agents. Sequence T-1.3 before T-1.2, or coordinate file-level merges.
+> **WARNING:** T-1.3 MUST complete before T-1.2 begins — they share write target `taints.py`. This is enforced by the `T13 --> T12` edge below.
+>
+> **SCHEDULING NOTE:** T-0.3 (CODEOWNERS + CI pipeline) should complete before T-1.1 begins so that CI is active from the first committed code. This is a scheduling preference, not a hard dependency — T-0.3 does not produce artifacts consumed by T-1.1, but CI provides quality gates that should be active during Phase 1.
 
 ```mermaid
 graph TD
@@ -631,8 +643,8 @@ graph TD
     T01 --> T03[T-0.3 CODEOWNERS + CI]
 
     %% Phase 1
-    T11 --> T12[T-1.2 Registry]
     T11 --> T13[T-1.3 Taint Lattice]
+    T13 --> T12[T-1.2 Registry]
     T11 --> T14[T-1.4 Severity Matrix]
     T11 --> T15[T-1.5 Type Markers]
     T11 --> T16[T-1.6 AuthoritativeField]
@@ -659,7 +671,8 @@ graph TD
     T36 --> T37[T-3.7 Coherence: Governance]
 
     %% Phase 4
-    T18 --> T41[T-4.1 Scanner Data Models]
+    T11 --> T41[T-4.1 Scanner Data Models]
+    T18 --> T41
     T41 --> T42[T-4.2 RuleBase]
     T41 --> T43[T-4.3 ScanEngine]
     T42 --> T43
@@ -684,6 +697,7 @@ graph TD
     %% T-4.INT Integration Checkpoint
     T43 --> T4INT[T-4.INT Integration Checkpoint]
     T47 --> T4INT
+    T46 --> T4INT
     T33 --> T4INT
     T34 --> T4INT
 
@@ -697,15 +711,18 @@ graph TD
     T11 --> T413
 
     %% Phase 5
-    T51[T-5.1 CLI Skeleton] --> T52[T-5.2 wardline scan]
+    T01 --> T51[T-5.1 CLI Skeleton]
+    T51 --> T52[T-5.2 wardline scan]
     T43 --> T52
     T413 --> T52
+    T4INT --> T52
     T51 --> T53[T-5.3 manifest validate + baseline]
     T33 --> T53
     T35 --> T53
     T51 --> T54[T-5.4 corpus verify]
     T31 --> T54
     T33 --> T54
+    T43 --> T54
     T51 --> T55[T-5.5 wardline explain]
     T46 --> T55
     T33 --> T55
@@ -729,7 +746,8 @@ graph TD
     T54 --> T63
 
     %% Self-Hosting Gate (split)
-    T43 --> T64a[T-6.4a Self-Hosting: Scan + Coverage]
+    T412 --> T64a[T-6.4a Self-Hosting: Scan + Coverage]
+    T43 --> T64a
     T47 --> T64a
     T48 --> T64a
     T49 --> T64a
