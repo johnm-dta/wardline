@@ -135,7 +135,7 @@ class TestCliExitCodes:
                     message="Rule crashed",
                     severity=Severity.WARNING,
                     exceptionability=Exceptionability.UNCONDITIONAL,
-                    taint_state=None,  # type: ignore[arg-type]
+                    taint_state=None,
                     analysis_level=0,
                     source_snippet=None,
                 ),

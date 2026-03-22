@@ -7,6 +7,7 @@ import textwrap
 
 import pytest
 
+from wardline.core.severity import RuleId
 from wardline.scanner.rules.base import RuleBase
 
 # ── Valid subclass for testing dispatch ───────────────────────────
@@ -14,6 +15,8 @@ from wardline.scanner.rules.base import RuleBase
 
 class _ValidRule(RuleBase):
     """A valid concrete rule for test dispatch."""
+
+    RULE_ID: RuleId = RuleId.TOOL_ERROR
 
     def __init__(self) -> None:
         self.visited: list[tuple[str, bool]] = []

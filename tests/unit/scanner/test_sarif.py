@@ -38,7 +38,7 @@ def _make_finding(
         message=message,
         severity=severity,
         exceptionability=exceptionability,
-        taint_state=taint_state,  # type: ignore[arg-type]
+        taint_state=taint_state,
         analysis_level=analysis_level,
         source_snippet=source_snippet,
     )
