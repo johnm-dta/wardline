@@ -36,10 +36,28 @@
       "description": "Rules expected to fire on this specimen.",
       "items": { "type": "string" }
     },
+    "rule": {
+      "type": "string",
+      "description": "The rule ID this specimen targets (e.g. PY-WL-001)."
+    },
+    "expected_rules": {
+      "type": "array",
+      "description": "Rules expected to fire on this specimen.",
+      "items": { "type": "string" }
+    },
     "expected_severity": {
       "type": ["string", "null"],
       "enum": ["ERROR", "WARNING", "SUPPRESS", null],
       "description": "Expected severity of the finding."
+    },
+    "expected_exceptionability": {
+      "type": ["string", "null"],
+      "enum": ["UNCONDITIONAL", "STANDARD", "RELAXED", "TRANSPARENT", null],
+      "description": "Expected exceptionability class of the finding."
+    },
+    "expected_match": {
+      "type": "boolean",
+      "description": "Whether the scanner is expected to produce a finding for this specimen."
     },
     "verdict": {
       "type": "string",
@@ -56,6 +74,6 @@
       "description": "Categorisation tags for the specimen."
     }
   },
-  "required": ["specimen_id", "fragment", "verdict"],
+  "required": ["specimen_id", "rule", "fragment", "taint_state", "verdict"],
   "additionalProperties": false
 }

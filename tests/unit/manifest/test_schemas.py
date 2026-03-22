@@ -148,7 +148,9 @@ class TestCorpusSpecimenSchema:
     def test_valid_specimen_accepted(self, schema: dict[str, object]) -> None:
         doc = {
             "specimen_id": "tp-wl004-bare-except",
+            "rule": "PY-WL-004",
             "fragment": "try:\\n    pass\\nexcept:\\n    pass",
+            "taint_state": "EXTERNAL_RAW",
             "verdict": "true_positive",
         }
         jsonschema.validate(doc, schema)
