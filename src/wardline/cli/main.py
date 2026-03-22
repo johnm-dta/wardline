@@ -215,3 +215,9 @@ def scan(
         sys.exit(EXIT_FINDINGS)
     else:
         sys.exit(EXIT_CLEAN)
+
+
+# --- Register subcommand groups ---
+from wardline.cli.corpus_cmds import corpus  # noqa: E402
+
+cli.add_command(corpus)
