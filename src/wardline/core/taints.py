@@ -1,4 +1,6 @@
-"""Taint state model — 8 canonical taint state tokens."""
+"""Taint state model — 8 canonical taint state tokens and join lattice."""
+
+from __future__ import annotations
 
 from enum import StrEnum
 
@@ -19,3 +21,37 @@ class TaintState(StrEnum):
     UNKNOWN_SHAPE_VALIDATED = "UNKNOWN_SHAPE_VALIDATED"
     UNKNOWN_SEM_VALIDATED = "UNKNOWN_SEM_VALIDATED"
     MIXED_RAW = "MIXED_RAW"
+
+
+# Non-trivial join pairs (upper triangle, excluding self-joins).
+# Self-joins are handled via identity check: join(a, a) == a.
+# Operand order is normalised for lookup: min(a, b), max(a, b) by value.
+# All pairs not listed here produce MIXED_RAW.
+_UR = TaintState.UNKNOWN_RAW
+_USH = TaintState.UNKNOWN_SHAPE_VALIDATED
+_USE = TaintState.UNKNOWN_SEM_VALIDATED
+
+_JOIN_TABLE: dict[tuple[TaintState, TaintState], TaintState] = {
+    # Within UNKNOWN family: demote to weaker validation
+    (_UR, _USE): _UR,
+    (_UR, _USH): _UR,
+    (_USE, _USH): _USH,
+}
+
+
+def taint_join(a: TaintState, b: TaintState) -> TaintState:
+    """Compute the join of two taint states per spec §5.
+
+    The join is commutative: join(a, b) == join(b, a).
+    MIXED_RAW is the absorbing element: join(MIXED_RAW, X) == MIXED_RAW for all X.
+    Self-joins are identity: join(a, a) == a.
+    """
+    if a is b:
+        return a
+
+    if a is TaintState.MIXED_RAW or b is TaintState.MIXED_RAW:
+        return TaintState.MIXED_RAW
+
+    # Normalise order for lookup (by string value for determinism)
+    key = (min(a, b, key=lambda x: x.value), max(a, b, key=lambda x: x.value))
+    return _JOIN_TABLE.get(key, TaintState.MIXED_RAW)
