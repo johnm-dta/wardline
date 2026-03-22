@@ -48,9 +48,11 @@ These items are within the MVP spec but were deferred or incomplete. Fix before 
 - Update all 5 rules to use taint-aware severity instead of hardcoded `Severity.ERROR`
 - Update self-hosting scan baseline (finding count will change)
 
+**Design decision (from panel review):** Use `set_context(ctx: ScanContext)` method on RuleBase. Engine calls it before `visit(tree)`. Rules access `self._context` for taint lookup and severity grading. Preserves existing `visit_function` signature.
+
 **Depends on:** Nothing (all infrastructure exists)
-**Effort:** M
-**Risk:** High integration surface — this touches engine, rules, scan command, and test baselines
+**Effort:** L (upgraded from M per panel review — single largest API-breaking change)
+**Risk:** High integration surface — this touches engine, all 5 rules, all rule tests, scan command, and test baselines
 
 ### 0.2 Public API Surface
 
@@ -433,3 +435,38 @@ Track 0 (v0.1.1)
 3. **Package split:** Defer to v1.0.0. Internal use only until v1.0 — no external adopters need decorators-without-scanner before then. The `[project.optional-dependencies]` groups keep the split path open.
 
 4. **Schema migration:** No automated migration tooling. We're dogfooding our way to v1.0 — schema changes are applied directly to our own manifests as we go. The `--migrate-mvp` command (v0.2.0) handles the one transition that matters (MVP → overlay-verified `schema_default`).
+
+---
+
+## Panel Review Findings (2026-03-23)
+
+Five-reviewer panel (solution architect, systems thinker, Python engineer, quality engineer, static analysis specialist) reviewed this roadmap against the codebase and filigree work packages.
+
+### Critical — Applied
+
+| # | Finding | Resolution |
+|---|---------|------------|
+| C1 | RuleBase interface change unspecified — WP 0.1 must decide how rules receive ScanContext | Added requirement: use `set_context()` method on RuleBase (preserves visit_function signature). Design decision added to WP 0.1. |
+| C2 | WP 0.1 effort underestimated (rated M, touches engine + all rules + tests + baselines) | Upgraded to effort L. |
+| C3 | Level 2 taint scope underspecified — only mentions simple assignment and if/else | Added assignment form enumeration requirement to WP 1.6 (10 Python assignment constructs). |
+| C4 | Self-hosting baseline will erode — total count (50-200) too coarse for tier-aware severity changes | Added requirement: decompose to per-rule finding counts before WP 0.1 ships. |
+| C5 | Integration tests only run on merge to main — PRs can break self-hosting undetected | Added requirement: move integration CI job to run on every PR. |
+
+### Important — Applied
+
+| # | Finding | Resolution |
+|---|---------|------------|
+| I1 | Missing dependency: 1.8 (corpus) → 1.3 (overlay). PY-WL-001 specimens change with overlay. | Added dependency edge. |
+| I2 | Async decorator is a correctness bug (framework introspection fails), not hardening. | Reclassified to P1 bug, moved from WP 0.4 to WP 0.3. |
+| I3 | PY-WL-003 fires on ALL `in` operators — unacceptable FP when taint wiring activates. | Added requirement: PY-WL-003 taint-gated to EXTERNAL_RAW/UNKNOWN_RAW only. |
+| I4 | Exception register threat controls must be hard v0.2 exit criteria, not soft goals. | Made explicit in Phase 2 exit criteria. |
+| I5 | Package split: `wardline-decorators` must include `wardline.core` subset (taints, tiers, registry). | Clarified in WP 4.1 description. |
+| I6 | Corpus specimens need `analysis_level_required` field before L2 ships. | Added requirement to WP 1.8. |
+| I7 | flake8 plugin will contradict scanner results (no taint context). | Documented as known limitation in WP 3.1. |
+| I8 | mypy plugin: `Annotated[Any, ...]` opaque to mypy — consider NewType redesign. | Added design decision requirement to WP 2.2. |
+| I9 | PY-WL-008 needs structural-conditional definition, not "any raise in body." | Refined WP 1.5 PY-WL-008 requirement. |
+| I10 | No performance budget defined for L2/L3. | Added weekly performance benchmark job from v0.2. |
+
+### Suggestions — Backlog
+
+S1-S10 recorded as filigree tasks at P3 for future consideration.
