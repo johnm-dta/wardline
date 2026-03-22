@@ -1,0 +1,9 @@
+# Wardline Corpus Manifest
+# Maps specimen IDs to SHA-256 hashes for integrity verification.
+---
+schema_version: "0.1"
+specimens: {}
+# Example entry:
+#   PY-WL-001-TP-001:
+#     sha256: "abc123..."
+#     path: "specimens/PY-WL-001/EXTERNAL_RAW/positive/tp_001.yaml"

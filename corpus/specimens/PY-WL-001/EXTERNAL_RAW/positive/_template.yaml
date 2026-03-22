@@ -1,0 +1,14 @@
+# Specimen template — copy and fill in for new specimens.
+# All fields marked with # REQUIRED must be present.
+---
+specimen_id: "PY-WL-001-TEMPLATE"  # REQUIRED: unique ID
+description: "Template specimen — replace with actual test case"
+fragment: |  # REQUIRED: Python source fragment
+  # Replace with actual Python code
+  x = data.get("key", "default")
+taint_state: "EXTERNAL_RAW"
+expected_rules:
+  - "PY-WL-001"
+expected_severity: "ERROR"
+verdict: "true_positive"  # REQUIRED: true_positive | true_negative | known_false_negative
+# sha256 is computed during verification, not set manually
