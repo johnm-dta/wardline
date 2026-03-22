@@ -1,7 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "wardline"
 version = "0.1.0"
-description = "Add your description here"
+description = "Semantic boundary enforcement framework for Python"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
+
+[project.optional-dependencies]
+scanner = [
+    "pyyaml>=6.0",
+    "jsonschema>=4.0",
+    "click>=8.0",
+]
+dev = [
+    "wardline[scanner]",
+    "pytest>=8.0",
+    "pytest-randomly",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+]
+
+[project.scripts]
+wardline = "wardline.cli.main:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wardline"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not integration and not network'"
+markers = [
+    "integration: marks tests as integration tests (deselected by default)",
+    "network: marks tests requiring network access (deselected by default, run weekly)",
+]
+
+[tool.ruff]
+src = ["src"]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "TCH",  # flake8-type-checking
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+mypy_path = "src"
+packages = ["wardline"]

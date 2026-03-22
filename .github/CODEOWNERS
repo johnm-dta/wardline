@@ -1,0 +1,16 @@
+# Wardline governance files — changes require review
+# See docs/2026-03-22-filigree-filing-system.md for rationale
+
+# Trust topology
+wardline.yaml                      @wardline/maintainers
+wardline.toml                      @wardline/maintainers
+
+# Overlay files (scattered across module_tiers directories)
+**/wardline.overlay.yaml           @wardline/maintainers
+
+# Corpus specimens
+corpus/                            @wardline/maintainers
+
+# Baselines (added by T-6.4b when they exist)
+# wardline.manifest.baseline.json  @wardline/maintainers
+# wardline.perimeter.baseline.json @wardline/maintainers
