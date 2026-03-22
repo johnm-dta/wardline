@@ -19,6 +19,7 @@ class _ValidRule(RuleBase):
     RULE_ID: RuleId = RuleId.TOOL_ERROR
 
     def __init__(self) -> None:
+        super().__init__()
         self.visited: list[tuple[str, bool]] = []
 
     def visit_function(
