@@ -8,6 +8,10 @@ from __future__ import annotations
 
 from wardline.decorators._base import wardline_decorator
 
+__all__ = [
+    "audit_critical",
+]
+
 audit_critical = wardline_decorator(
     2,
     "audit_critical",

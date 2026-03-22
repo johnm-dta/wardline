@@ -9,6 +9,16 @@ from __future__ import annotations
 from wardline.core.taints import TaintState
 from wardline.decorators._base import wardline_decorator
 
+__all__ = [
+    "audit_writer",
+    "authoritative_construction",
+    "external_boundary",
+    "tier1_read",
+    "validates_external",
+    "validates_semantic",
+    "validates_shape",
+]
+
 external_boundary = wardline_decorator(
     1,
     "external_boundary",
