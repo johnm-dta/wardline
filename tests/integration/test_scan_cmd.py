@@ -129,6 +129,21 @@ class TestScanProducesSarif:
         sarif = json.loads(output_file.read_text())
         assert sarif["version"] == "2.1.0"
 
+    def test_output_write_error_exits_2(self, tmp_path: Path) -> None:
+        """--output to nonexistent directory exits 2 with error message."""
+        manifest = _minimal_manifest(tmp_path)
+        bad_output = str(tmp_path / "no_such_dir" / "output.sarif.json")
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--allow-registry-mismatch",
+            "--output", bad_output,
+        ])
+        assert result.exit_code == 2
+        assert "error:" in result.stderr
+        assert "Traceback" not in (result.output + result.stderr)
+
 
 @pytest.mark.integration
 class TestScanExitCodes:

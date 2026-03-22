@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import logging
 
 import pytest
@@ -403,3 +405,87 @@ class TestGroup1Decorators:
             return 42
 
         assert f() == 42
+
+
+# ---------------------------------------------------------------------------
+# TestAsyncSupport
+# ---------------------------------------------------------------------------
+
+
+class TestAsyncSupport:
+    """Async function decorator support."""
+
+    def test_async_function_stays_coroutine(self) -> None:
+        """Decorating async def preserves coroutine function status."""
+
+        @external_boundary
+        async def my_async_func() -> int:
+            return 42
+
+        assert asyncio.iscoroutinefunction(my_async_func)
+        assert inspect.iscoroutinefunction(my_async_func)
+
+    def test_async_function_callable(self) -> None:
+        """Decorated async function can be awaited."""
+
+        @external_boundary
+        async def my_async_func() -> int:
+            return 42
+
+        result = asyncio.run(my_async_func())
+        assert result == 42
+
+    def test_async_function_has_wardline_groups(self) -> None:
+        """Decorated async function has _wardline_groups."""
+
+        @external_boundary
+        async def my_async_func() -> int:
+            return 1
+
+        assert hasattr(my_async_func, "_wardline_groups")
+        assert 1 in my_async_func._wardline_groups  # type: ignore[attr-defined]
+
+    def test_async_function_has_semantic_attrs(self) -> None:
+        """Decorated async function has semantic attributes."""
+
+        @external_boundary
+        async def my_async_func() -> int:
+            return 1
+
+        assert (
+            my_async_func._wardline_tier_source  # type: ignore[attr-defined]
+            is TaintState.EXTERNAL_RAW
+        )
+
+    def test_async_stacking(self) -> None:
+        """Stacked decorators on async preserve coroutine status."""
+
+        @audit_critical
+        @external_boundary
+        async def my_async_func() -> int:
+            return 1
+
+        assert asyncio.iscoroutinefunction(my_async_func)
+        groups = my_async_func._wardline_groups  # type: ignore[attr-defined]
+        assert 1 in groups
+        assert 2 in groups
+
+    def test_sync_function_not_coroutine(self) -> None:
+        """Sync function remains non-coroutine after decoration."""
+
+        @external_boundary
+        def my_sync_func() -> int:
+            return 1
+
+        assert not asyncio.iscoroutinefunction(my_sync_func)
+
+    def test_async_name_preserved(self) -> None:
+        """Async decorated function preserves __name__."""
+
+        @external_boundary
+        async def my_async_func() -> int:
+            """My async docstring."""
+            return 1
+
+        assert my_async_func.__name__ == "my_async_func"
+        assert my_async_func.__doc__ == "My async docstring."

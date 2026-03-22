@@ -172,8 +172,23 @@ def verify(corpus_dir: str) -> None:
 
     for specimen_path in specimens:
         total += 1
-        with open(specimen_path) as f:
-            data = yaml.load(f, Loader=WardlineSafeLoader)  # noqa: S506
+        try:
+            with open(specimen_path) as f:
+                data = yaml.load(f, Loader=WardlineSafeLoader)  # noqa: S506
+        except OSError as exc:
+            click.echo(
+                f"error: cannot read {specimen_path.name}: {exc}",
+                err=True,
+            )
+            errors += 1
+            continue
+        except yaml.YAMLError as exc:
+            click.echo(
+                f"error: {specimen_path.name} has invalid YAML: {exc}",
+                err=True,
+            )
+            errors += 1
+            continue
 
         if not isinstance(data, dict):
             click.echo(

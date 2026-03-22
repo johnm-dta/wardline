@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import inspect
 import logging
 from typing import Any, TypeVar
 
@@ -53,9 +54,14 @@ def wardline_decorator(
             unwrapped = fn.__func__
             wrapper_type = classmethod
 
-        @functools.wraps(unwrapped)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            return unwrapped(*args, **kwargs)
+        if inspect.iscoroutinefunction(unwrapped):
+            @functools.wraps(unwrapped)
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                return await unwrapped(*args, **kwargs)
+        else:
+            @functools.wraps(unwrapped)
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
+                return unwrapped(*args, **kwargs)
 
         # CRITICAL: set _wardline_groups AFTER functools.wraps()
         # Copy-on-accumulate: don't mutate inner decorator's set

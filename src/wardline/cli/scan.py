@@ -172,7 +172,8 @@ def _disabled_rule_findings(
 @click.option("--verification-mode", is_flag=True,
               help="Deterministic output (no timestamps).")
 @click.option("--max-unknown-raw-percent", type=float, default=None,
-              help="Max percentage of UNKNOWN_RAW functions (exit 1 if exceeded).")
+              help="Max percentage of UNKNOWN_RAW findings per file scanned "
+                   "(exit 1 if exceeded). Denominator is files_scanned.")
 @click.option("--allow-registry-mismatch", is_flag=True, default=False,
               help="Emit GOVERNANCE finding instead of exit 2 on registry mismatch.")
 @click.option("--allow-permissive-distribution", is_flag=True, default=False,
@@ -305,6 +306,8 @@ def scan(
     )
 
     # --- Check max_unknown_raw_percent ---
+    # NOTE: denominator is files_scanned, not function count. A single file
+    # with multiple UNKNOWN_RAW functions can push the ratio above 100%.
     exceeded_pct = False
     if effective_max_pct is not None and result.files_scanned > 0:
         pct = (unknown_raw_count / result.files_scanned) * 100
@@ -328,7 +331,11 @@ def scan(
     sarif_text = report.to_json_string() + "\n"
 
     if output is not None:
-        Path(output).write_text(sarif_text, encoding="utf-8")
+        try:
+            Path(output).write_text(sarif_text, encoding="utf-8")
+        except OSError as exc:
+            click.echo(f"error: cannot write to '{output}': {exc}", err=True)
+            sys.exit(EXIT_CONFIG_ERROR)
     else:
         click.echo(sarif_text, nl=False)
 

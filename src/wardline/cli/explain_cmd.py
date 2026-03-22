@@ -171,5 +171,5 @@ def explain(qualname: str, manifest: str | None, scan_path: str) -> None:
         break  # Only show first match
 
     if not found:
-        click.echo(f"error: function '{qualname}' not found", err=True)
+        click.echo(f"error: function '{qualname}' not found")
         sys.exit(1)

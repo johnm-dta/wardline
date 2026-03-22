@@ -188,6 +188,41 @@ class TestSpecimenLoading:
         assert "syntax error" in result.stderr
 
 
+class TestSpecimenFileErrors:
+    """Test error handling for unreadable or malformed specimen files."""
+
+    def test_malformed_yaml_handled(self, tmp_path: Path) -> None:
+        """Malformed YAML specimen produces error, not traceback."""
+        specimen = tmp_path / "bad.yaml"
+        specimen.write_text("{{{{not valid yaml: [}\n")
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, ["corpus", "verify", "--corpus-dir", str(tmp_path)]
+        )
+        assert result.exit_code == 1
+        assert "invalid YAML" in result.stderr
+        assert "Traceback" not in (result.output + result.stderr)
+
+    def test_unreadable_file_handled(self, tmp_path: Path) -> None:
+        """Unreadable specimen file produces error, not traceback."""
+        import os
+
+        specimen = tmp_path / "locked.yaml"
+        specimen.write_text("rule_id: TEST\n")
+        os.chmod(str(specimen), 0o000)
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, ["corpus", "verify", "--corpus-dir", str(tmp_path)]
+        )
+        # Restore permissions for cleanup
+        os.chmod(str(specimen), 0o644)
+        assert result.exit_code == 1
+        assert "cannot read" in result.stderr
+        assert "Traceback" not in (result.output + result.stderr)
+
+
 class TestVerdictEvaluation:
     """Test specimen verdict evaluation against scanner results."""
 
