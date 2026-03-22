@@ -11,6 +11,7 @@ wardline.toml                      @wardline/maintainers
 # Corpus specimens
 corpus/                            @wardline/maintainers
 
-# Baselines (added by T-6.4b when they exist)
-# wardline.manifest.baseline.json  @wardline/maintainers
-# wardline.perimeter.baseline.json @wardline/maintainers
+# Baselines (T-6.4b)
+wardline.manifest.baseline.json    @wardline/maintainers
+wardline.perimeter.baseline.json   @wardline/maintainers
+wardline.sarif.baseline.json       @wardline/maintainers

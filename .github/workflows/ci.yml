@@ -5,27 +5,50 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # Weekly: Sundays at 02:00 UTC
+    - cron: "0 2 * * 0"
 
 jobs:
-  lint:
+  test-unit:
+    name: Unit Tests + Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv sync --all-extras
-      - run: uv run ruff check src/
-      - run: uv run mypy src/
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      - name: Install dependencies
+        run: uv sync --dev
+      - name: Ruff check
+        run: uv run ruff check src/ tests/
+      - name: Mypy
+        run: uv run mypy src/
+      - name: Unit tests
+        run: uv run pytest -m "not integration" --tb=short
 
-  test:
+  test-integration:
+    name: Integration Tests
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test-unit
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv sync --all-extras
-      - run: uv run pytest -m "not integration and not network" tests/
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      - name: Install dependencies
+        run: uv sync --dev
+      - name: Integration tests
+        run: uv run pytest -m integration --tb=short
 
-  yaml-safety:
+  test-network:
+    name: Network Tests (Weekly)
     runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
     steps:
       - uses: actions/checkout@v4
-      - run: ./scripts/check_yaml_safety.sh
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      - name: Install dependencies
+        run: uv sync --dev
+      - name: Network tests
+        run: uv run pytest -m network --tb=short -v

@@ -1,0 +1,22 @@
+{
+  "module_paths": [
+    "src/wardline/__init__.py",
+    "src/wardline/_version.py",
+    "src/wardline/core",
+    "src/wardline/runtime",
+    "src/wardline/decorators",
+    "src/wardline/manifest/schemas",
+    "src/wardline/scanner/context.py",
+    "src/wardline/manifest/models.py",
+    "src/wardline/manifest/merge.py",
+    "src/wardline/manifest/coherence.py",
+    "src/wardline/scanner/sarif.py",
+    "src/wardline/scanner/taint",
+    "src/wardline/scanner/engine.py",
+    "src/wardline/scanner/discovery.py",
+    "src/wardline/scanner/rules",
+    "src/wardline/manifest/loader.py",
+    "src/wardline/manifest/discovery.py",
+    "src/wardline/cli"
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "tiers": [
+    {
+      "id": "AUDIT_TRAIL",
+      "tier": 1,
+      "description": "Authoritative internal data \u2014 enums, registries, base classes"
+    },
+    {
+      "id": "PIPELINE",
+      "tier": 2,
+      "description": "Validated data flowing through processing pipeline"
+    },
+    {
+      "id": "SHAPE_VALIDATED",
+      "tier": 3,
+      "description": "Partially validated \u2014 shape-checked but not semantically verified"
+    },
+    {
+      "id": "EXTERNAL_RAW",
+      "tier": 4,
+      "description": "Untrusted external input \u2014 CLI args, YAML files, filesystem"
+    }
+  ],
+  "module_tiers": [
+    {
+      "path": "src/wardline/__init__.py",
+      "default_taint": "AUDIT_TRAIL"
+    },
+    {
+      "path": "src/wardline/_version.py",
+      "default_taint": "AUDIT_TRAIL"
+    },
+    {
+      "path": "src/wardline/core",
+      "default_taint": "AUDIT_TRAIL"
+    },
+    {
+      "path": "src/wardline/runtime",
+      "default_taint": "AUDIT_TRAIL"
+    },
+    {
+      "path": "src/wardline/decorators",
+      "default_taint": "AUDIT_TRAIL"
+    },
+    {
+      "path": "src/wardline/manifest/schemas",
+      "default_taint": "AUDIT_TRAIL"
+    },
+    {
+      "path": "src/wardline/scanner/context.py",
+      "default_taint": "AUDIT_TRAIL"
+    },
+    {
+      "path": "src/wardline/manifest/models.py",
+      "default_taint": "PIPELINE"
+    },
+    {
+      "path": "src/wardline/manifest/merge.py",
+      "default_taint": "PIPELINE"
+    },
+    {
+      "path": "src/wardline/manifest/coherence.py",
+      "default_taint": "PIPELINE"
+    },
+    {
+      "path": "src/wardline/scanner/sarif.py",
+      "default_taint": "PIPELINE"
+    },
+    {
+      "path": "src/wardline/scanner/taint",
+      "default_taint": "PIPELINE"
+    },
+    {
+      "path": "src/wardline/scanner/engine.py",
+      "default_taint": "SHAPE_VALIDATED"
+    },
+    {
+      "path": "src/wardline/scanner/discovery.py",
+      "default_taint": "SHAPE_VALIDATED"
+    },
+    {
+      "path": "src/wardline/scanner/rules",
+      "default_taint": "SHAPE_VALIDATED"
+    },
+    {
+      "path": "src/wardline/manifest/loader.py",
+      "default_taint": "EXTERNAL_RAW"
+    },
+    {
+      "path": "src/wardline/manifest/discovery.py",
+      "default_taint": "EXTERNAL_RAW"
+    },
+    {
+      "path": "src/wardline/cli",
+      "default_taint": "EXTERNAL_RAW"
+    }
+  ]
+}

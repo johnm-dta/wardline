@@ -1,0 +1,3018 @@
+{
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "properties": {
+        "wardline.conformanceGaps": [],
+        "wardline.implementedRules": [
+          "PY-WL-001",
+          "PY-WL-002",
+          "PY-WL-003",
+          "PY-WL-004",
+          "PY-WL-005"
+        ],
+        "wardline.propertyBagVersion": "1",
+        "wardline.unknownRawFunctionCount": 0,
+        "wardline.unresolvedDecoratorCount": 0
+      },
+      "results": [
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/corpus_cmds.py"
+                },
+                "region": {
+                  "endColumn": 39,
+                  "endLine": 83,
+                  "startColumn": 19,
+                  "startLine": 83
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/corpus_cmds.py"
+                },
+                "region": {
+                  "endColumn": 66,
+                  "endLine": 83,
+                  "startColumn": 43,
+                  "startLine": 83
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/corpus_cmds.py"
+                },
+                "region": {
+                  "endColumn": 42,
+                  "endLine": 84,
+                  "startColumn": 19,
+                  "startLine": 84
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/corpus_cmds.py"
+                },
+                "region": {
+                  "endColumn": 28,
+                  "endLine": 89,
+                  "startColumn": 8,
+                  "startLine": 89
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/corpus_cmds.py"
+                },
+                "region": {
+                  "endColumn": 34,
+                  "endLine": 93,
+                  "startColumn": 18,
+                  "startLine": 93
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/corpus_cmds.py"
+                },
+                "region": {
+                  "endColumn": 42,
+                  "endLine": 186,
+                  "startColumn": 18,
+                  "startLine": 186
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/corpus_cmds.py"
+                },
+                "region": {
+                  "endColumn": 68,
+                  "endLine": 186,
+                  "startColumn": 46,
+                  "startLine": 186
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/corpus_cmds.py"
+                },
+                "region": {
+                  "endColumn": 47,
+                  "endLine": 200,
+                  "startColumn": 25,
+                  "startLine": 200
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/explain_cmd.py"
+                },
+                "region": {
+                  "endColumn": 77,
+                  "endLine": 57,
+                  "startColumn": 9,
+                  "startLine": 56
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Broad exception handler \u2014 'except Exception' catches overly broad exception type"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-004",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-004"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/explain_cmd.py"
+                },
+                "region": {
+                  "endColumn": 21,
+                  "endLine": 76,
+                  "startColumn": 9,
+                  "startLine": 75
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Silent exception handler \u2014 'continue' swallows exception without logging or re-raising"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-005",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-005"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/explain_cmd.py"
+                },
+                "region": {
+                  "endColumn": 37,
+                  "endLine": 86,
+                  "startColumn": 12,
+                  "startLine": 86
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/explain_cmd.py"
+                },
+                "region": {
+                  "endColumn": 46,
+                  "endLine": 107,
+                  "startColumn": 22,
+                  "startLine": 107
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/explain_cmd.py"
+                },
+                "region": {
+                  "endColumn": 59,
+                  "endLine": 111,
+                  "startColumn": 20,
+                  "startLine": 111
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/explain_cmd.py"
+                },
+                "region": {
+                  "endColumn": 33,
+                  "endLine": 132,
+                  "startColumn": 21,
+                  "startLine": 131
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Silent exception handler \u2014 'continue' swallows exception without logging or re-raising"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-005",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-005"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/explain_cmd.py"
+                },
+                "region": {
+                  "endColumn": 42,
+                  "endLine": 144,
+                  "startColumn": 18,
+                  "startLine": 144
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/explain_cmd.py"
+                },
+                "region": {
+                  "endColumn": 59,
+                  "endLine": 148,
+                  "startColumn": 16,
+                  "startLine": 148
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/explain_cmd.py"
+                },
+                "region": {
+                  "endColumn": 21,
+                  "endLine": 174,
+                  "startColumn": 13,
+                  "startLine": 173
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Silent exception handler \u2014 'pass' swallows exception without logging or re-raising"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-005",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-005"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/scan.py"
+                },
+                "region": {
+                  "endColumn": 68,
+                  "endLine": 69,
+                  "startColumn": 43,
+                  "startLine": 69
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/scan.py"
+                },
+                "region": {
+                  "endColumn": 77,
+                  "endLine": 137,
+                  "startColumn": 12,
+                  "startLine": 137
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Attribute access with fallback default \u2014 getattr() with default silently fabricates value for missing attribute"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-002",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-002"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/scan.py"
+                },
+                "region": {
+                  "endColumn": 36,
+                  "endLine": 142,
+                  "startColumn": 12,
+                  "startLine": 142
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/scan.py"
+                },
+                "region": {
+                  "endColumn": 64,
+                  "endLine": 228,
+                  "startColumn": 33,
+                  "startLine": 228
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/cli/scan.py"
+                },
+                "region": {
+                  "endColumn": 29,
+                  "endLine": 445,
+                  "startColumn": 5,
+                  "startLine": 443
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Broad exception handler \u2014 'except Exception' catches overly broad exception type"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-004",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-004"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/core/taints.py"
+                },
+                "region": {
+                  "endColumn": 54,
+                  "endLine": 57,
+                  "startColumn": 12,
+                  "startLine": 57
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/decorators/_base.py"
+                },
+                "region": {
+                  "endColumn": 28,
+                  "endLine": 30,
+                  "startColumn": 8,
+                  "startLine": 30
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/decorators/_base.py"
+                },
+                "region": {
+                  "endColumn": 39,
+                  "endLine": 39,
+                  "startColumn": 12,
+                  "startLine": 39
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/decorators/_base.py"
+                },
+                "region": {
+                  "endColumn": 56,
+                  "endLine": 63,
+                  "startColumn": 13,
+                  "startLine": 63
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Attribute access with fallback default \u2014 getattr() with default silently fabricates value for missing attribute"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-002",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-002"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/decorators/_base.py"
+                },
+                "region": {
+                  "endColumn": 56,
+                  "endLine": 63,
+                  "startColumn": 13,
+                  "startLine": 63
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Attribute access with fallback default \u2014 getattr() with default silently fabricates value for missing attribute"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-002",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-002"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/decorators/_base.py"
+                },
+                "region": {
+                  "endColumn": 31,
+                  "endLine": 93,
+                  "startColumn": 12,
+                  "startLine": 93
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/decorators/_base.py"
+                },
+                "region": {
+                  "endColumn": 65,
+                  "endLine": 99,
+                  "startColumn": 49,
+                  "startLine": 99
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/decorators/_base.py"
+                },
+                "region": {
+                  "endColumn": 56,
+                  "endLine": 103,
+                  "startColumn": 19,
+                  "startLine": 103
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Attribute access with fallback default \u2014 getattr() with default silently fabricates value for missing attribute"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-002",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-002"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/decorators/_base.py"
+                },
+                "region": {
+                  "endColumn": 54,
+                  "endLine": 109,
+                  "startColumn": 21,
+                  "startLine": 109
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Attribute access with fallback default \u2014 getattr() with default silently fabricates value for missing attribute"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-002",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-002"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/coherence.py"
+                },
+                "region": {
+                  "endColumn": 46,
+                  "endLine": 61,
+                  "startColumn": 12,
+                  "startLine": 61
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/coherence.py"
+                },
+                "region": {
+                  "endColumn": 56,
+                  "endLine": 98,
+                  "startColumn": 12,
+                  "startLine": 98
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/coherence.py"
+                },
+                "region": {
+                  "endColumn": 59,
+                  "endLine": 188,
+                  "startColumn": 22,
+                  "startLine": 188
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/coherence.py"
+                },
+                "region": {
+                  "endColumn": 52,
+                  "endLine": 192,
+                  "startColumn": 22,
+                  "startLine": 192
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/coherence.py"
+                },
+                "region": {
+                  "endColumn": 39,
+                  "endLine": 199,
+                  "startColumn": 12,
+                  "startLine": 199
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/coherence.py"
+                },
+                "region": {
+                  "endColumn": 59,
+                  "endLine": 244,
+                  "startColumn": 22,
+                  "startLine": 244
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/coherence.py"
+                },
+                "region": {
+                  "endColumn": 52,
+                  "endLine": 248,
+                  "startColumn": 22,
+                  "startLine": 248
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/coherence.py"
+                },
+                "region": {
+                  "endColumn": 39,
+                  "endLine": 258,
+                  "startColumn": 12,
+                  "startLine": 258
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/coherence.py"
+                },
+                "region": {
+                  "endColumn": 21,
+                  "endLine": 353,
+                  "startColumn": 9,
+                  "startLine": 352
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Silent exception handler \u2014 'continue' swallows exception without logging or re-raising"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-005",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-005"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/discovery.py"
+                },
+                "region": {
+                  "endColumn": 35,
+                  "endLine": 54,
+                  "startColumn": 12,
+                  "startLine": 54
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/discovery.py"
+                },
+                "region": {
+                  "endColumn": 58,
+                  "endLine": 104,
+                  "startColumn": 38,
+                  "startLine": 104
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/discovery.py"
+                },
+                "region": {
+                  "endColumn": 21,
+                  "endLine": 145,
+                  "startColumn": 9,
+                  "startLine": 144
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Silent exception handler \u2014 'continue' swallows exception without logging or re-raising"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-005",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-005"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/discovery.py"
+                },
+                "region": {
+                  "endColumn": 41,
+                  "endLine": 156,
+                  "startColumn": 12,
+                  "startLine": 156
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 33,
+                  "endLine": 97,
+                  "startColumn": 14,
+                  "startLine": 97
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 56,
+                  "endLine": 98,
+                  "startColumn": 19,
+                  "startLine": 98
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 49,
+                  "endLine": 167,
+                  "startColumn": 25,
+                  "startLine": 167
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 39,
+                  "endLine": 169,
+                  "startColumn": 18,
+                  "startLine": 169
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 46,
+                  "endLine": 174,
+                  "startColumn": 18,
+                  "startLine": 174
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 48,
+                  "endLine": 177,
+                  "startColumn": 22,
+                  "startLine": 177
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 77,
+                  "endLine": 179,
+                  "startColumn": 27,
+                  "startLine": 179
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 54,
+                  "endLine": 182,
+                  "startColumn": 22,
+                  "startLine": 182
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 38,
+                  "endLine": 186,
+                  "startColumn": 17,
+                  "startLine": 186
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 55,
+                  "endLine": 188,
+                  "startColumn": 25,
+                  "startLine": 188
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 40,
+                  "endLine": 191,
+                  "startColumn": 16,
+                  "startLine": 191
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 54,
+                  "endLine": 193,
+                  "startColumn": 22,
+                  "startLine": 193
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 44,
+                  "endLine": 239,
+                  "startColumn": 18,
+                  "startLine": 239
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 52,
+                  "endLine": 247,
+                  "startColumn": 19,
+                  "startLine": 247
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 48,
+                  "endLine": 251,
+                  "startColumn": 21,
+                  "startLine": 251
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 60,
+                  "endLine": 253,
+                  "startColumn": 30,
+                  "startLine": 253
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/loader.py"
+                },
+                "region": {
+                  "endColumn": 62,
+                  "endLine": 254,
+                  "startColumn": 31,
+                  "startLine": 254
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/merge.py"
+                },
+                "region": {
+                  "endColumn": 53,
+                  "endLine": 150,
+                  "startColumn": 12,
+                  "startLine": 150
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/models.py"
+                },
+                "region": {
+                  "endColumn": 54,
+                  "endLine": 196,
+                  "startColumn": 28,
+                  "startLine": 196
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/models.py"
+                },
+                "region": {
+                  "endColumn": 70,
+                  "endLine": 207,
+                  "startColumn": 30,
+                  "startLine": 207
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/models.py"
+                },
+                "region": {
+                  "endColumn": 71,
+                  "endLine": 210,
+                  "startColumn": 30,
+                  "startLine": 210
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/models.py"
+                },
+                "region": {
+                  "endColumn": 59,
+                  "endLine": 215,
+                  "startColumn": 18,
+                  "startLine": 215
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/models.py"
+                },
+                "region": {
+                  "endColumn": 60,
+                  "endLine": 224,
+                  "startColumn": 18,
+                  "startLine": 224
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/models.py"
+                },
+                "region": {
+                  "endColumn": 67,
+                  "endLine": 243,
+                  "startColumn": 26,
+                  "startLine": 243
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/models.py"
+                },
+                "region": {
+                  "endColumn": 71,
+                  "endLine": 267,
+                  "startColumn": 17,
+                  "startLine": 267
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/manifest/models.py"
+                },
+                "region": {
+                  "endColumn": 77,
+                  "endLine": 270,
+                  "startColumn": 17,
+                  "startLine": 270
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/runtime/base.py"
+                },
+                "region": {
+                  "endColumn": 58,
+                  "endLine": 48,
+                  "startColumn": 18,
+                  "startLine": 48
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Attribute access with fallback default \u2014 getattr() with default silently fabricates value for missing attribute"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-002",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-002"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/runtime/base.py"
+                },
+                "region": {
+                  "endColumn": 36,
+                  "endLine": 74,
+                  "startColumn": 12,
+                  "startLine": 74
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/runtime/types.py"
+                },
+                "region": {
+                  "endColumn": 36,
+                  "endLine": 37,
+                  "startColumn": 12,
+                  "startLine": 37
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/discovery.py"
+                },
+                "region": {
+                  "endColumn": 40,
+                  "endLine": 64,
+                  "startColumn": 16,
+                  "startLine": 64
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 hasattr() used for attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/discovery.py"
+                },
+                "region": {
+                  "endColumn": 35,
+                  "endLine": 118,
+                  "startColumn": 12,
+                  "startLine": 118
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/discovery.py"
+                },
+                "region": {
+                  "endColumn": 37,
+                  "endLine": 168,
+                  "startColumn": 12,
+                  "startLine": 168
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/discovery.py"
+                },
+                "region": {
+                  "endColumn": 49,
+                  "endLine": 334,
+                  "startColumn": 16,
+                  "startLine": 334
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/discovery.py"
+                },
+                "region": {
+                  "endColumn": 73,
+                  "endLine": 351,
+                  "startColumn": 55,
+                  "startLine": 351
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/discovery.py"
+                },
+                "region": {
+                  "endColumn": 41,
+                  "endLine": 381,
+                  "startColumn": 12,
+                  "startLine": 381
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/discovery.py"
+                },
+                "region": {
+                  "endColumn": 67,
+                  "endLine": 381,
+                  "startColumn": 46,
+                  "startLine": 381
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/engine.py"
+                },
+                "region": {
+                  "endColumn": 25,
+                  "endLine": 120,
+                  "startColumn": 13,
+                  "startLine": 119
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Silent exception handler \u2014 'continue' swallows exception without logging or re-raising"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-005",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-005"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/engine.py"
+                },
+                "region": {
+                  "endColumn": 14,
+                  "endLine": 193,
+                  "startColumn": 9,
+                  "startLine": 168
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Broad exception handler \u2014 'except Exception' catches overly broad exception type"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-004",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-004"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/base.py"
+                },
+                "region": {
+                  "endColumn": 43,
+                  "endLine": 45,
+                  "startColumn": 16,
+                  "startLine": 45
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/py_wl_003.py"
+                },
+                "region": {
+                  "endColumn": 48,
+                  "endLine": 104,
+                  "startColumn": 22,
+                  "startLine": 104
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Attribute access with fallback default \u2014 getattr() with default silently fabricates value for missing attribute"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-002",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-002"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/py_wl_003.py"
+                },
+                "region": {
+                  "endColumn": 51,
+                  "endLine": 105,
+                  "startColumn": 21,
+                  "startLine": 105
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Attribute access with fallback default \u2014 getattr() with default silently fabricates value for missing attribute"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-002",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-002"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/py_wl_003.py"
+                },
+                "region": {
+                  "endColumn": 59,
+                  "endLine": 106,
+                  "startColumn": 26,
+                  "startLine": 106
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Attribute access with fallback default \u2014 getattr() with default silently fabricates value for missing attribute"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-002",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-002"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/py_wl_003.py"
+                },
+                "region": {
+                  "endColumn": 62,
+                  "endLine": 107,
+                  "startColumn": 25,
+                  "startLine": 107
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Attribute access with fallback default \u2014 getattr() with default silently fabricates value for missing attribute"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-002",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-002"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/py_wl_004.py"
+                },
+                "region": {
+                  "endColumn": 49,
+                  "endLine": 45,
+                  "startColumn": 20,
+                  "startLine": 45
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Attribute access with fallback default \u2014 getattr() with default silently fabricates value for missing attribute"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-002",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-002"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/py_wl_004.py"
+                },
+                "region": {
+                  "endColumn": 54,
+                  "endLine": 57,
+                  "startColumn": 21,
+                  "startLine": 57
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/py_wl_004.py"
+                },
+                "region": {
+                  "endColumn": 66,
+                  "endLine": 91,
+                  "startColumn": 43,
+                  "startLine": 91
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/py_wl_004.py"
+                },
+                "region": {
+                  "endColumn": 73,
+                  "endLine": 93,
+                  "startColumn": 48,
+                  "startLine": 93
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/py_wl_004.py"
+                },
+                "region": {
+                  "endColumn": 72,
+                  "endLine": 97,
+                  "startColumn": 50,
+                  "startLine": 97
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/py_wl_004.py"
+                },
+                "region": {
+                  "endColumn": 49,
+                  "endLine": 101,
+                  "startColumn": 25,
+                  "startLine": 101
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/py_wl_005.py"
+                },
+                "region": {
+                  "endColumn": 49,
+                  "endLine": 86,
+                  "startColumn": 20,
+                  "startLine": 86
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Attribute access with fallback default \u2014 getattr() with default silently fabricates value for missing attribute"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-002",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-002"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/rules/py_wl_005.py"
+                },
+                "region": {
+                  "endColumn": 54,
+                  "endLine": 98,
+                  "startColumn": 21,
+                  "startLine": 98
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/sarif.py"
+                },
+                "region": {
+                  "endColumn": 72,
+                  "endLine": 98,
+                  "startColumn": 18,
+                  "startLine": 98
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/sarif.py"
+                },
+                "region": {
+                  "endColumn": 68,
+                  "endLine": 117,
+                  "startColumn": 22,
+                  "startLine": 117
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/sarif.py"
+                },
+                "region": {
+                  "endColumn": 14,
+                  "endLine": 123,
+                  "startColumn": 21,
+                  "startLine": 121
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Dict key access with fallback default \u2014 value fabricated for missing key without validation"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-001",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/sarif.py"
+                },
+                "region": {
+                  "endColumn": 45,
+                  "endLine": 148,
+                  "startColumn": 20,
+                  "startLine": 148
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/sarif.py"
+                },
+                "region": {
+                  "endColumn": 65,
+                  "endLine": 151,
+                  "startColumn": 40,
+                  "startLine": 151
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Existence check as structural gate \u2014 'in' operator used for key/attribute presence check"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-003",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/home/john/wardline/src/wardline/scanner/taint/function_level.py"
+                },
+                "region": {
+                  "endColumn": 21,
+                  "endLine": 113,
+                  "startColumn": 9,
+                  "startLine": 112
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Silent exception handler \u2014 'continue' swallows exception without logging or re-raising"
+          },
+          "properties": {
+            "wardline.analysisLevel": 1,
+            "wardline.exceptionability": "STANDARD",
+            "wardline.rule": "PY-WL-005",
+            "wardline.severity": "ERROR"
+          },
+          "ruleId": "PY-WL-005"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "<governance>"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Registry mismatch (allowed): registry has PY-WL-006 but no rule class is loaded"
+          },
+          "properties": {
+            "wardline.analysisLevel": 0,
+            "wardline.exceptionability": "UNCONDITIONAL",
+            "wardline.rule": "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED",
+            "wardline.severity": "WARNING"
+          },
+          "ruleId": "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "<governance>"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Registry mismatch (allowed): registry has PY-WL-007 but no rule class is loaded"
+          },
+          "properties": {
+            "wardline.analysisLevel": 0,
+            "wardline.exceptionability": "UNCONDITIONAL",
+            "wardline.rule": "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED",
+            "wardline.severity": "WARNING"
+          },
+          "ruleId": "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "<governance>"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Registry mismatch (allowed): registry has PY-WL-008 but no rule class is loaded"
+          },
+          "properties": {
+            "wardline.analysisLevel": 0,
+            "wardline.exceptionability": "UNCONDITIONAL",
+            "wardline.rule": "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED",
+            "wardline.severity": "WARNING"
+          },
+          "ruleId": "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "<governance>"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Registry mismatch (allowed): registry has PY-WL-009 but no rule class is loaded"
+          },
+          "properties": {
+            "wardline.analysisLevel": 0,
+            "wardline.exceptionability": "UNCONDITIONAL",
+            "wardline.rule": "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED",
+            "wardline.severity": "WARNING"
+          },
+          "ruleId": "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://wardline.dev",
+          "name": "wardline",
+          "rules": [
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "id": "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED",
+              "shortDescription": {
+                "text": "Registry mismatch allowed (diagnostic)"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "id": "PY-WL-001",
+              "shortDescription": {
+                "text": "Dict key access should use fallback default"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "id": "PY-WL-002",
+              "shortDescription": {
+                "text": "Missing shape validation on external input"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "id": "PY-WL-003",
+              "shortDescription": {
+                "text": "Raw external data used without sanitisation"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "id": "PY-WL-004",
+              "shortDescription": {
+                "text": "Unvalidated decorator argument"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "id": "PY-WL-005",
+              "shortDescription": {
+                "text": "Unsafe type coercion on tainted data"
+              }
+            }
+          ],
+          "version": "0.1.0"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}
