@@ -1,0 +1,14 @@
+tiers:
+  - id: "internal_db"
+    tier: 1
+    description: "PostgreSQL audit store"
+  - id: "partner_api"
+    tier: 4
+    description: "External partner API"
+module_tiers:
+  - path: "adapters/"
+    default_taint: "EXTERNAL_RAW"
+  - path: "core/"
+    default_taint: "PIPELINE"
+metadata:
+  organisation: "WardlineTestOrg"
