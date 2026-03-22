@@ -166,6 +166,23 @@ def target():
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_004
 
+    def test_nested_try_inside_except_star(self) -> None:
+        """Nested try/except inside except* produces separate findings."""
+        rule = _run_rule_module(
+            """\
+def target():
+    try:
+        pass
+    except* Exception:
+        try:
+            pass
+        except Exception:
+            pass
+"""
+        )
+
+        assert len(rule.findings) == 2
+
 
 # -- Negative: specific exceptions are silent ----------------------------
 

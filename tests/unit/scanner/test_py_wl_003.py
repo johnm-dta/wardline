@@ -181,3 +181,41 @@ class TestNoFalsePositives:
         rule = _run_rule_match(source)
 
         assert len(rule.findings) == 0
+
+    def test_match_star_silent(self) -> None:
+        """MatchStar (``case [first, *rest]:``) is NOT dynamic dispatch."""
+        source = '''\
+        def target():
+            match x:
+                case [first, *rest]:
+                    pass
+        '''
+        rule = _run_rule_match(source)
+
+        assert len(rule.findings) == 0
+
+    def test_match_or_silent(self) -> None:
+        """MatchOr (``case 1 | 2 | 3:``) is NOT dynamic dispatch."""
+        source = '''\
+        def target():
+            match x:
+                case 1 | 2 | 3:
+                    pass
+        '''
+        rule = _run_rule_match(source)
+
+        assert len(rule.findings) == 0
+
+    def test_match_as_wildcard_silent(self) -> None:
+        """MatchAs / wildcard (``case _:``) is NOT dynamic dispatch."""
+        source = '''\
+        def target():
+            match x:
+                case _ as y:
+                    pass
+                case _:
+                    pass
+        '''
+        rule = _run_rule_match(source)
+
+        assert len(rule.findings) == 0
