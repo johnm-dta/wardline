@@ -44,7 +44,7 @@ This document comprises two parts: Part I (the framework specification) and Part
 4. [Authority tier model](#4-authority-tier-model)
     - 4.1 Four tiers
 5. [Authority tier model: enforcement specification](#5-authority-tier-model-enforcement-specification)
-    - 5.1 Trust classification and validation status — 5.2 Transition semantics — 5.3 Trusted restoration boundaries — 5.4 Cross-language taint propagation
+    - 5.1 Trust classification and validation status — 5.2 Transition semantics — 5.3 Trusted restoration boundaries — 5.4 Cross-language taint propagation — 5.5 Third-party in-process dependency taint
 6. [Annotation vocabulary](#6-annotation-vocabulary)
 7. [Pattern rules](#7-pattern-rules)
     - 7.1 The rules — 7.2 Structural verification — 7.2.1 Structural-contract defaults and WL-001 — 7.3 Severity matrix — 7.4 Worked examples — 7.5 Derivation principles — 7.6 Taint analysis scope
