@@ -156,7 +156,7 @@ def _load_yaml(path: Path, alias_limit: int = DEFAULT_ALIAS_LIMIT) -> Any:
     """
     _check_file_size(path)
     loader_cls = make_wardline_loader(alias_limit)
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return yaml.load(f, Loader=loader_cls)  # noqa: S506
 
 

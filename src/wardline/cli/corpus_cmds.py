@@ -179,7 +179,7 @@ def verify(corpus_dir: str) -> None:
     for specimen_path in specimens:
         total += 1
         try:
-            with open(specimen_path) as f:
+            with open(specimen_path, encoding="utf-8") as f:
                 data = yaml.load(f, Loader=WardlineSafeLoader)  # noqa: S506
         except OSError as exc:
             click.echo(
