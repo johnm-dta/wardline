@@ -17,6 +17,11 @@ def test_registry_is_immutable() -> None:
 def test_registry_version_present() -> None:
     assert isinstance(REGISTRY_VERSION, str)
     assert len(REGISTRY_VERSION) > 0
+    # Must be a valid version format (e.g., "0.1", "1.0")
+    import re
+    assert re.fullmatch(r"\d+\.\d+", REGISTRY_VERSION), (
+        f"REGISTRY_VERSION must be 'major.minor' format, got: {REGISTRY_VERSION!r}"
+    )
 
 
 def test_registry_has_all_group1_decorators() -> None:

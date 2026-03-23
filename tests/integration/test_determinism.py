@@ -121,4 +121,4 @@ class TestDeterminism:
         run = sarif["runs"][0]
         assert "startTimeUtc" not in run.get("invocations", [{}])[0] if run.get("invocations") else True
         # The raw JSON should not contain ISO timestamp patterns
-        assert "T00:" not in sarif_str or "Z" not in sarif_str
+        assert "T00:" not in sarif_str and "Z" not in sarif_str
