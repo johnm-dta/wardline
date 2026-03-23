@@ -6,6 +6,7 @@
 **Target release:** v0.3.0
 **Dependencies:** None (ships independently of WP 2.1 L3 taint)
 **Governance profile target:** Lite-complete + Assurance hooks (SARIF metadata)
+**Spec references:** Wardline Framework Specification v0.2.0 — §9.2 (governance mechanisms), §9.3.1 (artefact classification), §14.3.2 (governance profiles). File: `docs/wardline/wardline-01-09-governance-model.md`
 
 ## Context
 
@@ -59,7 +60,18 @@ Coherence: 3 issues found (1 error, 2 warnings)
          Decorator @external_boundary has no manifest boundary declaration
 ```
 
-**JSON mode:** Array of objects with `check_name`, `severity`, `location`, `message`, `category` (policy/enforcement per spec §9.3.1).
+**JSON mode:** Array of objects with the following fields:
+
+| JSON field | Source | Notes |
+|------------|--------|-------|
+| `check_name` | `CoherenceIssue.kind` | e.g., `"orphaned_annotation"` |
+| `severity` | Derived from check table above | `"ERROR"` or `"WARNING"` |
+| `file_path` | `CoherenceIssue.file_path` | Empty string for module-level issues |
+| `function` | `CoherenceIssue.function` | Empty string for module-level issues |
+| `message` | `CoherenceIssue.detail` | Human-readable description |
+| `category` | Derived per §9.3.1 mapping | `"policy"` or `"enforcement"` |
+
+The `category` field requires a mapping from `CoherenceIssue.kind` to policy/enforcement. Tier-related checks (`tier_downgrades`, `tier_upgrade_without_evidence`) are policy; annotation-related checks (`orphaned_annotations`, `undeclared_boundaries`) are enforcement. Add this mapping to `cli/coherence_cmd.py`.
 
 ### Gate Behavior
 
@@ -68,7 +80,7 @@ Coherence: 3 issues found (1 error, 2 warnings)
 ### Implementation
 
 - New file: `cli/coherence_cmd.py` (~80 lines)
-- Wired into `cli/main.py` as `wardline manifest coherence`
+- Wired into `cli/manifest_cmds.py` as a subcommand of the existing `manifest` click group
 - Thin wrapper — all check logic already exists
 
 ## 2. `wardline fingerprint update` / `wardline fingerprint diff`
@@ -118,11 +130,23 @@ Scoped to **annotation fingerprints** (governance surface changes). AST fingerpr
 }
 ```
 
-### Hash Input
+### Hash Algorithm
 
-Canonical annotation surface: sorted decorator names + tier assignment + boundary type. Not the function body. Uses deterministic serialization — decorator names sorted alphabetically, tier as integer, boundary type as string. Changes to function implementation that do not alter annotations produce no hash change (spec §9.2 requirement).
+Per the fingerprint hashing scheme spec (`docs/superpowers/specs/2026-03-23-fingerprint-hashing-scheme.md`):
 
-The `FingerprintEntry` dataclass in `manifest/models.py` already has the required fields.
+```
+annotation_fingerprint = sha256(
+    "{python_version}|{qualname}|{sorted_canonical_decorator_names}|{sorted_decorator_attrs}"
+)[:16]
+```
+
+**Hash inputs:** Python version (major.minor), qualname, sorted canonical decorator names from registry, sorted `_wardline_*` attributes as key=value pairs.
+
+**NOT hash inputs:** `tier_context` and `boundary_transition` are stored in the `FingerprintEntry` alongside the hash for display context (diff output shows what changed) but do not participate in hash computation. File path is excluded intentionally — a function moved between files with identical annotations produces the same fingerprint.
+
+Changes to function implementation that do not alter annotations produce no hash change (spec §9.2 requirement).
+
+The `FingerprintEntry` dataclass in `manifest/models.py` has most required fields. **Model addition needed:** Add `artefact_class: str = ""` to `FingerprintEntry` to store the policy/enforcement classification per §9.3.1. This is derived at computation time from the decorator types (tier/boundary decorators → "policy", supplementary decorators → "enforcement") and stored in the baseline for diff output.
 
 ### `fingerprint update`
 
@@ -172,7 +196,7 @@ Coverage: 48/84 functions (57.1%) [was 47/83 (56.6%)]
 
 ### Gate Behavior
 
-`--gate`: Exit 1 if any **removed** annotations in Tier 1 modules. Exit 0 otherwise. This is the highest-risk change category per spec §9.2 — a function leaving the enforcement surface in a Tier 1 module.
+`--gate`: Exit 1 if any **removed** annotations in Tier 1 modules. Exit 0 otherwise. Modified annotations in Tier 1 produce a warning in output but do not fail the gate — they remain on the enforcement surface, so the function is still governed. Removal is the higher-risk event because the function exits governance entirely (spec §9.2: "Annotation removal in Tier 1 modules MUST be flagged as a priority review item").
 
 ### Implementation
 
@@ -196,9 +220,8 @@ Gathers governance health metrics from existing artifacts. No scan performed.
 
 **Data sources:**
 - Manifest (`wardline.yaml`) → governance profile, ratification metadata, analysis level, tier definitions
-- Exception register (`wardline.exceptions.json`) → active/expired/stale counts, expedited ratio, agent-originated count, governance paths
-- Fingerprint baseline (`wardline.fingerprint.json`) → staleness, coverage ratio, Tier 1 coverage
-- Last SARIF output (if cached in manifest dir) → finding count summary, last scan timestamp
+- Exception register (`wardline.exceptions.json`) → active/expired/stale counts, expedited ratio, agent-originated count, governance paths. If absent: all exception fields show 0/N/A.
+- Fingerprint baseline (`wardline.fingerprint.json`) → staleness, coverage ratio, Tier 1 coverage. If absent: `Status: not present (run wardline fingerprint update)`.
 
 **Text output:**
 ```
@@ -235,7 +258,7 @@ Manifest ratification:
 
 ### `regime verify` — Active Checks
 
-Runs `regime status` data collection plus verification checks:
+Runs `regime status` data collection plus active verification checks. The coherence check runs the 8 coherence functions from `manifest/coherence.py` inline — it does not depend on a cached result from a previous `wardline manifest coherence` run.
 
 | Check | Pass Condition | Severity |
 |-------|---------------|----------|
@@ -247,7 +270,7 @@ Runs `regime status` data collection plus verification checks:
 | Fingerprint baseline exists | File present in manifest dir | WARNING |
 | Fingerprint baseline fresh | Age < ratification interval | WARNING |
 | No expired exceptions | All active exceptions within expiry | WARNING |
-| Manifest ratification current | Age < declared interval | WARNING |
+| Manifest ratification current | Age < declared interval (overdue when `age >= interval`) | WARNING |
 
 **Exit codes (with `--gate`):** Exit 1 if any ERROR check fails. Exit 0 if only warnings or clean. Without `--gate`, always exits 0 (reporting mode).
 
@@ -371,6 +394,8 @@ Returns complete explain result as structured object:
 
 Extends existing `cli/explain_cmd.py` (~80 lines of additions). No new files. The three new sections are additive reads from existing data structures.
 
+**Multi-file match behavior:** Inherited from existing implementation (first match wins, `break` after first hit). `--path` narrows the search space. No change to this behavior in WP 2.3a.
+
 ### Deferred to WP 2.3b (depends on L3)
 
 - L3 call-graph taint provenance chains
@@ -382,16 +407,21 @@ Extends existing `cli/explain_cmd.py` (~80 lines of additions). No new files. Th
 
 ### Error Handling
 
-All commands follow existing CLI patterns:
+All commands follow existing CLI patterns (exit codes defined in `cli/scan.py`: `EXIT_CLEAN=0`, `EXIT_FINDINGS=1`, `EXIT_CONFIG_ERROR=2`, `EXIT_TOOL_ERROR=3`):
+
 - Missing manifest: warn and continue with reduced output (explain already does this)
 - Missing fingerprint baseline: report as "not present" in status, warn in diff
-- Malformed JSON: exit 2 (`EXIT_CONFIG_ERROR`) with structured error to stderr
+- Missing exception register: treat as empty (0 exceptions) — not an error
+- Malformed JSON (manifest, exceptions, fingerprint): exit 2 (`EXIT_CONFIG_ERROR`) with `error:` message to stderr
 - Permission errors: skip file, log warning, continue
+- `fingerprint update` with no annotated functions: write baseline with empty `entries` array and coverage showing 0/N. Not an error — this is the first-run case for projects without decorators.
+- `fingerprint diff` when baseline was generated on a different Python version: report all entries as "MODIFIED (Python version changed)" with a distinct message. The hash includes `python_version`, so version upgrades invalidate all fingerprints. Users must run `fingerprint update` after Python upgrades.
 
 ### Testing Strategy
 
 - **Unit tests:** Each metric collection function in `manifest/regime.py` tested independently with fixture data
 - **Integration tests:** Frozen test project under `tests/fixtures/governance/` with known manifest, exceptions, fingerprints, and source files. CLI commands run against fixture and assert exact output. Isolates governance tests from scanner evolution.
+- **Negative tests:** Malformed manifest/exceptions JSON (assert exit 2), missing baseline (assert warning not error), `--gate` exit codes (assert exit 1 on error conditions for coherence, fingerprint, and regime verify)
 - **Self-hosting:** `wardline regime verify --gate` added to CI as an informational job (not blocking initially)
 
 ### Effort Estimate
