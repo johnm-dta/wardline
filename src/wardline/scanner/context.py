@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from wardline.manifest.models import BoundaryEntry
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Finding:
     """A single scanner finding — maps to one SARIF result.
 
@@ -36,6 +36,9 @@ class Finding:
     taint_state: TaintState | None
     analysis_level: int
     source_snippet: str | None
+    qualname: str | None = None
+    exception_id: str | None = None
+    exception_expires: str | None = None
 
 
 @dataclass(frozen=True)

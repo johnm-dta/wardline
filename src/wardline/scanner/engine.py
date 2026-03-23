@@ -216,6 +216,7 @@ class ScanEngine:
                     taint_state=None,
                     analysis_level=0,
                     source_snippet=None,
+                    qualname=None,
                 )
             )
 
