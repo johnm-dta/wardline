@@ -44,9 +44,10 @@ def resolve_boundaries(
         # merge() is OUTSIDE the try — ManifestWidenError propagates
         resolved = merge(manifest, overlay)
 
-        # Tag each boundary with the overlay's scope
+        # Tag each boundary with the overlay's ABSOLUTE scope path
+        scope = str((root / overlay.overlay_for).resolve())
         for boundary in resolved.boundaries:
-            scoped = replace(boundary, overlay_scope=overlay.overlay_for)
+            scoped = replace(boundary, overlay_scope=scope)
             all_boundaries.append(scoped)
 
     return tuple(all_boundaries)

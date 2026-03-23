@@ -7,9 +7,9 @@ dictionary keys, bypassing validation:
 - ``d.setdefault(key, default)`` — mutates dict with fabricated default
 - ``defaultdict(factory)`` — constructor registers a default factory
 
-``schema_default()`` suppresses to a WARNING-severity finding with
-rule ID ``PY-WL-001-UNVERIFIED-DEFAULT`` (overlay verification is
-not yet implemented in MVP).
+``schema_default()`` with a matching overlay boundary declaration
+emits a SUPPRESS-severity finding (``PY-WL-001-GOVERNED-DEFAULT``).
+Without a matching boundary, it emits ERROR (``PY-WL-001``).
 """
 
 from __future__ import annotations

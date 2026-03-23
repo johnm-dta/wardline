@@ -60,7 +60,8 @@ class TestResolveBoundaries:
 
         assert len(result) == 1
         assert result[0].function == "Handler.handle"
-        assert result[0].overlay_scope == "adapters"
+        # overlay_scope is now absolute, resolved from root / overlay_for
+        assert result[0].overlay_scope == str((tmp_path / "adapters").resolve())
 
     def test_governance_error_propagates(self, tmp_path: Path) -> None:
         """Overlay in undeclared directory raises GovernanceError."""

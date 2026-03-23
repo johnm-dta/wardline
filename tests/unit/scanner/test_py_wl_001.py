@@ -30,7 +30,7 @@ def _run_rule_with_context(
     source: str,
     *,
     boundaries: tuple[BoundaryEntry, ...] = (),
-    file_path: str = "src/adapters/handler.py",
+    file_path: str = "/project/src/adapters/handler.py",
 ) -> RulePyWl001:
     """Parse source inside a function, set context with boundaries, run rule."""
     tree = parse_function_source(source)
@@ -148,7 +148,7 @@ class TestSchemaDefaultGoverned:
         boundary = BoundaryEntry(
             function="target",
             transition="construction",
-            overlay_scope="src/adapters",
+            overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
             'd.get("key", schema_default("fallback"))\n',
@@ -164,7 +164,7 @@ class TestSchemaDefaultGoverned:
         boundary = BoundaryEntry(
             function="target",
             transition="restoration",
-            overlay_scope="src/adapters",
+            overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
             'd.setdefault("key", schema_default([]))\n',
@@ -178,12 +178,12 @@ class TestSchemaDefaultGoverned:
         boundary = BoundaryEntry(
             function="target",
             transition="construction",
-            overlay_scope="src/adapters",
+            overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
             'd.get("key", schema_default("x"))\n',
             boundaries=(boundary,),
-            file_path="src/adapters/handler.py",
+            file_path="/project/src/adapters/handler.py",
         )
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_001_GOVERNED_DEFAULT
@@ -198,11 +198,11 @@ class MyClass:
         boundary = BoundaryEntry(
             function="MyClass.handle",
             transition="construction",
-            overlay_scope="src/adapters",
+            overlay_scope="/project/src/adapters",
         )
-        rule = RulePyWl001(file_path="src/adapters/handler.py")
+        rule = RulePyWl001(file_path="/project/src/adapters/handler.py")
         ctx = ScanContext(
-            file_path="src/adapters/handler.py",
+            file_path="/project/src/adapters/handler.py",
             function_level_taint_map={},
             boundaries=(boundary,),
         )
@@ -214,8 +214,8 @@ class MyClass:
 
     def test_multiple_boundaries_only_match_suppresses(self) -> None:
         boundaries = (
-            BoundaryEntry(function="other", transition="construction", overlay_scope="src/adapters"),
-            BoundaryEntry(function="target", transition="construction", overlay_scope="src/adapters"),
+            BoundaryEntry(function="other", transition="construction", overlay_scope="/project/src/adapters"),
+            BoundaryEntry(function="target", transition="construction", overlay_scope="/project/src/adapters"),
         )
         rule = _run_rule_with_context(
             'd.get("key", schema_default(42))\n',
@@ -241,7 +241,7 @@ class TestSchemaDefaultUngoverned:
         boundary = BoundaryEntry(
             function="other_fn",
             transition="construction",
-            overlay_scope="src/adapters",
+            overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
             'd.get("key", schema_default(42))\n',
@@ -254,7 +254,7 @@ class TestSchemaDefaultUngoverned:
         boundary = BoundaryEntry(
             function="target",
             transition="shape_validation",
-            overlay_scope="src/adapters",
+            overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
             'd.get("key", schema_default(42))\n',
@@ -267,12 +267,12 @@ class TestSchemaDefaultUngoverned:
         boundary = BoundaryEntry(
             function="target",
             transition="construction",
-            overlay_scope="services",
+            overlay_scope="/project/services",
         )
         rule = _run_rule_with_context(
             'd.get("key", schema_default(42))\n',
             boundaries=(boundary,),
-            file_path="src/adapters/handler.py",
+            file_path="/project/src/adapters/handler.py",
         )
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_001
@@ -307,7 +307,7 @@ class TestSchemaDefaultUngoverned:
         boundary = BoundaryEntry(
             function="Target",
             transition="construction",
-            overlay_scope="src/adapters",
+            overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
             'd.get("key", schema_default(42))\n',
@@ -321,7 +321,7 @@ class TestSchemaDefaultUngoverned:
         boundary = BoundaryEntry(
             function="target",
             transition="construction",
-            overlay_scope="src/adapters",
+            overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
             'd.get("key", "hardcoded")\n',
