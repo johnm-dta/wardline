@@ -99,14 +99,14 @@ def resolve_module_default(
     if manifest is None:
         return None
 
-    from pathlib import PurePosixPath
+    from pathlib import PurePath
 
-    file_p = PurePosixPath(file_path)
+    file_p = PurePath(file_path)
 
     # Collect all matching entries
     matches: list[tuple[int, str]] = []
     for entry in manifest.module_tiers:
-        entry_p = PurePosixPath(entry.path)
+        entry_p = PurePath(entry.path)
         try:
             file_p.relative_to(entry_p)
         except ValueError:

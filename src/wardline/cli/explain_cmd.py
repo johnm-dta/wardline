@@ -114,11 +114,11 @@ def explain(qualname: str, manifest: str | None, scan_path: str) -> None:
             # Find which module_tiers entry matched
             click.echo("Resolution: module_tiers entry")
             if manifest_model is not None:
-                from pathlib import PurePosixPath
+                from pathlib import PurePath
 
-                file_p = PurePosixPath(file_path_str)
+                file_p = PurePath(file_path_str)
                 for mt in manifest_model.module_tiers:
-                    entry_p = PurePosixPath(mt.path)
+                    entry_p = PurePath(mt.path)
                     try:
                         file_p.relative_to(entry_p)
                         click.echo(f"  Matched path: {mt.path}")

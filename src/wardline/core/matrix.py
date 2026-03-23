@@ -8,14 +8,14 @@ from types import MappingProxyType
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.core.taints import TaintState
 
-E = Severity.ERROR
-W = Severity.WARNING
-Su = Severity.SUPPRESS
+_E = Severity.ERROR
+_W = Severity.WARNING
+_Su = Severity.SUPPRESS
 
-U = Exceptionability.UNCONDITIONAL
-St = Exceptionability.STANDARD
-R = Exceptionability.RELAXED
-T = Exceptionability.TRANSPARENT
+_U = Exceptionability.UNCONDITIONAL
+_St = Exceptionability.STANDARD
+_R = Exceptionability.RELAXED
+_T = Exceptionability.TRANSPARENT
 
 
 @dataclass(frozen=True)
@@ -44,23 +44,23 @@ _TAINT_ORDER = [
 # Row data: (rule, [(severity, exceptionability) for each taint state])
 _MATRIX_DATA: list[tuple[RuleId, list[tuple[Severity, Exceptionability]]]] = [
     # PY-WL-001 inherits WL-001 matrix (dict key access with fallback default)
-    (RuleId.PY_WL_001, [(E,U), (E,St), (E,St), (E,St), (E,St), (E,St), (E,St), (E,St)]),
+    (RuleId.PY_WL_001, [(_E,_U), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St)]),
     # PY-WL-002 inherits WL-001 matrix (attribute access with fallback default)
-    (RuleId.PY_WL_002, [(E,U), (E,St), (E,St), (E,St), (E,St), (E,St), (E,St), (E,St)]),
+    (RuleId.PY_WL_002, [(_E,_U), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St)]),
     # PY-WL-003 = WL-002 (existence-checking as structural gate)
-    (RuleId.PY_WL_003, [(E,U), (E,U), (E,U), (E,St), (E,St), (E,U), (E,U), (E,St)]),
+    (RuleId.PY_WL_003, [(_E,_U), (_E,_U), (_E,_U), (_E,_St), (_E,_St), (_E,_U), (_E,_U), (_E,_St)]),
     # PY-WL-004 = WL-003 (catching all exceptions broadly)
-    (RuleId.PY_WL_004, [(E,U), (E,St), (W,St), (W,R), (E,St), (W,St), (W,St), (E,St)]),
+    (RuleId.PY_WL_004, [(_E,_U), (_E,_St), (_W,_St), (_W,_R), (_E,_St), (_W,_St), (_W,_St), (_E,_St)]),
     # PY-WL-005 = WL-004 (catching exceptions silently)
-    (RuleId.PY_WL_005, [(E,U), (E,St), (E,St), (E,St), (E,St), (E,St), (E,St), (E,St)]),
+    (RuleId.PY_WL_005, [(_E,_U), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St)]),
     # PY-WL-006 = WL-005 (audit-critical writes in broad handlers)
-    (RuleId.PY_WL_006, [(E,U), (E,U), (E,St), (E,St), (E,St), (E,St), (E,St), (E,St)]),
+    (RuleId.PY_WL_006, [(_E,_U), (_E,_U), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St)]),
     # PY-WL-007 = WL-006 (runtime type-checking internal data)
-    (RuleId.PY_WL_007, [(E,St), (W,R), (W,R), (Su,T), (Su,T), (W,R), (W,R), (W,St)]),
+    (RuleId.PY_WL_007, [(_E,_St), (_W,_R), (_W,_R), (_Su,_T), (_Su,_T), (_W,_R), (_W,_R), (_W,_St)]),
     # PY-WL-008 = WL-007 (validation with no rejection path)
-    (RuleId.PY_WL_008, [(E,U), (E,U), (E,U), (E,U), (E,U), (E,U), (E,U), (E,U)]),
+    (RuleId.PY_WL_008, [(_E,_U), (_E,_U), (_E,_U), (_E,_U), (_E,_U), (_E,_U), (_E,_U), (_E,_U)]),
     # PY-WL-009 = WL-008 (semantic validation without shape validation)
-    (RuleId.PY_WL_009, [(E,U), (E,U), (E,U), (E,U), (E,U), (E,U), (E,U), (E,U)]),
+    (RuleId.PY_WL_009, [(_E,_U), (_E,_U), (_E,_U), (_E,_U), (_E,_U), (_E,_U), (_E,_U), (_E,_U)]),
 ]
 # fmt: on
 
