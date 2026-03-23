@@ -92,14 +92,14 @@ class TestSelfHostingScan:
         assert "properties" in sarif["runs"][0]
 
     def test_scan_finding_count_stable(self) -> None:
-        """Finding count is within expected range (regression check).
+        """Per-rule finding counts are within expected ranges.
 
-        The self-hosting scan produces findings because wardline's own
-        code uses dict.get(), hasattr(), getattr() with defaults, and
-        exception handlers — exactly the patterns the scanner detects.
-        These are documented, expected findings in a tooling codebase.
+        Prevents baseline erosion when tier-aware severity changes
+        finding distribution. Ranges are ±50% of measured baselines
+        to absorb minor code changes while catching regressions.
         """
         import json
+        from collections import Counter
 
         from wardline.cli.main import cli
 
@@ -119,24 +119,33 @@ class TestSelfHostingScan:
 
         sarif = json.loads(_extract_sarif_json(result.output))
         results = sarif["runs"][0]["results"]
-
-        # Separate governance from scan findings
         scan_findings = [
             r for r in results
             if "GOVERNANCE" not in r["ruleId"]
         ]
 
-        # Baseline: ~101 findings as of T-6.4a.
-        # Allow ±20 for minor code changes; a large increase suggests
-        # a regression, a large decrease suggests suppression.
-        assert len(scan_findings) >= 50, (
-            f"Suspiciously few findings ({len(scan_findings)}) — "
-            "possible suppression regression"
-        )
-        assert len(scan_findings) <= 200, (
-            f"Too many findings ({len(scan_findings)}) — "
-            "possible scanner regression"
-        )
+        counts = Counter(r["ruleId"] for r in scan_findings)
+
+        # Per-rule baselines (measured 2026-03-23, ±50% tolerance)
+        expected_ranges: dict[str, tuple[int, int]] = {
+            "PY-WL-001": (21, 63),
+            "PY-WL-002": (6, 18),
+            "PY-WL-003": (20, 59),
+            "PY-WL-004": (2, 6),
+            "PY-WL-005": (4, 11),
+        }
+
+        for rule_id, (lo, hi) in expected_ranges.items():
+            count = counts.get(rule_id, 0)
+            assert lo <= count <= hi, (
+                f"{rule_id}: {count} findings outside expected "
+                f"range [{lo}, {hi}]"
+            )
+
+        # Total sanity check
+        total = len(scan_findings)
+        assert total >= 50, f"Suspiciously few findings ({total})"
+        assert total <= 200, f"Too many findings ({total})"
 
     def test_files_scanned_count(self) -> None:
         """Scanner processes all wardline source files."""
