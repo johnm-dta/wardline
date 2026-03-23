@@ -153,3 +153,33 @@ class TestSetName:
     def test_class_access_returns_descriptor(self) -> None:
         """Accessing the descriptor on the class returns the descriptor."""
         assert isinstance(_SampleEntity.value, AuthoritativeField)
+
+
+# ── Subclass storage key isolation ───────────────────────────
+
+
+class _Parent:
+    value = AuthoritativeField()
+
+
+class _Child(_Parent):
+    value = AuthoritativeField()  # type: ignore[assignment]
+
+
+class TestSubclassStorageKeyIsolation:
+    """Subclass fields with the same name get distinct storage keys."""
+
+    def test_parent_and_child_have_different_storage_keys(self) -> None:
+        parent_desc = _Parent.__dict__["value"]
+        child_desc = _Child.__dict__["value"]
+        assert parent_desc.storage_name != child_desc.storage_name
+        assert "_Parent_" in parent_desc.storage_name
+        assert "_Child_" in child_desc.storage_name
+
+    def test_parent_and_child_values_independent(self) -> None:
+        p = _Parent()
+        c = _Child()
+        p.value = "parent_val"
+        c.value = "child_val"
+        assert p.value == "parent_val"
+        assert c.value == "child_val"

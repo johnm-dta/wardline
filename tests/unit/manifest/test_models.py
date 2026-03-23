@@ -9,6 +9,8 @@ import pytest
 
 from wardline.core.severity import RuleId
 from wardline.core.taints import TaintState
+from types import MappingProxyType
+
 from wardline.manifest.models import (
     BoundaryEntry,
     ContractBinding,
@@ -18,6 +20,7 @@ from wardline.manifest.models import (
     FingerprintEntry,
     ManifestMetadata,
     ModuleTierEntry,
+    RulesConfig,
     ScannerConfig,
     TierEntry,
     WardlineManifest,
@@ -334,3 +337,28 @@ analysis_level = 2
         config = ScannerConfig.from_toml(toml_file)
         with pytest.raises(FrozenInstanceError):
             config.analysis_level = 3  # type: ignore[misc]
+
+
+# ── RulesConfig deep-freeze ──────────────────────────────────────
+
+
+class TestRulesConfigDeepFreeze:
+    """RulesConfig.overrides dicts are deep-frozen via MappingProxyType."""
+
+    def test_overrides_are_mapping_proxy(self) -> None:
+        rc = RulesConfig(overrides=({"id": "PY-WL-001", "severity": "ERROR"},))
+        assert isinstance(rc.overrides[0], MappingProxyType)
+
+    def test_overrides_immutable(self) -> None:
+        rc = RulesConfig(overrides=({"id": "PY-WL-001", "severity": "ERROR"},))
+        with pytest.raises(TypeError):
+            rc.overrides[0]["severity"] = "WARNING"  # type: ignore[index]
+
+    def test_empty_overrides(self) -> None:
+        rc = RulesConfig()
+        assert rc.overrides == ()
+
+    def test_already_frozen_proxy_preserved(self) -> None:
+        proxy = MappingProxyType({"id": "R1"})
+        rc = RulesConfig(overrides=(proxy,))
+        assert rc.overrides[0] is proxy

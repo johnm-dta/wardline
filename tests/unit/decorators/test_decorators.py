@@ -108,6 +108,24 @@ class TestRegistryEnforcement:
         )
         assert callable(dec)
 
+    def test_group_mismatch_raises(self) -> None:
+        """Passing a group that doesn't match the registry entry raises."""
+        with pytest.raises(ValueError, match="Group mismatch"):
+            wardline_decorator(
+                99,
+                "external_boundary",
+                _wardline_tier_source=TaintState.EXTERNAL_RAW,
+            )
+
+    def test_correct_group_succeeds(self) -> None:
+        """Passing the correct group from the registry works."""
+        dec = wardline_decorator(
+            1,
+            "external_boundary",
+            _wardline_tier_source=TaintState.EXTERNAL_RAW,
+        )
+        assert callable(dec)
+
 
 # ---------------------------------------------------------------------------
 # TestStacking
