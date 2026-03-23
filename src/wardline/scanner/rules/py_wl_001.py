@@ -174,7 +174,7 @@ class RulePyWl001(RuleBase):
         else:
             self.findings.append(
                 Finding(
-                    rule_id=RuleId.PY_WL_001,
+                    rule_id=RuleId.PY_WL_001_UNGOVERNED_DEFAULT,
                     file_path=self._file_path,
                     line=call.lineno,
                     col=call.col_offset,
