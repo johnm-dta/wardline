@@ -124,6 +124,8 @@ def apply_exceptions(
                     f"Exception '{exc.id}' has stale AST fingerprint "
                     f"(expected {exc.ast_fingerprint}, got {current_fp})",
                     qualname=finding.qualname,
+                    exception_id=exc.id,
+                    original_rule=exc.rule,
                 ))
                 continue
 
@@ -136,6 +138,8 @@ def apply_exceptions(
                     f"Exception '{exc.id}' has no AST fingerprint — "
                     f"run 'wardline exception refresh {exc.id}' to compute one",
                     qualname=finding.qualname,
+                    exception_id=exc.id,
+                    original_rule=exc.rule,
                 ))
                 continue
 
@@ -183,6 +187,8 @@ def _emit_register_governance(
                 f"Exception '{exc.id}' has unknown agent provenance "
                 f"(agent_originated is null)",
                 qualname=exc_qualname,
+                exception_id=exc.id,
+                original_rule=exc.rule,
             ))
 
         if exc.recurrence_count >= 2:
@@ -192,6 +198,8 @@ def _emit_register_governance(
                 1,
                 f"Exception '{exc.id}' has been renewed {exc.recurrence_count} times",
                 qualname=exc_qualname,
+                exception_id=exc.id,
+                original_rule=exc.rule,
             ))
 
         if exc.expires is None:
@@ -201,6 +209,8 @@ def _emit_register_governance(
                 1,
                 f"Exception '{exc.id}' has no expiry date",
                 qualname=exc_qualname,
+                exception_id=exc.id,
+                original_rule=exc.rule,
             ))
 
 
@@ -211,6 +221,8 @@ def _governance_finding(
     message: str,
     *,
     qualname: str | None = None,
+    exception_id: str | None = None,
+    original_rule: str | None = None,
 ) -> Finding:
     """Create a governance pseudo-rule finding (delegates to shared factory)."""
     return make_governance_finding(
@@ -219,4 +231,6 @@ def _governance_finding(
         file_path=file_path,
         line=line,
         qualname=qualname,
+        exception_id=exception_id,
+        original_rule=original_rule,
     )
