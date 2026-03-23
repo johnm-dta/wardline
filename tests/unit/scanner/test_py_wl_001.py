@@ -234,7 +234,7 @@ class TestSchemaDefaultUngoverned:
         )
         assert len(rule.findings) == 1
         f = rule.findings[0]
-        assert f.rule_id == RuleId.PY_WL_001
+        assert f.rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
         assert f.severity == Severity.ERROR
 
     def test_wrong_function_emits_error(self) -> None:
@@ -248,7 +248,7 @@ class TestSchemaDefaultUngoverned:
             boundaries=(boundary,),
         )
         assert len(rule.findings) == 1
-        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
 
     def test_wrong_transition_emits_error(self) -> None:
         boundary = BoundaryEntry(
@@ -261,7 +261,7 @@ class TestSchemaDefaultUngoverned:
             boundaries=(boundary,),
         )
         assert len(rule.findings) == 1
-        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
 
     def test_wrong_scope_emits_error(self) -> None:
         boundary = BoundaryEntry(
@@ -275,7 +275,7 @@ class TestSchemaDefaultUngoverned:
             file_path="/project/src/adapters/handler.py",
         )
         assert len(rule.findings) == 1
-        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
 
     def test_empty_scope_does_not_match(self) -> None:
         """Empty overlay_scope must NOT match (E4)."""
@@ -289,7 +289,7 @@ class TestSchemaDefaultUngoverned:
             boundaries=(boundary,),
         )
         assert len(rule.findings) == 1
-        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
 
     def test_no_context_emits_error(self) -> None:
         tree = parse_function_source(
@@ -300,7 +300,7 @@ class TestSchemaDefaultUngoverned:
         rule.visit(tree)
 
         assert len(rule.findings) == 1
-        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
         assert rule.findings[0].severity == Severity.ERROR
 
     def test_case_sensitive_qualname(self) -> None:
@@ -314,7 +314,7 @@ class TestSchemaDefaultUngoverned:
             boundaries=(boundary,),
         )
         assert len(rule.findings) == 1
-        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
 
     def test_non_schema_default_unchanged(self) -> None:
         """Regular default -> ERROR regardless of boundaries."""

@@ -499,3 +499,58 @@ class TestPermissiveDistribution:
             if r["ruleId"] == "GOVERNANCE-PERMISSIVE-DISTRIBUTION"
         ]
         assert len(gov_perm) == 1
+
+
+@pytest.mark.integration
+class TestPreviewPhase2Flag:
+    """Smoke tests for --preview-phase2 flag."""
+
+    def test_preview_phase2_flag_produces_json(self, tmp_path: Path) -> None:
+        """--preview-phase2 produces JSON output, not SARIF."""
+        manifest = _minimal_manifest(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--allow-registry-mismatch",
+            "--preview-phase2",
+        ])
+        assert result.exit_code == 0, (
+            f"Expected exit 0, got {result.exit_code}. Output: {result.output}"
+        )
+        report = json.loads(result.stdout)
+        assert "version" in report
+        assert "scan_metadata" in report
+        assert report["unverified_default_count"] == 0
+
+    def test_preview_phase2_output_to_file(self, tmp_path: Path) -> None:
+        """--preview-phase2 with --output writes JSON to file."""
+        manifest = _minimal_manifest(tmp_path)
+        output_file = tmp_path / "preview.json"
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--allow-registry-mismatch",
+            "--preview-phase2",
+            "--output", str(output_file),
+        ])
+        assert result.exit_code == 0
+        report = json.loads(output_file.read_text())
+        assert "version" in report
+        assert "scan_metadata" in report
+
+    def test_preview_phase2_not_sarif(self, tmp_path: Path) -> None:
+        """--preview-phase2 output does NOT contain SARIF '$schema' key."""
+        manifest = _minimal_manifest(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--allow-registry-mismatch",
+            "--preview-phase2",
+        ])
+        assert result.exit_code == 0
+        report = json.loads(result.stdout)
+        assert "$schema" not in report
+        assert "runs" not in report

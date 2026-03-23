@@ -40,6 +40,7 @@ class Finding:
     qualname: str | None = None
     exception_id: str | None = None
     exception_expires: str | None = None
+    original_rule: str | None = None
 
 
 @dataclass(frozen=True)
@@ -96,6 +97,8 @@ def make_governance_finding(
     line: int = 1,
     severity: Severity = Severity.WARNING,
     qualname: str | None = None,
+    exception_id: str | None = None,
+    original_rule: str | None = None,
 ) -> Finding:
     """Create a governance pseudo-rule finding.
 
@@ -117,4 +120,6 @@ def make_governance_finding(
         analysis_level=0,
         source_snippet=None,
         qualname=qualname,
+        exception_id=exception_id,
+        original_rule=original_rule,
     )

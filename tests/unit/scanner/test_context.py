@@ -173,3 +173,67 @@ class TestWardlineAnnotation:
             canonical_name="tier1_read", group=1, attrs=mp
         )
         assert ann.attrs is mp
+
+
+# ── make_governance_finding ───────────────────────────────────────
+
+from wardline.core.severity import RuleId
+from wardline.scanner.context import make_governance_finding
+
+
+def test_make_governance_finding_with_exception_id():
+    f = make_governance_finding(
+        RuleId.GOVERNANCE_STALE_EXCEPTION,
+        "test message",
+        exception_id="EXC-abc12345",
+        original_rule="PY-WL-001",
+    )
+    assert f.exception_id == "EXC-abc12345"
+    assert f.original_rule == "PY-WL-001"
+
+
+def test_make_governance_finding_defaults_none():
+    f = make_governance_finding(
+        RuleId.GOVERNANCE_STALE_EXCEPTION,
+        "test message",
+    )
+    assert f.exception_id is None
+    assert f.original_rule is None
+
+
+import datetime
+from pathlib import Path
+from wardline.manifest.models import ExceptionEntry
+from wardline.scanner.exceptions import apply_exceptions
+
+
+def test_governance_findings_carry_exception_id_and_original_rule():
+    """Verify _emit_register_governance forwards exception_id and original_rule."""
+    exc = ExceptionEntry(
+        id="EXC-test0001",
+        rule="PY-WL-001",
+        taint_state="UNKNOWN_RAW",
+        location="src/app.py::App.handle",
+        exceptionability="STANDARD",
+        severity_at_grant="ERROR",
+        rationale="accepted risk",
+        reviewer="alice",
+        ast_fingerprint="",
+        expires=None,
+        recurrence_count=0,
+        governance_path="standard",
+        agent_originated=None,
+        last_refreshed_by=None,
+        last_refresh_rationale=None,
+        last_refreshed_at=None,
+    )
+    _, governance = apply_exceptions(
+        [],
+        (exc,),
+        project_root=Path("."),
+        now=datetime.date(2026, 3, 23),
+    )
+    assert len(governance) >= 1
+    for gf in governance:
+        assert gf.exception_id == "EXC-test0001", f"{gf.rule_id} missing exception_id"
+        assert gf.original_rule == "PY-WL-001", f"{gf.rule_id} missing original_rule"
