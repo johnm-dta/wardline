@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import ast
 
+from wardline.core import matrix
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase
@@ -30,10 +31,9 @@ class RulePyWl001(RuleBase):
 
     RULE_ID = RuleId.PY_WL_001
 
-    def __init__(self, *, file_path: str = "", taint_state: str = "") -> None:
+    def __init__(self, *, file_path: str = "") -> None:
         super().__init__()
         self._file_path = file_path
-        self._taint_state = taint_state
 
     def visit_function(
         self,
@@ -113,6 +113,8 @@ class RulePyWl001(RuleBase):
         enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> None:
         """Emit a PY-WL-001 finding."""
+        taint = self._get_function_taint(self._current_qualname)
+        cell = matrix.lookup(self.RULE_ID, taint)
         self.findings.append(
             Finding(
                 rule_id=RuleId.PY_WL_001,
@@ -125,9 +127,9 @@ class RulePyWl001(RuleBase):
                     "Dict key access with fallback default — "
                     "value fabricated for missing key without validation"
                 ),
-                severity=Severity.ERROR,
-                exceptionability=Exceptionability.STANDARD,
-                taint_state=None,
+                severity=cell.severity,
+                exceptionability=cell.exceptionability,
+                taint_state=taint,
                 analysis_level=1,
                 source_snippet=None,
             )
@@ -139,6 +141,7 @@ class RulePyWl001(RuleBase):
         enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> None:
         """Emit a PY-WL-001-UNVERIFIED-DEFAULT WARNING."""
+        taint = self._get_function_taint(self._current_qualname)
         self.findings.append(
             Finding(
                 rule_id=RuleId.PY_WL_001_UNVERIFIED_DEFAULT,
@@ -154,7 +157,7 @@ class RulePyWl001(RuleBase):
                 ),
                 severity=Severity.WARNING,
                 exceptionability=Exceptionability.UNCONDITIONAL,
-                taint_state=None,
+                taint_state=taint,
                 analysis_level=1,
                 source_snippet=None,
             )

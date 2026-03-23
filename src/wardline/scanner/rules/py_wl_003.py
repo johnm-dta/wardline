@@ -14,9 +14,23 @@ from __future__ import annotations
 
 import ast
 
+from wardline.core import matrix
 from wardline.core.severity import Exceptionability, RuleId, Severity
+from wardline.core.taints import TaintState
 from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase
+
+# PY-WL-003 only fires at these taint states.
+# MIXED_RAW included: matrix shows (E,St) same as EXTERNAL_RAW/UNKNOWN_RAW.
+# Temporary divergence from matrix for suppressed states — the matrix shows
+# (E,U) at AUDIT_TRAIL/PIPELINE/SHAPE_VALIDATED but we suppress here because
+# "key in config" is a normal pattern in safe contexts, not a structural gate.
+# Tracked: wardline-a87ea844eb (reconcile _ACTIVE_TAINTS with matrix)
+_ACTIVE_TAINTS = frozenset({
+    TaintState.EXTERNAL_RAW,
+    TaintState.UNKNOWN_RAW,
+    TaintState.MIXED_RAW,
+})
 
 
 class RulePyWl003(RuleBase):
@@ -28,10 +42,9 @@ class RulePyWl003(RuleBase):
 
     RULE_ID = RuleId.PY_WL_003
 
-    def __init__(self, *, file_path: str = "", taint_state: str = "") -> None:
+    def __init__(self, *, file_path: str = "") -> None:
         super().__init__()
         self._file_path = file_path
-        self._taint_state = taint_state
 
     def visit_function(
         self,
@@ -40,17 +53,21 @@ class RulePyWl003(RuleBase):
         is_async: bool,
     ) -> None:
         """Walk the function body looking for PY-WL-003 patterns."""
+        taint = self._get_function_taint(self._current_qualname)
+        if taint not in _ACTIVE_TAINTS:
+            return
         for child in ast.walk(node):
             if isinstance(child, ast.Compare):
-                self._check_compare(child, node)
+                self._check_compare(child, node, taint)
             elif isinstance(child, ast.Call):
-                self._check_hasattr(child, node)
+                self._check_hasattr(child, node, taint)
             elif isinstance(child, ast.MatchMapping):
                 self._emit_finding(
                     child,
                     node,
                     "Existence check as structural gate — "
                     "structural pattern match on mapping",
+                    taint,
                 )
             elif isinstance(child, ast.MatchClass):
                 self._emit_finding(
@@ -58,12 +75,14 @@ class RulePyWl003(RuleBase):
                     node,
                     "Existence check as structural gate — "
                     "structural pattern match on class",
+                    taint,
                 )
 
     def _check_compare(
         self,
         compare: ast.Compare,
         enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
+        taint: TaintState,
     ) -> None:
         """Check a Compare node for ``in`` / ``not in`` operators."""
         for op in compare.ops:
@@ -73,6 +92,7 @@ class RulePyWl003(RuleBase):
                     enclosing_func,
                     "Existence check as structural gate — "
                     "'in' operator used for key/attribute presence check",
+                    taint,
                 )
                 return
 
@@ -80,6 +100,7 @@ class RulePyWl003(RuleBase):
         self,
         call: ast.Call,
         enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
+        taint: TaintState,
     ) -> None:
         """Check a Call node for ``hasattr(obj, name)``."""
         if isinstance(call.func, ast.Name) and call.func.id == "hasattr":
@@ -88,6 +109,7 @@ class RulePyWl003(RuleBase):
                 enclosing_func,
                 "Existence check as structural gate — "
                 "hasattr() used for attribute presence check",
+                taint,
             )
 
     def _emit_finding(
@@ -95,8 +117,10 @@ class RulePyWl003(RuleBase):
         node: ast.AST,
         enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
         message: str,
+        taint: TaintState,
     ) -> None:
         """Emit a PY-WL-003 finding."""
+        cell = matrix.lookup(RuleId.PY_WL_003, taint)
         self.findings.append(
             Finding(
                 rule_id=RuleId.PY_WL_003,
@@ -106,9 +130,9 @@ class RulePyWl003(RuleBase):
                 end_line=getattr(node, "end_lineno", None),
                 end_col=getattr(node, "end_col_offset", None),
                 message=message,
-                severity=Severity.ERROR,
-                exceptionability=Exceptionability.STANDARD,
-                taint_state=None,
+                severity=cell.severity,
+                exceptionability=cell.exceptionability,
+                taint_state=taint,
                 analysis_level=1,
                 source_snippet=None,
             )

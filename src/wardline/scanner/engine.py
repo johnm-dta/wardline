@@ -21,11 +21,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
-from wardline.scanner.context import Finding
+from wardline.scanner.context import Finding, ScanContext
+from wardline.scanner.discovery import discover_annotations
+from wardline.scanner.taint.function_level import assign_function_taints
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from wardline.manifest.models import WardlineManifest
     from wardline.scanner.rules.base import RuleBase
 
 logger = logging.getLogger(__name__)
@@ -57,10 +60,12 @@ class ScanEngine:
         target_paths: tuple[Path, ...],
         exclude_paths: tuple[Path, ...] = (),
         rules: tuple[RuleBase, ...] = (),
+        manifest: WardlineManifest | None = None,
     ) -> None:
         self._target_paths = target_paths
         self._exclude_paths = tuple(p.resolve() for p in exclude_paths)
         self._rules = rules
+        self._manifest = manifest
 
     def scan(self) -> ScanResult:
         """Run a full scan across all target paths.
@@ -145,7 +150,26 @@ class ScanEngine:
 
         result.files_scanned += 1
 
+        # Pass 1: Discovery + taint assignment (fault-tolerant)
+        try:
+            annotations = discover_annotations(tree, file_path)
+            taint_map = assign_function_taints(
+                tree, file_path, annotations, self._manifest
+            )
+        except Exception as exc:
+            logger.warning("Discovery/taint failed for %s: %s", file_path, exc)
+            result.errors.append(
+                f"Discovery/taint failed for {file_path}: {exc}"
+            )
+            taint_map = {}
+
+        ctx = ScanContext(
+            file_path=str(file_path), function_level_taint_map=taint_map
+        )
+
+        # Pass 2: Run rules with context
         for rule in self._rules:
+            rule.set_context(ctx)
             self._run_rule(rule, tree, file_path, result)
 
     def _run_rule(
@@ -157,8 +181,7 @@ class ScanEngine:
     ) -> None:
         """Execute a single rule, catching crashes as TOOL-ERROR findings."""
         try:
-            # Set file context and reset findings for this file
-            rule._file_path = str(file_path)
+            # Reset findings for this file (context already set via set_context)
             rule.findings.clear()
 
             rule.visit(tree)

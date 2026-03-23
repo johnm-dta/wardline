@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import ast
 
+from wardline.core import matrix
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase
@@ -27,10 +28,9 @@ class RulePyWl002(RuleBase):
 
     RULE_ID = RuleId.PY_WL_002
 
-    def __init__(self, *, file_path: str = "", taint_state: str = "") -> None:
+    def __init__(self, *, file_path: str = "") -> None:
         super().__init__()
         self._file_path = file_path
-        self._taint_state = taint_state
 
     def visit_function(
         self,
@@ -63,6 +63,8 @@ class RulePyWl002(RuleBase):
         enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> None:
         """Emit a PY-WL-002 finding."""
+        taint = self._get_function_taint(self._current_qualname)
+        cell = matrix.lookup(self.RULE_ID, taint)
         self.findings.append(
             Finding(
                 rule_id=RuleId.PY_WL_002,
@@ -76,9 +78,9 @@ class RulePyWl002(RuleBase):
                     "getattr() with default silently fabricates "
                     "value for missing attribute"
                 ),
-                severity=Severity.ERROR,
-                exceptionability=Exceptionability.STANDARD,
-                taint_state=None,
+                severity=cell.severity,
+                exceptionability=cell.exceptionability,
+                taint_state=taint,
                 analysis_level=1,
                 source_snippet=None,
             )
