@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.core.taints import TaintState
@@ -63,12 +64,17 @@ _MATRIX_DATA: list[tuple[RuleId, list[tuple[Severity, Exceptionability]]]] = [
 ]
 # fmt: on
 
-SEVERITY_MATRIX: dict[tuple[RuleId, TaintState], SeverityCell] = {}
+_severity_matrix_builder: dict[tuple[RuleId, TaintState], SeverityCell] = {}
 for _rule, _cells in _MATRIX_DATA:
     for _taint, (_sev, _exc) in zip(_TAINT_ORDER, _cells, strict=True):
-        SEVERITY_MATRIX[(_rule, _taint)] = SeverityCell(
+        _severity_matrix_builder[(_rule, _taint)] = SeverityCell(
             severity=_sev, exceptionability=_exc
         )
+
+SEVERITY_MATRIX: MappingProxyType[tuple[RuleId, TaintState], SeverityCell] = (
+    MappingProxyType(_severity_matrix_builder)
+)
+del _severity_matrix_builder
 
 
 def lookup(rule: RuleId, taint: TaintState) -> SeverityCell:

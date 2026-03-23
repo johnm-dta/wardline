@@ -362,11 +362,19 @@ def _match_decorators(
 def _resolve_decorator(
     dec: ast.expr,
     import_table: dict[str, str],
+    *,
+    max_depth: int = 50,
+    _depth: int = 0,
 ) -> str | None:
     """Resolve a decorator AST node to a canonical registry name.
 
     Returns the canonical name if resolved, None otherwise.
+    Returns None if the ``__wrapped__`` / call chain exceeds *max_depth*
+    to prevent unbounded recursion on pathological decorator chains.
     """
+    if _depth >= max_depth:
+        return None
+
     # @name — direct import or aliased import
     if isinstance(dec, ast.Name):
         return import_table.get(dec.id)
@@ -382,6 +390,8 @@ def _resolve_decorator(
 
     # @call() — decorator with arguments (e.g., @external_boundary())
     if isinstance(dec, ast.Call):
-        return _resolve_decorator(dec.func, import_table)
+        return _resolve_decorator(
+            dec.func, import_table, max_depth=max_depth, _depth=_depth + 1
+        )
 
     return None

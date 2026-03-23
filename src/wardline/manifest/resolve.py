@@ -11,7 +11,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from wardline.manifest.discovery import discover_overlays
+from wardline.manifest.discovery import GovernanceError, discover_overlays
 from wardline.manifest.loader import ManifestLoadError, load_overlay
 from wardline.manifest.merge import merge
 
@@ -40,6 +40,14 @@ def resolve_boundaries(
         except (ManifestLoadError, OSError) as exc:
             logger.warning("Failed to load overlay %s: %s", overlay_path, exc)
             continue
+
+        # Verify overlay_for matches actual file location
+        overlay_dir = str(overlay_path.parent.relative_to(root))
+        if not overlay_dir.startswith(overlay.overlay_for.rstrip("/")):
+            raise GovernanceError(
+                f"Overlay at {overlay_path} claims overlay_for='{overlay.overlay_for}' "
+                f"but is located in '{overlay_dir}'"
+            )
 
         # merge() is OUTSIDE the try — ManifestWidenError propagates
         resolved = merge(manifest, overlay)
