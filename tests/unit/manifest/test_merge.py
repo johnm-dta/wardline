@@ -5,11 +5,14 @@ from __future__ import annotations
 import pytest
 
 from wardline.manifest.merge import (
+    ManifestWidenError,
     ResolvedManifest,
+    _resolve_module_tier,
     merge,
 )
 from wardline.manifest.models import (
     BoundaryEntry,
+    ModuleTierEntry,
     RulesConfig,
     TierEntry,
     WardlineManifest,
@@ -89,12 +92,12 @@ class TestTierNarrowOnly:
         result = merge(base, overlay)
         assert len(result.boundaries) == 1
 
-    def test_boundary_with_tier_accepted(self) -> None:
-        """Boundaries with from_tier/to_tier are accepted by merge.
+    def test_boundary_with_tier_accepted_when_no_module_tiers(self) -> None:
+        """Boundary tier values pass when base manifest has no module_tiers.
 
-        Narrow-only enforcement for tier changes is handled by coherence
-        checks (check_tier_downgrades), not at merge time. Merge accepts
-        all valid boundary entries.
+        With no module_tiers, _resolve_module_tier returns None and the
+        narrow-only check is skipped. Enforcement only applies when the
+        overlay's governed directory matches a module_tiers entry.
         """
         base = _base_manifest(
             tiers=(TierEntry(id="process_payment", tier=1),),
@@ -251,3 +254,124 @@ class TestResolvedManifest:
         tiers = (TierEntry(id="x", tier=1),)
         result = merge(_base_manifest(tiers=tiers), _overlay())
         assert result.tiers == tiers
+
+
+# ---------------------------------------------------------------------------
+# _resolve_module_tier helper
+# ---------------------------------------------------------------------------
+
+
+class TestResolveModuleTier:
+    def test_exact_path_match(self) -> None:
+        module_tiers = (ModuleTierEntry(path="src/adapters", default_taint="EXTERNAL_RAW"),)
+        tier_map = {"EXTERNAL_RAW": 4}
+        assert _resolve_module_tier("src/adapters", module_tiers, tier_map) == 4
+
+    def test_prefix_match(self) -> None:
+        module_tiers = (ModuleTierEntry(path="src/adapters", default_taint="EXTERNAL_RAW"),)
+        tier_map = {"EXTERNAL_RAW": 4}
+        assert _resolve_module_tier("src/adapters/partner", module_tiers, tier_map) == 4
+
+    def test_longest_prefix_wins(self) -> None:
+        module_tiers = (
+            ModuleTierEntry(path="src/adapters", default_taint="EXTERNAL_RAW"),
+            ModuleTierEntry(path="src/adapters/partner", default_taint="PIPELINE"),
+        )
+        tier_map = {"EXTERNAL_RAW": 4, "PIPELINE": 2}
+        assert _resolve_module_tier("src/adapters/partner", module_tiers, tier_map) == 2
+
+    def test_no_match_returns_none(self) -> None:
+        module_tiers = (ModuleTierEntry(path="src/core", default_taint="AUDIT_TRAIL"),)
+        tier_map = {"AUDIT_TRAIL": 1}
+        assert _resolve_module_tier("src/other", module_tiers, tier_map) is None
+
+    def test_default_taint_not_in_tiers_returns_none(self) -> None:
+        module_tiers = (ModuleTierEntry(path="src/x", default_taint="NONEXISTENT"),)
+        assert _resolve_module_tier("src/x", module_tiers, {}) is None
+
+    def test_path_segment_safe(self) -> None:
+        """'src/adapt' must NOT match 'src/adapters'."""
+        module_tiers = (ModuleTierEntry(path="src/adapters", default_taint="EXTERNAL_RAW"),)
+        tier_map = {"EXTERNAL_RAW": 4}
+        assert _resolve_module_tier("src/adapt", module_tiers, tier_map) is None
+
+
+# ---------------------------------------------------------------------------
+# Boundary-level tier enforcement
+# ---------------------------------------------------------------------------
+
+
+class TestBoundaryTierEnforcement:
+    def _manifest_with_tiers(self) -> WardlineManifest:
+        return WardlineManifest(
+            tiers=(
+                TierEntry(id="AUDIT_TRAIL", tier=1),
+                TierEntry(id="PIPELINE", tier=2),
+                TierEntry(id="EXTERNAL_RAW", tier=4),
+            ),
+            module_tiers=(
+                ModuleTierEntry(path="src/core", default_taint="AUDIT_TRAIL"),
+                ModuleTierEntry(path="src/adapters", default_taint="EXTERNAL_RAW"),
+            ),
+        )
+
+    def test_from_tier_exceeds_raises(self) -> None:
+        base = self._manifest_with_tiers()
+        overlay = _overlay(
+            name="src/core",
+            boundaries=(BoundaryEntry(function="Handler.handle", transition="construction", from_tier=3),),
+        )
+        with pytest.raises(ManifestWidenError) as exc_info:
+            merge(base, overlay)
+        assert exc_info.value.overlay_name == "src/core"
+        assert exc_info.value.field_name == "from_tier"
+        assert exc_info.value.base_value == 1
+        assert exc_info.value.attempted_value == 3
+
+    def test_to_tier_exceeds_raises(self) -> None:
+        base = self._manifest_with_tiers()
+        overlay = _overlay(
+            name="src/core",
+            boundaries=(BoundaryEntry(function="Proc.run", transition="construction", to_tier=2),),
+        )
+        with pytest.raises(ManifestWidenError) as exc_info:
+            merge(base, overlay)
+        assert exc_info.value.field_name == "to_tier"
+        assert exc_info.value.base_value == 1
+        assert exc_info.value.attempted_value == 2
+
+    def test_tighten_passes(self) -> None:
+        base = self._manifest_with_tiers()
+        overlay = _overlay(
+            name="src/adapters",
+            boundaries=(BoundaryEntry(function="Client.call", transition="construction", from_tier=2),),
+        )
+        result = merge(base, overlay)
+        assert len(result.boundaries) == 1
+
+    def test_same_tier_passes(self) -> None:
+        base = self._manifest_with_tiers()
+        overlay = _overlay(
+            name="src/adapters",
+            boundaries=(BoundaryEntry(function="Client.call", transition="construction", from_tier=4),),
+        )
+        result = merge(base, overlay)
+        assert len(result.boundaries) == 1
+
+    def test_no_module_tier_passes(self) -> None:
+        base = self._manifest_with_tiers()
+        overlay = _overlay(
+            name="src/unknown",
+            boundaries=(BoundaryEntry(function="fn", transition="construction", from_tier=99),),
+        )
+        result = merge(base, overlay)
+        assert len(result.boundaries) == 1
+
+    def test_none_tiers_pass(self) -> None:
+        base = self._manifest_with_tiers()
+        overlay = _overlay(
+            name="src/core",
+            boundaries=(BoundaryEntry(function="fn", transition="construction"),),
+        )
+        result = merge(base, overlay)
+        assert len(result.boundaries) == 1

@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 from wardline.manifest.models import (
     BoundaryEntry,
+    ModuleTierEntry,
     RulesConfig,
     TierEntry,
     WardlineManifest,
@@ -123,6 +124,28 @@ def merge(
     # -- Resolve boundaries (overlays are the sole source of boundaries) -----
     resolved_boundaries = overlay.boundaries
 
+    # -- Boundary-level narrow-only check -----------------------------------
+    tier_number_map: dict[str, int] = {t.id: t.tier for t in base.tiers}
+    module_tier = _resolve_module_tier(
+        overlay.overlay_for, base.module_tiers, tier_number_map
+    )
+    if module_tier is not None:
+        for boundary in resolved_boundaries:
+            if boundary.from_tier is not None and boundary.from_tier > module_tier:
+                raise ManifestWidenError(
+                    overlay_name=overlay.overlay_for,
+                    field_name="from_tier",
+                    base_value=module_tier,
+                    attempted_value=boundary.from_tier,
+                )
+            if boundary.to_tier is not None and boundary.to_tier > module_tier:
+                raise ManifestWidenError(
+                    overlay_name=overlay.overlay_for,
+                    field_name="to_tier",
+                    base_value=module_tier,
+                    attempted_value=boundary.to_tier,
+                )
+
     return ResolvedManifest(
         tiers=base.tiers,
         rules=merged_rules,
@@ -149,46 +172,27 @@ def _severity_rank(severity: str) -> int:
     return _SEVERITY_RANKS.get(severity.upper(), -1)
 
 
-def _check_boundary_tier(
-    boundary: BoundaryEntry,
-    base_tier_map: dict[str, int],
-    overlay_name: str,
-) -> None:
-    """Raise :class:`ManifestWidenError` if *boundary* relaxes a tier."""
-    if boundary.from_tier is not None:
-        _assert_tier_not_widened(
-            tier_id=boundary.function,
-            base_map=base_tier_map,
-            overlay_value=boundary.from_tier,
-            overlay_name=overlay_name,
-            field="from_tier",
-        )
-    if boundary.to_tier is not None:
-        _assert_tier_not_widened(
-            tier_id=boundary.function,
-            base_map=base_tier_map,
-            overlay_value=boundary.to_tier,
-            overlay_name=overlay_name,
-            field="to_tier",
-        )
+def _resolve_module_tier(
+    overlay_scope: str,
+    module_tiers: tuple[ModuleTierEntry, ...],
+    tier_number_map: dict[str, int],
+) -> int | None:
+    """Resolve the module tier for a boundary's overlay scope via longest prefix.
 
-
-def _assert_tier_not_widened(
-    tier_id: str,
-    base_map: dict[str, int],
-    overlay_value: int,
-    overlay_name: str,
-    field: str,
-) -> None:
-    """Raise if *overlay_value* would relax the base tier for *tier_id*.
-
-    A higher tier number is "less strict" — i.e. widening.
+    Uses path-segment-safe prefix matching (requires separator after prefix).
+    Returns the tier number, or None if no module tier covers the overlay scope.
     """
-    base_value = base_map.get(tier_id)
-    if base_value is not None and overlay_value > base_value:
-        raise ManifestWidenError(
-            overlay_name=overlay_name,
-            field_name=field,
-            base_value=base_value,
-            attempted_value=overlay_value,
-        )
+    best_match: int | None = None
+    best_length = -1
+
+    for mt in module_tiers:
+        if (
+            overlay_scope == mt.path
+            or overlay_scope.startswith(mt.path + "/")
+        ) and len(mt.path) > best_length:
+            tier_num = tier_number_map.get(mt.default_taint)
+            if tier_num is not None:
+                best_match = tier_num
+                best_length = len(mt.path)
+
+    return best_match
