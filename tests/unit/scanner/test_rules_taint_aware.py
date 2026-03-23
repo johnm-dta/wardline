@@ -10,6 +10,7 @@ from wardline.scanner.context import ScanContext
 from wardline.scanner.rules.py_wl_001 import RulePyWl001
 from wardline.scanner.rules.py_wl_002 import RulePyWl002
 from wardline.scanner.rules.py_wl_004 import RulePyWl004
+from wardline.scanner.rules.py_wl_003 import RulePyWl003
 from wardline.scanner.rules.py_wl_005 import RulePyWl005
 
 
@@ -159,3 +160,55 @@ class TestRule005TaintAware:
         cell = lookup(RuleId.PY_WL_005, TaintState.AUDIT_TRAIL)
         assert f.taint_state == TaintState.AUDIT_TRAIL
         assert f.severity == cell.severity
+
+
+# ── PY-WL-003 (taint-gated) ──────────────────────────────────
+
+_SRC_003 = 'def target():\n    d = {}\n    if "key" in d:\n        pass\n'
+
+
+class TestRule003TaintGated:
+    """PY-WL-003 is fully suppressed at safe taint states."""
+
+    def test_fires_at_external_raw(self) -> None:
+        rule = RulePyWl003()
+        rule.set_context(_make_context("target", TaintState.EXTERNAL_RAW))
+        _parse_and_visit(rule, _SRC_003)
+        assert len(rule.findings) >= 1
+        assert rule.findings[0].taint_state == TaintState.EXTERNAL_RAW
+
+    def test_fires_at_unknown_raw(self) -> None:
+        rule = RulePyWl003()
+        rule.set_context(_make_context("target", TaintState.UNKNOWN_RAW))
+        _parse_and_visit(rule, _SRC_003)
+        assert len(rule.findings) >= 1
+
+    def test_fires_at_mixed_raw(self) -> None:
+        rule = RulePyWl003()
+        rule.set_context(_make_context("target", TaintState.MIXED_RAW))
+        _parse_and_visit(rule, _SRC_003)
+        assert len(rule.findings) >= 1
+
+    def test_silent_at_audit_trail(self) -> None:
+        rule = RulePyWl003()
+        rule.set_context(_make_context("target", TaintState.AUDIT_TRAIL))
+        _parse_and_visit(rule, _SRC_003)
+        assert len(rule.findings) == 0
+
+    def test_silent_at_pipeline(self) -> None:
+        rule = RulePyWl003()
+        rule.set_context(_make_context("target", TaintState.PIPELINE))
+        _parse_and_visit(rule, _SRC_003)
+        assert len(rule.findings) == 0
+
+    def test_silent_at_shape_validated(self) -> None:
+        rule = RulePyWl003()
+        rule.set_context(_make_context("target", TaintState.SHAPE_VALIDATED))
+        _parse_and_visit(rule, _SRC_003)
+        assert len(rule.findings) == 0
+
+    def test_silent_at_unknown_sem_validated(self) -> None:
+        rule = RulePyWl003()
+        rule.set_context(_make_context("target", TaintState.UNKNOWN_SEM_VALIDATED))
+        _parse_and_visit(rule, _SRC_003)
+        assert len(rule.findings) == 0
