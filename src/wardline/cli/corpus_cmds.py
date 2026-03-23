@@ -66,19 +66,39 @@ def _make_rules() -> tuple[RuleBase, ...]:
     )
 
 
+def _collect_qualnames(
+    nodes: list[ast.stmt],
+    prefix: str,
+    result: dict[str, None],
+) -> None:
+    """Recursively collect dotted qualnames for all functions, mirroring RuleBase scope tracking."""
+    for node in nodes:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            qualname = f"{prefix}.{node.name}" if prefix else node.name
+            result[qualname] = None
+            _collect_qualnames(node.body, qualname, result)
+        elif isinstance(node, ast.ClassDef):
+            new_prefix = f"{prefix}.{node.name}" if prefix else node.name
+            _collect_qualnames(node.body, new_prefix, result)
+
+
 def _build_specimen_context(
     tree: ast.Module,
     taint_state: str,
 ) -> ScanContext:
-    """Build a ScanContext that assigns *taint_state* to every function in *tree*."""
+    """Build a ScanContext that assigns *taint_state* to every function in *tree*.
+
+    Uses dotted qualnames (e.g. ``MyClass.method``) matching the scope-stack
+    construction in ``RuleBase._dispatch``, so ``_get_function_taint`` lookups
+    resolve correctly for class methods and nested functions.
+    """
     from wardline.core.taints import TaintState
     from wardline.scanner.context import ScanContext
 
     taint = TaintState(taint_state)
-    taint_map: dict[str, TaintState] = {}
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            taint_map[node.name] = taint
+    qualnames: dict[str, None] = {}
+    _collect_qualnames(tree.body, "", qualnames)
+    taint_map: dict[str, TaintState] = {qn: taint for qn in qualnames}
     return ScanContext(
         file_path="<specimen>",
         function_level_taint_map=taint_map,
@@ -90,15 +110,18 @@ def _run_rules_on_fragment(
     rules: tuple[RuleBase, ...],
     taint_state: str | None = None,
 ) -> set[str]:
-    """Run all rules on a source fragment, return set of fired rule IDs."""
+    """Run all rules on a source fragment, return set of fired rule IDs.
+
+    Findings with ``Severity.SUPPRESS`` are excluded — they represent
+    matrix cells where the rule is intentionally silent at that taint state.
+    """
+    from wardline.core.severity import Severity
+
     tree = ast.parse(source)
 
     ctx: ScanContext | None = None
-    if taint_state:
-        try:
-            ctx = _build_specimen_context(tree, taint_state)
-        except ValueError:
-            logger.warning("Unknown taint_state '%s', running without context", taint_state)
+    if taint_state is not None:
+        ctx = _build_specimen_context(tree, taint_state)
 
     fired: set[str] = set()
     for rule in rules:
@@ -111,7 +134,7 @@ def _run_rules_on_fragment(
                 "Rule %s crashed on specimen: %s", rule.RULE_ID, exc,
             )
             continue
-        if rule.findings:
+        if any(f.severity != Severity.SUPPRESS for f in rule.findings):
             fired.add(str(rule.RULE_ID))
     return fired
 
@@ -132,7 +155,8 @@ def _evaluate_specimen(
     if rule_id not in stats:
         stats[rule_id] = _RuleStats()
 
-    taint_state = str(data.get("taint_state", "")) or None
+    raw_taint = data.get("taint_state")
+    taint_state = str(raw_taint) if raw_taint is not None else None
     fired = _run_rules_on_fragment(source, rules, taint_state=taint_state)
     rule_fired = rule_id in fired
 
@@ -279,7 +303,15 @@ def verify(corpus_dir: str) -> None:
             continue
 
         # Evaluate verdict against scanner rules
-        _evaluate_specimen(data, str(source), rules, stats)
+        try:
+            _evaluate_specimen(data, str(source), rules, stats)
+        except ValueError as exc:
+            click.echo(
+                f"error: {specimen_path.name}: {exc}",
+                err=True,
+            )
+            errors += 1
+            continue
 
     click.echo(f"Lite bootstrap: {total} specimens")
     _print_stats(stats)
