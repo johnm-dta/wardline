@@ -10,8 +10,9 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from wardline.core.severity import Exceptionability, RuleId, Severity
+
 if TYPE_CHECKING:
-    from wardline.core.severity import Exceptionability, RuleId, Severity
     from wardline.core.taints import TaintState
     from wardline.manifest.models import BoundaryEntry
 
@@ -85,3 +86,35 @@ class ScanContext:
                 "function_level_taint_map",
                 MappingProxyType(self.function_level_taint_map),
             )
+
+
+def make_governance_finding(
+    rule_id: RuleId,
+    message: str,
+    *,
+    file_path: str = "<governance>",
+    line: int = 1,
+    severity: Severity = Severity.WARNING,
+    qualname: str | None = None,
+) -> Finding:
+    """Create a governance pseudo-rule finding.
+
+    Unified factory for governance findings used by both the scan CLI
+    (run-level diagnostics) and the exception matcher (register-level
+    diagnostics).
+    """
+    return Finding(
+        rule_id=rule_id,
+        file_path=file_path,
+        line=line,
+        col=0,
+        end_line=None,
+        end_col=None,
+        message=message,
+        severity=severity,
+        exceptionability=Exceptionability.UNCONDITIONAL,
+        taint_state=None,
+        analysis_level=0,
+        source_snippet=None,
+        qualname=qualname,
+    )

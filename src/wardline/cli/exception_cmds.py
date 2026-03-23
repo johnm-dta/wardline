@@ -40,6 +40,26 @@ _RULE_GOVERNANCE_CONTEXT: dict[str, str] = {
         "This rule detects unsafe type coercion on tainted data. Implicit type "
         "conversion can silently alter data semantics."
     ),
+    "PY-WL-006": (
+        "This rule detects audit writes in broad exception handlers. Catching "
+        "broad exceptions can mask errors while still writing to audit trails, "
+        "potentially recording corrupted or misleading audit data."
+    ),
+    "PY-WL-007": (
+        "This rule detects runtime type-checking on internal data. isinstance/type "
+        "checks on data that should be statically typed indicate a trust boundary "
+        "violation or missing upstream validation."
+    ),
+    "PY-WL-008": (
+        "This rule detects validation with no rejection path. Code that validates "
+        "data but has no mechanism to reject invalid input creates a false sense "
+        "of security — the validation result is computed but never acted on."
+    ),
+    "PY-WL-009": (
+        "This rule detects semantic validation without prior shape validation. "
+        "Performing semantic checks before confirming the data structure is valid "
+        "can produce misleading results or mask structural corruption."
+    ),
 }
 
 _EXCEPTIONS_FILENAME = "wardline.exceptions.json"
@@ -241,6 +261,12 @@ def refresh(
         results.append({"id": entry["id"], "status": "refreshed", "old_fp": old_fp, "new_fp": new_fp})
 
     if not dry_run:
+        if refresh_all:
+            data["last_batch_refresh"] = {
+                "at": today,
+                "by": actor,
+                "rationale": rationale,
+            }
         _write_exceptions(exc_path, data)
 
     if json_output:
@@ -317,9 +343,10 @@ def review(json_output: bool) -> None:
             recurring.append(entry["id"])
 
     ratio = expedited / total if total > 0 else 0.0
+    last_batch = data.get("last_batch_refresh")
 
     if json_output:
-        click.echo(json.dumps({
+        result: dict[str, Any] = {
             "stale": stale,
             "expired": expired,
             "approaching_expiry": approaching,
@@ -327,7 +354,10 @@ def review(json_output: bool) -> None:
             "recurring": recurring,
             "expedited_ratio": round(ratio, 3),
             "total": total,
-        }, indent=2))
+        }
+        if last_batch is not None:
+            result["last_batch_refresh"] = last_batch
+        click.echo(json.dumps(result, indent=2))
     else:
         click.echo(f"Exception Register Review ({total} total)")
         click.echo(f"  Stale (fingerprint mismatch): {len(stale)}")
@@ -336,6 +366,11 @@ def review(json_output: bool) -> None:
         click.echo(f"  Unknown provenance: {len(unknown_prov)}")
         click.echo(f"  Recurring (count >= 2): {len(recurring)}")
         click.echo(f"  Expedited ratio: {ratio:.1%}")
+        if last_batch is not None:
+            click.echo(
+                f"  Last batch refresh: {last_batch.get('at', '?')} "
+                f"by {last_batch.get('by', '?')}"
+            )
 
 
 # --- Helpers ---
