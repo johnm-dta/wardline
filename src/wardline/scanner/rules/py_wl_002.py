@@ -16,7 +16,7 @@ import ast
 from wardline.core import matrix
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner.context import Finding
-from wardline.scanner.rules.base import RuleBase
+from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
 
 
 class RulePyWl002(RuleBase):
@@ -39,7 +39,7 @@ class RulePyWl002(RuleBase):
         is_async: bool,
     ) -> None:
         """Walk the function body looking for PY-WL-002 patterns."""
-        for child in ast.walk(node):
+        for child in walk_skip_nested_defs(node):
             if not isinstance(child, ast.Call):
                 continue
             self._check_call(child, node)

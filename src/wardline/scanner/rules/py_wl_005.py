@@ -19,7 +19,7 @@ import ast
 from wardline.core import matrix
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner.context import Finding
-from wardline.scanner.rules.base import RuleBase
+from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
 
 _SILENT_MESSAGES: dict[type, str] = {
     ast.Pass: (
@@ -86,13 +86,13 @@ class RulePyWl005(RuleBase):
         _TryStar = getattr(ast, "TryStar", None)
         trystar_handlers: set[int] = set()
         if _TryStar is not None:
-            for child in ast.walk(node):
+            for child in walk_skip_nested_defs(node):
                 if isinstance(child, _TryStar):
                     for handler in child.handlers:
                         trystar_handlers.add(id(handler))
                         self._check_handler(handler)
 
-        for child in ast.walk(node):
+        for child in walk_skip_nested_defs(node):
             if (
                 isinstance(child, ast.ExceptHandler)
                 and id(child) not in trystar_handlers

@@ -96,9 +96,32 @@ def _check_file_size(path: Path) -> None:
 
 
 def _check_schema_version(data: dict[str, Any], path: Path) -> None:
-    """Check $id version against expected scanner version."""
+    """Check $id version against expected scanner version.
+
+    Extracts the version segment from the ``$id`` URL (the path component
+    between ``/schemas/`` and the next ``/``) and compares it exactly
+    against ``EXPECTED_SCHEMA_VERSION``.  Falls back to substring match
+    only when the URL doesn't follow the expected pattern.
+    """
     doc_id = data.get("$id", "")
-    if doc_id and EXPECTED_SCHEMA_VERSION not in doc_id:
+    if not doc_id:
+        return
+
+    # Extract version from $id URL: .../schemas/<version>/...
+    import re
+
+    m = re.search(r"/schemas/([^/]+)/", doc_id)
+    if m:
+        doc_version = m.group(1)
+        if doc_version != EXPECTED_SCHEMA_VERSION:
+            raise ManifestLoadError(
+                f"Manifest {path} targets schema version "
+                f"'{doc_version}' (from $id '{doc_id}'), this scanner "
+                f"bundles version {EXPECTED_SCHEMA_VERSION} — update "
+                f"the manifest or upgrade wardline."
+            )
+    elif EXPECTED_SCHEMA_VERSION not in doc_id:
+        # Fallback for non-standard $id formats
         raise ManifestLoadError(
             f"Manifest {path} targets schema version "
             f"'{doc_id}', this scanner bundles version "

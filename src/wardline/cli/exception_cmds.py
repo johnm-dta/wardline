@@ -155,6 +155,7 @@ def add(
 @click.option("--confirm", is_flag=True, help="Required with --all")
 @click.option("--dry-run", is_flag=True, help="Show rule context without modifying")
 @click.option("--json", "json_output", is_flag=True, help="JSON output")
+@click.option("--agent-originated", is_flag=True, default=False, help="Mark refresh as agent-originated")
 def refresh(
     ids: tuple[str, ...],
     refresh_all: bool,
@@ -163,6 +164,7 @@ def refresh(
     confirm: bool,
     dry_run: bool,
     json_output: bool,
+    agent_originated: bool,
 ) -> None:
     """Refresh exception fingerprints after code changes."""
     if not ids and not refresh_all:
@@ -233,6 +235,8 @@ def refresh(
         entry["last_refreshed_by"] = actor
         entry["last_refresh_rationale"] = rationale
         entry["last_refreshed_at"] = today
+        if agent_originated:
+            entry["refresh_agent_originated"] = True
         updated += 1
         results.append({"id": entry["id"], "status": "refreshed", "old_fp": old_fp, "new_fp": new_fp})
 

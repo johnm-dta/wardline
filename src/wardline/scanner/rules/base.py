@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import ast
 from abc import ABC, abstractmethod
+from collections import deque
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, ClassVar, final
 
 from wardline.core.taints import TaintState
@@ -21,6 +23,24 @@ if TYPE_CHECKING:
     from wardline.scanner.context import Finding, ScanContext
 
 _GUARDED_METHODS = frozenset({"visit_FunctionDef", "visit_AsyncFunctionDef"})
+
+
+def walk_skip_nested_defs(node: ast.AST) -> Iterator[ast.AST]:
+    """Like ``ast.walk`` but skip nested FunctionDef/AsyncFunctionDef bodies.
+
+    The root *node* is always yielded. Child nodes that are
+    ``FunctionDef`` or ``AsyncFunctionDef`` (and are not the root) are
+    skipped entirely — the base class ``generic_visit`` handles those
+    separately, so descending here would cause duplicate findings.
+    """
+    todo: deque[ast.AST] = deque([node])
+    while todo:
+        current = todo.popleft()
+        yield current
+        for child in ast.iter_child_nodes(current):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child is not node:
+                continue
+            todo.append(child)
 
 
 class RuleBase(ast.NodeVisitor, ABC):
