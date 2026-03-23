@@ -174,13 +174,20 @@ class TestSarifRuleDescriptors:
         assert len(rules) == 1
         assert rules[0]["id"] == "PY-WL-001"
 
-    def test_unverified_default_not_in_implemented_rules(self) -> None:
+    def test_governed_default_not_in_implemented_rules(self) -> None:
         report = SarifReport(findings=[])
         props = report.to_dict()["runs"][0]["properties"]
         implemented = props["wardline.implementedRules"]
-        assert "PY-WL-001-UNVERIFIED-DEFAULT" not in implemented
+        assert "PY-WL-001-GOVERNED-DEFAULT" not in implemented
         # But canonical rules are present.
         assert "PY-WL-001" in implemented
+
+    def test_conformance_gaps_empty(self) -> None:
+        """Conformance gaps must remain empty after WP 1.3."""
+        report = SarifReport(findings=[])
+        output = report.to_dict()
+        gaps = output["runs"][0]["properties"]["wardline.conformanceGaps"]
+        assert gaps == []
 
 
 # ---------------------------------------------------------------------------

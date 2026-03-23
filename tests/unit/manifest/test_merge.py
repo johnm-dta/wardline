@@ -375,3 +375,41 @@ class TestBoundaryTierEnforcement:
         )
         result = merge(base, overlay)
         assert len(result.boundaries) == 1
+
+    def test_both_tiers_set_only_from_exceeds(self) -> None:
+        """When both from_tier and to_tier are set but only from_tier exceeds,
+        error names from_tier specifically."""
+        base = self._manifest_with_tiers()
+        overlay = _overlay(
+            name="src/core",
+            boundaries=(
+                BoundaryEntry(
+                    function="Handler.handle",
+                    transition="construction",
+                    from_tier=3,  # exceeds module tier 1
+                    to_tier=1,    # does not exceed
+                ),
+            ),
+        )
+        with pytest.raises(ManifestWidenError) as exc_info:
+            merge(base, overlay)
+        assert exc_info.value.field_name == "from_tier"
+
+    def test_both_tiers_set_only_to_exceeds(self) -> None:
+        """When both from_tier and to_tier are set but only to_tier exceeds,
+        error names to_tier specifically."""
+        base = self._manifest_with_tiers()
+        overlay = _overlay(
+            name="src/core",
+            boundaries=(
+                BoundaryEntry(
+                    function="Handler.handle",
+                    transition="construction",
+                    from_tier=1,  # does not exceed
+                    to_tier=3,    # exceeds module tier 1
+                ),
+            ),
+        )
+        with pytest.raises(ManifestWidenError) as exc_info:
+            merge(base, overlay)
+        assert exc_info.value.field_name == "to_tier"
