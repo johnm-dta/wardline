@@ -30,6 +30,7 @@ class RulePyWl001(RuleBase):
     """
 
     RULE_ID = RuleId.PY_WL_001
+    _GOVERNED_TRANSITIONS = frozenset({"construction", "restoration"})
 
     def __init__(self, *, file_path: str = "") -> None:
         super().__init__()
@@ -140,25 +141,67 @@ class RulePyWl001(RuleBase):
         call: ast.Call,
         enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> None:
-        """Emit a PY-WL-001-UNVERIFIED-DEFAULT WARNING."""
+        """Emit governed (SUPPRESS) or ungoverned (ERROR) for schema_default()."""
         taint = self._get_function_taint(self._current_qualname)
-        self.findings.append(
-            Finding(
-                rule_id=RuleId.PY_WL_001_UNVERIFIED_DEFAULT,
-                file_path=self._file_path,
-                line=call.lineno,
-                col=call.col_offset,
-                end_line=call.end_lineno,
-                end_col=call.end_col_offset,
-                message=(
-                    "schema_default() suppresses PY-WL-001 but overlay "
-                    "verification is not yet implemented — this "
-                    "suppression is un-governed"
-                ),
-                severity=Severity.WARNING,
-                exceptionability=Exceptionability.UNCONDITIONAL,
-                taint_state=taint,
-                analysis_level=1,
-                source_snippet=None,
+
+        if self._is_governed_by_boundary():
+            self.findings.append(
+                Finding(
+                    rule_id=RuleId.PY_WL_001_GOVERNED_DEFAULT,
+                    file_path=self._file_path,
+                    line=call.lineno,
+                    col=call.col_offset,
+                    end_line=call.end_lineno,
+                    end_col=call.end_col_offset,
+                    message=(
+                        "schema_default() governed by overlay boundary — "
+                        "suppressed"
+                    ),
+                    severity=Severity.SUPPRESS,
+                    exceptionability=Exceptionability.TRANSPARENT,
+                    taint_state=taint,
+                    analysis_level=1,
+                    source_snippet=None,
+                )
             )
-        )
+        else:
+            self.findings.append(
+                Finding(
+                    rule_id=RuleId.PY_WL_001,
+                    file_path=self._file_path,
+                    line=call.lineno,
+                    col=call.col_offset,
+                    end_line=call.end_lineno,
+                    end_col=call.end_col_offset,
+                    message=(
+                        "schema_default() without overlay boundary — "
+                        "ungoverned default value"
+                    ),
+                    severity=Severity.ERROR,
+                    exceptionability=Exceptionability.STANDARD,
+                    taint_state=taint,
+                    analysis_level=1,
+                    source_snippet=None,
+                )
+            )
+
+    def _is_governed_by_boundary(self) -> bool:
+        """Check if current function has a matching governance boundary.
+
+        Three conditions must ALL be met:
+        1. Exact qualname match (boundary.function == self._current_qualname)
+        2. Transition type is governance-relevant (construction or restoration)
+        3. File is within the boundary's overlay scope (non-empty, path-prefix)
+        """
+        if self._context is None:
+            return False
+
+        for boundary in self._context.boundaries:
+            if (
+                boundary.function == self._current_qualname
+                and boundary.transition in self._GOVERNED_TRANSITIONS
+                and boundary.overlay_scope  # non-empty required (E4)
+                and self._file_path.startswith(boundary.overlay_scope + "/")
+            ):
+                return True
+        return False

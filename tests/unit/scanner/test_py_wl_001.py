@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from wardline.core.severity import RuleId, Severity
+from wardline.core.severity import Exceptionability, RuleId, Severity
+from wardline.manifest.models import BoundaryEntry
+from wardline.scanner.context import ScanContext
 from wardline.scanner.rules.py_wl_001 import RulePyWl001
 
 from .conftest import parse_function_source, parse_module_source
@@ -20,6 +22,25 @@ def _run_rule_module(source: str) -> RulePyWl001:
     """Parse raw module source and run PY-WL-001."""
     tree = parse_module_source(source)
     rule = RulePyWl001(file_path="test.py")
+    rule.visit(tree)
+    return rule
+
+
+def _run_rule_with_context(
+    source: str,
+    *,
+    boundaries: tuple[BoundaryEntry, ...] = (),
+    file_path: str = "src/adapters/handler.py",
+) -> RulePyWl001:
+    """Parse source inside a function, set context with boundaries, run rule."""
+    tree = parse_function_source(source)
+    rule = RulePyWl001(file_path=file_path)
+    ctx = ScanContext(
+        file_path=file_path,
+        function_level_taint_map={},
+        boundaries=boundaries,
+    )
+    rule.set_context(ctx)
     rule.visit(tree)
     return rule
 
@@ -120,35 +141,194 @@ class TestDefaultdict:
 # ── schema_default() suppression ─────────────────────────────────
 
 
-class TestSchemaDefault:
-    """``schema_default()`` suppresses to WARNING, not silence."""
+class TestSchemaDefaultGoverned:
+    """schema_default() with matching boundary -> SUPPRESS (governed)."""
 
-    def test_get_with_schema_default_emits_warning(self) -> None:
-        rule = _run_rule('d.get("key", schema_default("fallback"))\n')
-
+    def test_get_with_boundary_suppresses(self) -> None:
+        boundary = BoundaryEntry(
+            function="target",
+            transition="construction",
+            overlay_scope="src/adapters",
+        )
+        rule = _run_rule_with_context(
+            'd.get("key", schema_default("fallback"))\n',
+            boundaries=(boundary,),
+        )
         assert len(rule.findings) == 1
         f = rule.findings[0]
-        assert f.rule_id == RuleId.PY_WL_001_UNVERIFIED_DEFAULT
-        assert f.severity == Severity.WARNING
-        assert "un-governed" in f.message
+        assert f.rule_id == RuleId.PY_WL_001_GOVERNED_DEFAULT
+        assert f.severity == Severity.SUPPRESS
+        assert f.exceptionability == Exceptionability.TRANSPARENT
 
-    def test_setdefault_with_schema_default_emits_warning(self) -> None:
-        rule = _run_rule(
-            'd.setdefault("key", schema_default([]))\n'
+    def test_setdefault_with_boundary_suppresses(self) -> None:
+        boundary = BoundaryEntry(
+            function="target",
+            transition="restoration",
+            overlay_scope="src/adapters",
         )
+        rule = _run_rule_with_context(
+            'd.setdefault("key", schema_default([]))\n',
+            boundaries=(boundary,),
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_GOVERNED_DEFAULT
+
+    def test_matching_scope_suppresses(self) -> None:
+        """Positive test: file within non-empty overlay scope -> SUPPRESS (E8)."""
+        boundary = BoundaryEntry(
+            function="target",
+            transition="construction",
+            overlay_scope="src/adapters",
+        )
+        rule = _run_rule_with_context(
+            'd.get("key", schema_default("x"))\n',
+            boundaries=(boundary,),
+            file_path="src/adapters/handler.py",
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_GOVERNED_DEFAULT
+
+    def test_class_method_with_boundary_suppresses(self) -> None:
+        source = '''
+class MyClass:
+    def handle(self):
+        d.get("key", schema_default("x"))
+'''
+        tree = parse_module_source(source)
+        boundary = BoundaryEntry(
+            function="MyClass.handle",
+            transition="construction",
+            overlay_scope="src/adapters",
+        )
+        rule = RulePyWl001(file_path="src/adapters/handler.py")
+        ctx = ScanContext(
+            file_path="src/adapters/handler.py",
+            function_level_taint_map={},
+            boundaries=(boundary,),
+        )
+        rule.set_context(ctx)
+        rule.visit(tree)
 
         assert len(rule.findings) == 1
-        assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNVERIFIED_DEFAULT
-        assert rule.findings[0].severity == Severity.WARNING
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_GOVERNED_DEFAULT
 
-    def test_schema_default_does_not_produce_error(self) -> None:
-        """schema_default should NOT produce an ERROR-level PY-WL-001."""
-        rule = _run_rule('d.get("key", schema_default(42))\n')
+    def test_multiple_boundaries_only_match_suppresses(self) -> None:
+        boundaries = (
+            BoundaryEntry(function="other", transition="construction", overlay_scope="src/adapters"),
+            BoundaryEntry(function="target", transition="construction", overlay_scope="src/adapters"),
+        )
+        rule = _run_rule_with_context(
+            'd.get("key", schema_default(42))\n',
+            boundaries=boundaries,
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_GOVERNED_DEFAULT
 
-        error_findings = [
-            f for f in rule.findings if f.rule_id == RuleId.PY_WL_001
-        ]
-        assert len(error_findings) == 0
+
+class TestSchemaDefaultUngoverned:
+    """schema_default() without matching boundary -> ERROR."""
+
+    def test_no_boundary_emits_error(self) -> None:
+        rule = _run_rule_with_context(
+            'd.get("key", schema_default("fallback"))\n',
+        )
+        assert len(rule.findings) == 1
+        f = rule.findings[0]
+        assert f.rule_id == RuleId.PY_WL_001
+        assert f.severity == Severity.ERROR
+
+    def test_wrong_function_emits_error(self) -> None:
+        boundary = BoundaryEntry(
+            function="other_fn",
+            transition="construction",
+            overlay_scope="src/adapters",
+        )
+        rule = _run_rule_with_context(
+            'd.get("key", schema_default(42))\n',
+            boundaries=(boundary,),
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+
+    def test_wrong_transition_emits_error(self) -> None:
+        boundary = BoundaryEntry(
+            function="target",
+            transition="shape_validation",
+            overlay_scope="src/adapters",
+        )
+        rule = _run_rule_with_context(
+            'd.get("key", schema_default(42))\n',
+            boundaries=(boundary,),
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+
+    def test_wrong_scope_emits_error(self) -> None:
+        boundary = BoundaryEntry(
+            function="target",
+            transition="construction",
+            overlay_scope="services",
+        )
+        rule = _run_rule_with_context(
+            'd.get("key", schema_default(42))\n',
+            boundaries=(boundary,),
+            file_path="src/adapters/handler.py",
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+
+    def test_empty_scope_does_not_match(self) -> None:
+        """Empty overlay_scope must NOT match (E4)."""
+        boundary = BoundaryEntry(
+            function="target",
+            transition="construction",
+            overlay_scope="",
+        )
+        rule = _run_rule_with_context(
+            'd.get("key", schema_default(42))\n',
+            boundaries=(boundary,),
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+
+    def test_no_context_emits_error(self) -> None:
+        tree = parse_function_source(
+            'd.get("key", schema_default(42))\n'
+        )
+        rule = RulePyWl001(file_path="test.py")
+        # No set_context call -- _context is None
+        rule.visit(tree)
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+        assert rule.findings[0].severity == Severity.ERROR
+
+    def test_case_sensitive_qualname(self) -> None:
+        boundary = BoundaryEntry(
+            function="Target",
+            transition="construction",
+            overlay_scope="src/adapters",
+        )
+        rule = _run_rule_with_context(
+            'd.get("key", schema_default(42))\n',
+            boundaries=(boundary,),
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+
+    def test_non_schema_default_unchanged(self) -> None:
+        """Regular default -> ERROR regardless of boundaries."""
+        boundary = BoundaryEntry(
+            function="target",
+            transition="construction",
+            overlay_scope="src/adapters",
+        )
+        rule = _run_rule_with_context(
+            'd.get("key", "hardcoded")\n',
+            boundaries=(boundary,),
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001
 
 
 # ── Lambda .get() corpus specimen ────────────────────────────────
