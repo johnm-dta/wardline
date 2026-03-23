@@ -272,6 +272,17 @@ def scan(
     if cfg is not None and cfg.exclude_paths:
         exclude_paths = cfg.exclude_paths
 
+    # --- Resolve overlay boundaries ---
+    from wardline.manifest.discovery import discover_manifest
+    from wardline.manifest.models import BoundaryEntry as _BoundaryEntry
+    from wardline.manifest.resolve import resolve_boundaries
+
+    boundaries: tuple[_BoundaryEntry, ...] = ()
+    if manifest_model is not None:
+        manifest_path = Path(manifest) if manifest is not None else discover_manifest(Path.cwd())
+        if manifest_path is not None:
+            boundaries = resolve_boundaries(manifest_path.parent, manifest_model)
+
     # --- Create engine and run scan ---
     from wardline.scanner.engine import ScanEngine, ScanResult
 
@@ -280,6 +291,7 @@ def scan(
         exclude_paths=exclude_paths,
         rules=active_rules,
         manifest=manifest_model,
+        boundaries=boundaries,
     )
 
     logger.info("Scanning %d target path(s)...", len(target_paths))

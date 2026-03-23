@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
+import pytest
+
 from wardline.core.severity import RuleId, Severity
+from wardline.manifest.models import BoundaryEntry
+from wardline.scanner.context import ScanContext
 from wardline.scanner.engine import ScanEngine
 from wardline.scanner.rules.base import RuleBase
 
@@ -359,3 +363,78 @@ class TestMultipleTargets:
         assert result.files_scanned == 2
         visited_names = {name for name, _ in rule.visited}
         assert visited_names == {"fn_a", "fn_b"}
+
+
+# ── Context-capturing rule for boundary tests ────────────────────
+
+
+class _ContextCapturingRule(RuleBase):
+    """Captures self._context on visit_function for test inspection."""
+
+    RULE_ID: ClassVar[RuleId] = RuleId.TOOL_ERROR
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.captured_context: ScanContext | None = None
+
+    def visit_function(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+        *,
+        is_async: bool,
+    ) -> None:
+        self.captured_context = self._context
+
+
+# ── ScanContext.boundaries tests ─────────────────────────────────
+
+
+class TestScanContextBoundaries:
+    """ScanContext carries overlay boundaries as a frozen tuple."""
+
+    def test_boundaries_default_empty(self) -> None:
+        ctx = ScanContext(file_path="test.py", function_level_taint_map={})
+        assert ctx.boundaries == ()
+
+    def test_boundaries_set_at_construction(self) -> None:
+        b = BoundaryEntry(function="fn", transition="construction")
+        ctx = ScanContext(
+            file_path="test.py",
+            function_level_taint_map={},
+            boundaries=(b,),
+        )
+        assert len(ctx.boundaries) == 1
+        assert ctx.boundaries[0].function == "fn"
+
+    def test_boundaries_frozen(self) -> None:
+        ctx = ScanContext(file_path="test.py", function_level_taint_map={})
+        with pytest.raises(AttributeError):
+            ctx.boundaries = ()  # type: ignore[misc]
+
+
+# ── Engine boundary injection tests ──────────────────────────────
+
+
+class TestEngineBoundaryInjection:
+    """ScanEngine passes boundaries through to ScanContext."""
+
+    def test_engine_passes_boundaries_to_context(self, tmp_path: Path) -> None:
+        _write_py(tmp_path / "a.py", "def foo(): pass\n")
+        b = BoundaryEntry(function="foo", transition="construction")
+        rule = _ContextCapturingRule()
+        engine = ScanEngine(
+            target_paths=(tmp_path,),
+            rules=(rule,),
+            boundaries=(b,),
+        )
+        engine.scan()
+        assert rule.captured_context is not None
+        assert len(rule.captured_context.boundaries) == 1
+
+    def test_engine_no_boundaries_backward_compat(self, tmp_path: Path) -> None:
+        _write_py(tmp_path / "a.py", "def foo(): pass\n")
+        rule = _ContextCapturingRule()
+        engine = ScanEngine(target_paths=(tmp_path,), rules=(rule,))
+        engine.scan()
+        assert rule.captured_context is not None
+        assert rule.captured_context.boundaries == ()
