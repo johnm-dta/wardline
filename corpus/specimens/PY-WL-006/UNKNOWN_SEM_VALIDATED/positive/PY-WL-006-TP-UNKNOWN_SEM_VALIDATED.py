@@ -1,5 +1,5 @@
 def process():
     try:
         risky()
-    except Exception:
-        logger.error("failed")
+    except Exception as e:
+        audit.save({"error": str(e)})

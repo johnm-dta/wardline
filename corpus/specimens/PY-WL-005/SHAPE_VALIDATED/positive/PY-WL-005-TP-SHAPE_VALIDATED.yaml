@@ -2,13 +2,13 @@
 specimen_id: PY-WL-005-TP-SHAPE_VALIDATED
 description: PY-WL-005 true_positive at SHAPE_VALIDATED
 rule: PY-WL-005
-fragment: "def process():\n    try:\n        pass\n    except Exception:\n       \
-  \ pass\n"
+fragment: "def process():\n    try:\n        pass\n    except RuntimeError:\n    \
+  \    pass\n"
 taint_state: SHAPE_VALIDATED
 expected_rules:
 - PY-WL-005
 expected_severity: ERROR
 expected_exceptionability: STANDARD
 expected_match: true
-sha256: f45f081293981a52107c95479cbc55aee5b545b62f7fa64d173723e8427ff314
+sha256: 953fc33abd033ad0fa3fe4111831180f834d8b290a06ad58535543a138c961a9
 verdict: true_positive

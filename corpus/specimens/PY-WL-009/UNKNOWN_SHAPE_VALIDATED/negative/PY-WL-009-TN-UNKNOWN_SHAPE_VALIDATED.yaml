@@ -2,12 +2,12 @@
 specimen_id: PY-WL-009-TN-UNKNOWN_SHAPE_VALIDATED
 description: PY-WL-009 true negative at UNKNOWN_SHAPE_VALIDATED
 rule: PY-WL-009
-fragment: "def process(data):\n    if isinstance(data, dict):\n        pass\n    if\
-  \ data[\"status\"] == \"active\":\n        pass\n"
+fragment: "def process(data):\n    data = ensure_shape(data, required=[\"status\"\
+  ])\n    if data[\"status\"] == \"active\":\n        pass\n"
 taint_state: UNKNOWN_SHAPE_VALIDATED
 expected_rules: []
 expected_severity: null
 expected_exceptionability: null
 expected_match: false
-sha256: 965d3796983070162f1b4ac0b2b7b0e022c245da1eba9f272b9a13b4a317894d
+sha256: f28a7e04b40687b2b460804a27eaf1dbcbf9f9e9f83f3f4e9c8b93dd9be8e17c
 verdict: true_negative

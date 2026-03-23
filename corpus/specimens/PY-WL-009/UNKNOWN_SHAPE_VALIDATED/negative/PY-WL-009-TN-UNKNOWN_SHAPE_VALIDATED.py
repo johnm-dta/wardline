@@ -1,5 +1,4 @@
 def process(data):
-    if isinstance(data, dict):
-        pass
+    data = ensure_shape(data, required=["status"])
     if data["status"] == "active":
         pass

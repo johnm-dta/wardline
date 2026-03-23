@@ -2,12 +2,12 @@
 specimen_id: PY-WL-009-TN-MIXED_RAW
 description: PY-WL-009 true negative at MIXED_RAW
 rule: PY-WL-009
-fragment: "def process(data):\n    if isinstance(data, dict):\n        pass\n    if\
-  \ data[\"status\"] == \"active\":\n        pass\n"
+fragment: "def process(data):\n    if not isinstance(data, dict) or \"status\" not\
+  \ in data:\n        return\n    if data[\"status\"] == \"active\":\n        pass\n"
 taint_state: MIXED_RAW
 expected_rules: []
 expected_severity: null
 expected_exceptionability: null
 expected_match: false
-sha256: 965d3796983070162f1b4ac0b2b7b0e022c245da1eba9f272b9a13b4a317894d
+sha256: fba5ca76725668e3a177c80528e19dc87ae6b10a7ffc0bc9e45ed2840ec2f76b
 verdict: true_negative

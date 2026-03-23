@@ -1,4 +1,5 @@
-specimen_id: ADV-005-long-function
+---
+specimen_id: PY-WL-005-TP-long-function
 description: "Long function with broad silent handler \u2014 triggers both PY-WL-004\
   \ and PY-WL-005"
 rule: PY-WL-005
@@ -19,7 +20,6 @@ expected_rules:
 expected_match: true
 verdict: true_positive
 tags:
-- adversarial
 - long-function
 sha256: 9bddf2557fa2ae1e5677cad3af71ad356af5563f2e49e2f79ce7316593c3fea8
 expected_severity: null

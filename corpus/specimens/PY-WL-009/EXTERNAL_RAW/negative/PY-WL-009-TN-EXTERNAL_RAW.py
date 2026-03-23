@@ -1,5 +1,5 @@
 def process(data):
-    if isinstance(data, dict):
+    if "status" in data:
         pass
     if data["status"] == "active":
         pass

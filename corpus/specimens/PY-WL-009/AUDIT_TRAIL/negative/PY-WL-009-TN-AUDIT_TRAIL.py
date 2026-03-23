@@ -1,5 +1,4 @@
 def process(data):
-    if isinstance(data, dict):
-        pass
+    schema_validated = validate_shape(data)
     if data["status"] == "active":
         pass
