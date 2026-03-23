@@ -1,13 +1,14 @@
 ---
 specimen_id: PY-WL-005-TN-PIPELINE
-description: PY-WL-005 true negative at PIPELINE
+description: PY-WL-005 true positive at PIPELINE
 rule: PY-WL-005
 fragment: "def process():\n    try:\n        pass\n    except ValueError:\n      \
   \  pass\n"
 taint_state: PIPELINE
-expected_rules: []
-expected_severity: null
-expected_exceptionability: null
-expected_match: false
+expected_rules:
+- PY-WL-005
+expected_severity: ERROR
+expected_exceptionability: STANDARD
+expected_match: true
 sha256: 2fc262ee2b3d7c221393e6d7cbb220b7a176122a5859e1fb37268fe92c11cd5c
-verdict: true_negative
+verdict: true_positive
