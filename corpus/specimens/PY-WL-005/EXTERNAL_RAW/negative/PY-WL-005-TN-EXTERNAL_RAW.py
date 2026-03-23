@@ -1,5 +1,5 @@
-def process():
+def process(data):
     try:
-        pass
+        result = data["key"]
     except ValueError:
-        pass
+        raise

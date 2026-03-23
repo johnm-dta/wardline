@@ -1,13 +1,12 @@
----
 specimen_id: PY-WL-005-TN-SHAPE_VALIDATED
-description: PY-WL-005 true negative at SHAPE_VALIDATED
+description: "PY-WL-005 true negative at SHAPE_VALIDATED \u2014 re-raises (not silent)"
 rule: PY-WL-005
-fragment: "def process():\n    try:\n        pass\n    except ValueError:\n      \
-  \  pass\n"
+fragment: "def process(data):\n    try:\n        result = data[\"key\"]\n    except\
+  \ ValueError:\n        raise\n"
 taint_state: SHAPE_VALIDATED
 expected_rules: []
 expected_severity: null
 expected_exceptionability: null
 expected_match: false
-sha256: 2fc262ee2b3d7c221393e6d7cbb220b7a176122a5859e1fb37268fe92c11cd5c
+sha256: 3d59de76e0952ad670d2c53d9413a7ae26b779ca8b3fa1bfc64dd1f04e40bd24
 verdict: true_negative
