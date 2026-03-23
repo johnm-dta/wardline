@@ -165,6 +165,8 @@ def _disabled_rule_findings(
               help="Emit GOVERNANCE finding instead of exit 2 on registry mismatch.")
 @click.option("--allow-permissive-distribution", is_flag=True, default=False,
               help="Emit GOVERNANCE finding for permissive distribution mode.")
+@click.option("--preview-phase2", is_flag=True, default=False,
+              help="Output Phase 2 migration impact report (JSON) instead of SARIF.")
 def scan(
     path: str,
     manifest: str | None,
@@ -176,6 +178,7 @@ def scan(
     max_unknown_raw_percent: float | None,
     allow_registry_mismatch: bool,
     allow_permissive_distribution: bool,
+    preview_phase2: bool,
 ) -> None:
     """Scan Python files for boundary violations."""
     _setup_logging(verbose=verbose, debug=debug)
@@ -364,6 +367,41 @@ def scan(
                 "UNKNOWN_RAW percentage %.1f%% exceeds max %.1f%%",
                 pct, effective_max_pct,
             )
+
+    # --- Preview Phase 2 report ---
+    if preview_phase2:
+        from wardline.cli.preview import build_preview_report
+        import wardline
+        import json
+
+        report = build_preview_report(
+            result.findings,
+            governance_findings,
+            scanned_path=str(Path(path).resolve()),
+            wardline_version=wardline.__version__,
+        )
+        report_text = json.dumps(report, indent=2) + "\n"
+
+        if output is not None:
+            try:
+                Path(output).write_text(report_text, encoding="utf-8")
+            except OSError as exc:
+                click.echo(f"error: cannot write to '{output}': {exc}", err=True)
+                sys.exit(EXIT_CONFIG_ERROR)
+        else:
+            click.echo(report_text, nl=False)
+
+        # Normal exit code rules apply — preview changes format, not enforcement
+        has_tool_error = any(
+            f.rule_id == RuleId.TOOL_ERROR for f in result.findings
+        )
+        scan_finding_count = len(result.findings)
+        if has_tool_error:
+            sys.exit(EXIT_TOOL_ERROR)
+        elif exceeded_pct or scan_finding_count > 0:
+            sys.exit(EXIT_FINDINGS)
+        else:
+            sys.exit(EXIT_CLEAN)
 
     # --- Build SARIF output ---
     loaded_rule_ids = frozenset(r.RULE_ID for r in active_rules)
