@@ -507,6 +507,9 @@ def _load_manifest(
         if not manifest_path.exists():
             _error(f"manifest not found: {manifest_arg}")
             return None
+        if manifest_path.is_dir():
+            _error(f"manifest path is a directory, not a file: {manifest_arg}")
+            return None
     else:
         manifest_path = discover_manifest(Path.cwd())
         if manifest_path is None:
@@ -544,6 +547,9 @@ def _load_config(config_arg: str | None) -> ScannerConfig | None | _ConfigError:
     config_path = Path(config_arg)
     if not config_path.exists():
         _error(f"config not found: {config_arg}")
+        return _CONFIG_ERROR
+    if config_path.is_dir():
+        _error(f"config path is a directory, not a file: {config_arg}")
         return _CONFIG_ERROR
 
     try:

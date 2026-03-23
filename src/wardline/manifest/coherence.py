@@ -372,6 +372,17 @@ def check_expired_exceptions(
         try:
             expiry_date = datetime.date.fromisoformat(exc.expires)
         except ValueError:
+            issues.append(
+                CoherenceIssue(
+                    kind="GOVERNANCE WARNING",
+                    function="",
+                    file_path=exc.location,
+                    detail=(
+                        f"Exception '{exc.id}' has invalid expires date "
+                        f"'{exc.expires}' — cannot parse as ISO 8601."
+                    ),
+                )
+            )
             continue
 
         if expiry_date < now:

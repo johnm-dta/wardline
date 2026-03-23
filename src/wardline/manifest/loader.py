@@ -105,6 +105,10 @@ def _check_schema_version(data: dict[str, Any], path: Path) -> None:
     """
     doc_id = data.get("$id", "")
     if not doc_id:
+        import logging
+        logging.getLogger("wardline").warning(
+            "Document %s has no $id — schema version cannot be verified", path
+        )
         return
 
     # Extract version from $id URL: .../schemas/<version>/...
