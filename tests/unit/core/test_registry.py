@@ -5,6 +5,15 @@ import pytest
 from wardline.core.registry import REGISTRY, REGISTRY_VERSION
 
 
+def test_registry_is_immutable() -> None:
+    """REGISTRY must be a MappingProxyType — mutation raises TypeError."""
+    from types import MappingProxyType
+
+    assert isinstance(REGISTRY, MappingProxyType)
+    with pytest.raises(TypeError):
+        REGISTRY["rogue"] = None  # type: ignore[index]
+
+
 def test_registry_version_present() -> None:
     assert isinstance(REGISTRY_VERSION, str)
     assert len(REGISTRY_VERSION) > 0

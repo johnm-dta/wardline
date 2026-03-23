@@ -41,7 +41,7 @@ class RegistryEntry:
 # Group 1: Authority Tier Flow (7 decorators)
 # Group 2: Audit (1 decorator)
 # These are the MVP-required decorators.
-REGISTRY: dict[str, RegistryEntry] = {
+REGISTRY: MappingProxyType[str, RegistryEntry] = MappingProxyType({
     "external_boundary": RegistryEntry(
         canonical_name="external_boundary",
         group=1,
@@ -93,4 +93,4 @@ REGISTRY: dict[str, RegistryEntry] = {
         args={},
         attrs={"_wardline_audit_critical": bool},
     ),
-}
+})

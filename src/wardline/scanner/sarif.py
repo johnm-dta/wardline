@@ -149,6 +149,9 @@ class SarifReport:
     implemented_rule_ids: frozenset[RuleId] | None = None
     unknown_raw_count: int = 0
     unresolved_decorator_count: int = 0
+    active_exception_count: int = 0
+    stale_exception_count: int = 0
+    expedited_exception_ratio: float = 0.0
 
     def _implemented_rules(self) -> list[str]:
         """Return sorted list of canonical rule ID values (excludes pseudo-IDs).
@@ -200,6 +203,9 @@ class SarifReport:
                 ),
                 "wardline.unknownRawFunctionCount": self.unknown_raw_count,
                 "wardline.unresolvedDecoratorCount": self.unresolved_decorator_count,
+                "wardline.activeExceptionCount": self.active_exception_count,
+                "wardline.staleExceptionCount": self.stale_exception_count,
+                "wardline.expeditedExceptionRatio": round(self.expedited_exception_ratio, 3),
             },
             "results": results,
             "tool": {

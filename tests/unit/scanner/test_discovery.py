@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from wardline.scanner.discovery import (
     _build_import_table,
     _collect_type_checking_lines,
+    _resolve_decorator,
     discover_annotations,
 )
 
@@ -455,3 +456,32 @@ class TestEdgeCaseWarnings:
         assert any("Star import" in m for m in warning_msgs)
         # Should have the unresolved decorator warning
         assert any("cannot be reliably resolved" in m for m in warning_msgs)
+
+
+# ── Recursion depth limit ────────────────────────────────────────
+
+
+class TestResolveDecoratorDepthLimit:
+    """_resolve_decorator must not recurse unboundedly."""
+
+    def test_deep_call_chain_returns_none(self) -> None:
+        """A Call chain deeper than max_depth returns None instead of recursing."""
+        # Build a deeply nested ast.Call chain: f()()()...()
+        inner: ast.expr = ast.Name(id="external_boundary", ctx=ast.Load())
+        for _ in range(60):
+            inner = ast.Call(func=inner, args=[], keywords=[])
+
+        import_table = {"external_boundary": "external_boundary"}
+        # With default max_depth=50, this should return None (not recurse endlessly)
+        result = _resolve_decorator(inner, import_table)
+        assert result is None
+
+    def test_shallow_call_chain_resolves(self) -> None:
+        """A shallow Call chain within max_depth resolves normally."""
+        inner: ast.expr = ast.Name(id="external_boundary", ctx=ast.Load())
+        for _ in range(3):
+            inner = ast.Call(func=inner, args=[], keywords=[])
+
+        import_table = {"external_boundary": "external_boundary"}
+        result = _resolve_decorator(inner, import_table)
+        assert result == "external_boundary"

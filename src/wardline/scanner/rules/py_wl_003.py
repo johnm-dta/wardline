@@ -18,7 +18,7 @@ from wardline.core import matrix
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.core.taints import TaintState
 from wardline.scanner.context import Finding
-from wardline.scanner.rules.base import RuleBase
+from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
 
 # PY-WL-003 only fires at these taint states.
 # MIXED_RAW included: matrix shows (E,St) same as EXTERNAL_RAW/UNKNOWN_RAW.
@@ -56,7 +56,7 @@ class RulePyWl003(RuleBase):
         taint = self._get_function_taint(self._current_qualname)
         if taint not in _ACTIVE_TAINTS:
             return
-        for child in ast.walk(node):
+        for child in walk_skip_nested_defs(node):
             if isinstance(child, ast.Compare):
                 self._check_compare(child, node, taint)
             elif isinstance(child, ast.Call):

@@ -410,9 +410,13 @@ class TestTierUpgradeWithoutEvidence:
 
         tiers = (_tier("strict", 1), _tier("permissive", 3))
         module_tiers = (_module_tier("src/core", "strict"),)
-        # Boundary function starts with the module path
+        # Boundary overlay_scope covers the module path
         boundaries = (
-            BoundaryEntry(function="src/core.handler", transition="INGRESS"),
+            BoundaryEntry(
+                function="handler",
+                transition="INGRESS",
+                overlay_scope="/project/src/core",
+            ),
         )
 
         issues = check_tier_upgrade_without_evidence(

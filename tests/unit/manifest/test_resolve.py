@@ -118,3 +118,40 @@ class TestResolveBoundaries:
 
         result = resolve_boundaries(tmp_path, manifest)
         assert result == ()
+
+    def test_overlay_for_path_mismatch_raises(self, tmp_path: Path) -> None:
+        """Overlay claiming overlay_for that doesn't match its directory raises GovernanceError."""
+        overlay_dir = tmp_path / "adapters"
+        overlay_dir.mkdir()
+        _write_overlay(
+            overlay_dir / "wardline.overlay.yaml",
+            (
+                '$id: "https://wardline.dev/schemas/0.1/overlay.schema.json"\n'
+                "overlay_for: audit\n"
+                "boundaries: []\n"
+            ),
+        )
+        # Allow both "adapters" and "audit" in discovery so we get past that check
+        manifest = _minimal_manifest(module_paths=("adapters", "audit"))
+
+        with pytest.raises(GovernanceError, match="overlay_for='audit'"):
+            resolve_boundaries(tmp_path, manifest)
+
+    def test_overlay_for_path_match_accepted(self, tmp_path: Path) -> None:
+        """Overlay whose overlay_for matches its directory is accepted."""
+        overlay_dir = tmp_path / "adapters" / "partner"
+        overlay_dir.mkdir(parents=True)
+        _write_overlay(
+            overlay_dir / "wardline.overlay.yaml",
+            (
+                '$id: "https://wardline.dev/schemas/0.1/overlay.schema.json"\n'
+                "overlay_for: adapters/partner\n"
+                "boundaries:\n"
+                '  - function: "Client.call"\n'
+                '    transition: "construction"\n'
+            ),
+        )
+        manifest = _minimal_manifest(module_paths=("adapters",))
+
+        result = resolve_boundaries(tmp_path, manifest)
+        assert len(result) == 1

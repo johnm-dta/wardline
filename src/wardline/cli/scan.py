@@ -19,7 +19,7 @@ from wardline.core.severity import (
     RuleId,
     Severity,
 )
-from wardline.scanner.context import Finding
+from wardline.scanner.context import Finding, make_governance_finding
 from wardline.scanner.sarif import _PSEUDO_RULE_IDS, SarifReport
 
 if TYPE_CHECKING:
@@ -103,21 +103,8 @@ def _make_governance_finding(
     message: str,
     severity: Severity = Severity.WARNING,
 ) -> Finding:
-    """Create a GOVERNANCE-level diagnostic finding."""
-    return Finding(
-        rule_id=rule_id,
-        file_path="<governance>",
-        line=1,
-        col=0,
-        end_line=None,
-        end_col=None,
-        message=message,
-        severity=severity,
-        exceptionability=Exceptionability.UNCONDITIONAL,
-        taint_state=None,
-        analysis_level=0,
-        source_snippet=None,
-    )
+    """Create a GOVERNANCE-level diagnostic finding (delegates to shared factory)."""
+    return make_governance_finding(rule_id, message, severity=severity)
 
 
 def _disabled_rule_findings(
@@ -303,15 +290,52 @@ def scan(
 
     # --- Apply exception register ---
     from wardline.manifest.exceptions import load_exceptions
+    from wardline.manifest.loader import ManifestLoadError
     from wardline.scanner.exceptions import apply_exceptions
 
-    exceptions = load_exceptions(manifest_path.parent)
+    try:
+        exceptions = load_exceptions(manifest_path.parent)
+    except ManifestLoadError as exc:
+        _error(f"exception register failed: {exc}")
+        sys.exit(EXIT_CONFIG_ERROR)
+    active_exception_count = 0
+    stale_exception_count = 0
+    expedited_exception_ratio = 0.0
+
     if exceptions:
         processed, governance_ex = apply_exceptions(
             result.findings, exceptions, project_root=manifest_path.parent
         )
         result.findings = processed
         governance_findings.extend(governance_ex)
+
+        # Compute exception stats for SARIF
+        import datetime as _dt
+
+        _today = _dt.date.today()
+        _active = 0
+        _stale = 0
+        _expedited = 0
+        for _exc in exceptions:
+            if _exc.expires is not None:
+                try:
+                    if _dt.date.fromisoformat(_exc.expires) < _today:
+                        continue
+                except ValueError:
+                    pass
+            _active += 1
+            if _exc.governance_path == "expedited":
+                _expedited += 1
+        # Stale = governance findings of type GOVERNANCE_STALE_EXCEPTION
+        _stale = sum(
+            1 for gf in governance_ex
+            if gf.rule_id == RuleId.GOVERNANCE_STALE_EXCEPTION
+        )
+        active_exception_count = _active
+        stale_exception_count = _stale
+        expedited_exception_ratio = (
+            _expedited / _active if _active > 0 else 0.0
+        )
 
     # --- Merge governance findings ---
     all_findings = governance_findings + result.findings
@@ -349,6 +373,9 @@ def scan(
         implemented_rule_ids=loaded_rule_ids,
         unknown_raw_count=unknown_raw_count,
         unresolved_decorator_count=unresolved_decorator_count,
+        active_exception_count=active_exception_count,
+        stale_exception_count=stale_exception_count,
+        expedited_exception_ratio=expedited_exception_ratio,
     )
 
     sarif_text = report.to_json_string() + "\n"

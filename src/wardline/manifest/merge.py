@@ -1,9 +1,8 @@
 """Overlay merge — combine a base manifest with an overlay.
 
 Enforces the narrow-only invariant: overlays may tighten tiers but never
-relax them.  Severity reduction (e.g. ERROR -> WARNING) *is* permitted as a
-soft-adoption path; when it occurs a GOVERNANCE INFO signal is recorded in
-the returned :class:`ResolvedManifest`.
+relax them.  Severity reduction (e.g. ERROR -> WARNING) raises
+:class:`ManifestWidenError` — an overlay CANNOT lower severity.
 """
 
 from __future__ import annotations
@@ -104,14 +103,11 @@ def merge(
                 and _severity_rank(str(overlay_severity))
                 < _severity_rank(str(base_severity))
             ):
-                governance_signals.append(
-                    GovernanceSignal(
-                        level="INFO",
-                        message=(
-                            f"Severity reduced for rule '{rule_id}': "
-                            f"{base_severity} -> {overlay_severity}"
-                        ),
-                    )
+                raise ManifestWidenError(
+                    overlay_name=overlay.overlay_for,
+                    field_name="severity",
+                    base_value=base_severity,
+                    attempted_value=overlay_severity,
                 )
         # Overlay wins — update or insert
         merged = dict(base_ovr) if base_ovr else {}

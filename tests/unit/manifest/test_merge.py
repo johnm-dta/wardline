@@ -139,10 +139,10 @@ class TestTierNarrowOnly:
 
 
 class TestSeverityReduction:
-    """Severity reduction is allowed but emits a GOVERNANCE INFO signal."""
+    """Severity reduction raises ManifestWidenError — overlays CANNOT lower severity."""
 
-    def test_severity_reduction_accepted(self) -> None:
-        """ERROR -> WARNING is allowed."""
+    def test_severity_reduction_raises(self) -> None:
+        """ERROR -> WARNING raises ManifestWidenError."""
         base = _base_manifest(
             overrides=({"id": "PY-WL-001", "severity": "ERROR"},),
         )
@@ -150,32 +150,27 @@ class TestSeverityReduction:
             rule_overrides=({"id": "PY-WL-001", "severity": "WARNING"},),
         )
 
-        result = merge(base, overlay)
+        with pytest.raises(ManifestWidenError) as exc_info:
+            merge(base, overlay)
 
-        # The merged override should have WARNING
-        merged = {o["id"]: o for o in result.rules.overrides}
-        assert merged["PY-WL-001"]["severity"] == "WARNING"
+        assert exc_info.value.field_name == "severity"
+        assert exc_info.value.base_value == "ERROR"
+        assert exc_info.value.attempted_value == "WARNING"
 
-    def test_governance_signal_emitted_on_reduction(self) -> None:
-        """A GOVERNANCE INFO signal is emitted when severity is reduced."""
+    def test_severity_reduction_error_to_info_raises(self) -> None:
+        """ERROR -> INFO also raises ManifestWidenError."""
         base = _base_manifest(
             overrides=({"id": "PY-WL-002", "severity": "ERROR"},),
         )
         overlay = _overlay(
-            rule_overrides=({"id": "PY-WL-002", "severity": "WARNING"},),
+            rule_overrides=({"id": "PY-WL-002", "severity": "INFO"},),
         )
 
-        result = merge(base, overlay)
+        with pytest.raises(ManifestWidenError):
+            merge(base, overlay)
 
-        assert len(result.governance_signals) == 1
-        signal = result.governance_signals[0]
-        assert signal.level == "INFO"
-        assert "PY-WL-002" in signal.message
-        assert "ERROR" in signal.message
-        assert "WARNING" in signal.message
-
-    def test_severity_increase_no_signal(self) -> None:
-        """Increasing severity (WARNING -> ERROR) emits no signal."""
+    def test_severity_increase_accepted(self) -> None:
+        """Increasing severity (WARNING -> ERROR) is accepted."""
         base = _base_manifest(
             overrides=({"id": "PY-WL-003", "severity": "WARNING"},),
         )
@@ -185,10 +180,11 @@ class TestSeverityReduction:
 
         result = merge(base, overlay)
 
-        assert len(result.governance_signals) == 0
+        merged = {o["id"]: o for o in result.rules.overrides}
+        assert merged["PY-WL-003"]["severity"] == "ERROR"
 
-    def test_no_base_override_no_signal(self) -> None:
-        """New rule override with no base entry emits no signal."""
+    def test_no_base_override_accepted(self) -> None:
+        """New rule override with no base entry is accepted."""
         base = _base_manifest()
         overlay = _overlay(
             rule_overrides=({"id": "PY-WL-004", "severity": "WARNING"},),
@@ -196,7 +192,6 @@ class TestSeverityReduction:
 
         result = merge(base, overlay)
 
-        assert len(result.governance_signals) == 0
         merged = {o["id"]: o for o in result.rules.overrides}
         assert merged["PY-WL-004"]["severity"] == "WARNING"
 

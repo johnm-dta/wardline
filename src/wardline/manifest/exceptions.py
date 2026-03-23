@@ -17,6 +17,8 @@ from wardline.core.taints import TaintState
 from wardline.manifest.loader import ManifestLoadError
 from wardline.manifest.models import ExceptionEntry
 
+from wardline.core.severity import GovernancePath
+
 _SCHEMA_DIR = Path(__file__).parent / "schemas"
 _EXCEPTIONS_FILENAME = "wardline.exceptions.json"
 
@@ -38,7 +40,12 @@ def load_exceptions(manifest_dir: Path) -> tuple[ExceptionEntry, ...]:
 
     # Schema validation
     schema_path = _SCHEMA_DIR / "exceptions.schema.json"
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    try:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise ManifestLoadError(
+            f"Cannot read exception schema {schema_path}: {exc}"
+        ) from exc
     try:
         jsonschema.validate(data, schema)
     except jsonschema.ValidationError as exc:
@@ -62,7 +69,7 @@ def load_exceptions(manifest_dir: Path) -> tuple[ExceptionEntry, ...]:
             agent_originated=raw.get("agent_originated"),
             ast_fingerprint=raw.get("ast_fingerprint", ""),
             recurrence_count=raw.get("recurrence_count", 0),
-            governance_path=raw.get("governance_path", "standard"),
+            governance_path=GovernancePath(raw.get("governance_path", "standard")),
             last_refreshed_by=raw.get("last_refreshed_by"),
             last_refresh_rationale=raw.get("last_refresh_rationale"),
             last_refreshed_at=raw.get("last_refreshed_at"),

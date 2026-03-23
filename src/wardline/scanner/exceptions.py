@@ -18,13 +18,21 @@ from wardline.core.severity import (
     RuleId,
     Severity,
 )
-from wardline.scanner.context import Finding
+from wardline.scanner.context import Finding, make_governance_finding
 from wardline.scanner.fingerprint import compute_ast_fingerprint
 
 if TYPE_CHECKING:
     from wardline.manifest.models import ExceptionEntry
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_location(location: str) -> tuple[str, str | None]:
+    """Parse 'file_path::qualname' into (file_path, qualname)."""
+    if "::" in location:
+        parts = location.split("::", 1)
+        return parts[0], parts[1]
+    return location, None
 
 
 def apply_exceptions(
@@ -165,32 +173,34 @@ def _emit_register_governance(
             except ValueError:
                 pass
 
+        exc_file, exc_qualname = _parse_location(exc.location)
+
         if exc.agent_originated is None:
             governance.append(_governance_finding(
                 RuleId.GOVERNANCE_UNKNOWN_PROVENANCE,
-                exc.location.split("::")[0] if "::" in exc.location else "",
+                exc_file,
                 1,
                 f"Exception '{exc.id}' has unknown agent provenance "
                 f"(agent_originated is null)",
-                qualname=exc.location.split("::")[-1] if "::" in exc.location else None,
+                qualname=exc_qualname,
             ))
 
         if exc.recurrence_count >= 2:
             governance.append(_governance_finding(
                 RuleId.GOVERNANCE_RECURRING_EXCEPTION,
-                exc.location.split("::")[0] if "::" in exc.location else "",
+                exc_file,
                 1,
                 f"Exception '{exc.id}' has been renewed {exc.recurrence_count} times",
-                qualname=exc.location.split("::")[-1] if "::" in exc.location else None,
+                qualname=exc_qualname,
             ))
 
         if exc.expires is None:
             governance.append(_governance_finding(
                 RuleId.GOVERNANCE_NO_EXPIRY_EXCEPTION,
-                exc.location.split("::")[0] if "::" in exc.location else "",
+                exc_file,
                 1,
                 f"Exception '{exc.id}' has no expiry date",
-                qualname=exc.location.split("::")[-1] if "::" in exc.location else None,
+                qualname=exc_qualname,
             ))
 
 
@@ -202,19 +212,11 @@ def _governance_finding(
     *,
     qualname: str | None = None,
 ) -> Finding:
-    """Create a governance pseudo-rule finding."""
-    return Finding(
-        rule_id=rule_id,
+    """Create a governance pseudo-rule finding (delegates to shared factory)."""
+    return make_governance_finding(
+        rule_id,
+        message,
         file_path=file_path,
         line=line,
-        col=0,
-        end_line=None,
-        end_col=None,
-        message=message,
-        severity=Severity.WARNING,
-        exceptionability=Exceptionability.UNCONDITIONAL,
-        taint_state=None,
-        analysis_level=0,
-        source_snippet=None,
         qualname=qualname,
     )

@@ -152,6 +152,17 @@ def test_lookup_raises_on_invalid_combo() -> None:
         lookup(RuleId.TOOL_ERROR, TaintState.AUDIT_TRAIL)
 
 
+def test_severity_matrix_is_immutable() -> None:
+    """SEVERITY_MATRIX must be a MappingProxyType — mutation raises TypeError."""
+    from types import MappingProxyType
+
+    from wardline.core.matrix import SEVERITY_MATRIX
+
+    assert isinstance(SEVERITY_MATRIX, MappingProxyType)
+    with pytest.raises(TypeError):
+        SEVERITY_MATRIX[(RuleId.PY_WL_001, TaintState.AUDIT_TRAIL)] = None  # type: ignore[index]
+
+
 def test_no_matrix_import_at_module_level() -> None:
     """Verify this test file does not import from wardline.core.matrix at module level."""
     import ast

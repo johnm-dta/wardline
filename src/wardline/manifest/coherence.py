@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -183,7 +184,14 @@ def check_tier_downgrades(
     if not baseline_path.exists():
         return []
 
-    baseline_data = json.loads(baseline_path.read_text())
+    try:
+        baseline_data = json.loads(baseline_path.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        logging.getLogger("wardline").warning(
+            "Cannot read baseline %s: %s — skipping tier downgrade check",
+            baseline_path, exc,
+        )
+        return []
     baseline_modules: dict[str, str] = {
         entry["path"]: entry["default_taint"]
         for entry in baseline_data.get("module_tiers", [])
@@ -239,7 +247,14 @@ def check_tier_upgrade_without_evidence(
     if not baseline_path.exists():
         return []
 
-    baseline_data = json.loads(baseline_path.read_text())
+    try:
+        baseline_data = json.loads(baseline_path.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        logging.getLogger("wardline").warning(
+            "Cannot read baseline %s: %s — skipping tier upgrade check",
+            baseline_path, exc,
+        )
+        return []
     baseline_modules: dict[str, str] = {
         entry["path"]: entry["default_taint"]
         for entry in baseline_data.get("module_tiers", [])
@@ -251,8 +266,11 @@ def check_tier_upgrade_without_evidence(
 
     current_tier_map: dict[str, int] = {t.id: t.tier for t in tiers}
 
-    # Collect boundary function names as evidence
-    boundary_functions = frozenset(b.function for b in boundaries)
+    # Collect boundary overlay scopes as evidence — these are absolute
+    # paths that tell us which directory each boundary covers.
+    boundary_scopes = frozenset(
+        b.overlay_scope for b in boundaries if b.overlay_scope
+    )
 
     issues: list[CoherenceIssue] = []
     for mt in module_tiers:
@@ -261,13 +279,16 @@ def check_tier_upgrade_without_evidence(
             old_tier = baseline_tiers.get(old_taint)
             new_tier = current_tier_map.get(mt.default_taint)
             if old_tier is not None and new_tier is not None and new_tier < old_tier:
-                # Check if any boundary covers this module path
+                # Check if any boundary's overlay scope covers this module path.
+                # Module paths are relative (e.g. "src/wardline/scanner"),
+                # overlay scopes are absolute. A scope covers a module if
+                # the scope path ends with the module path.
                 module_prefix = mt.path.rstrip("/")
                 has_evidence = any(
-                    bf == module_prefix
-                    or bf.startswith(module_prefix + "/")
-                    or bf.startswith(module_prefix + ".")
-                    for bf in boundary_functions
+                    scope.endswith("/" + module_prefix)
+                    or scope.endswith("/" + module_prefix + "/")
+                    or scope == module_prefix
+                    for scope in boundary_scopes
                 )
                 if not has_evidence:
                     issues.append(
