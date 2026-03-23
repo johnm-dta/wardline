@@ -20,6 +20,7 @@ import yaml
 from wardline.manifest.loader import make_wardline_loader
 
 if TYPE_CHECKING:
+    from wardline.scanner.context import ScanContext
     from wardline.scanner.rules.base import RuleBase
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,10 @@ def _make_rules() -> tuple[RuleBase, ...]:
     from wardline.scanner.rules.py_wl_003 import RulePyWl003
     from wardline.scanner.rules.py_wl_004 import RulePyWl004
     from wardline.scanner.rules.py_wl_005 import RulePyWl005
+    from wardline.scanner.rules.py_wl_006 import RulePyWl006
+    from wardline.scanner.rules.py_wl_007 import RulePyWl007
+    from wardline.scanner.rules.py_wl_008 import RulePyWl008
+    from wardline.scanner.rules.py_wl_009 import RulePyWl009
 
     return (
         RulePyWl001(),
@@ -54,19 +59,51 @@ def _make_rules() -> tuple[RuleBase, ...]:
         RulePyWl003(),
         RulePyWl004(),
         RulePyWl005(),
+        RulePyWl006(),
+        RulePyWl007(),
+        RulePyWl008(),
+        RulePyWl009(),
+    )
+
+
+def _build_specimen_context(
+    tree: ast.Module,
+    taint_state: str,
+) -> ScanContext:
+    """Build a ScanContext that assigns *taint_state* to every function in *tree*."""
+    from wardline.core.taints import TaintState
+    from wardline.scanner.context import ScanContext
+
+    taint = TaintState(taint_state)
+    taint_map: dict[str, TaintState] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            taint_map[node.name] = taint
+    return ScanContext(
+        file_path="<specimen>",
+        function_level_taint_map=taint_map,
     )
 
 
 def _run_rules_on_fragment(
     source: str,
     rules: tuple[RuleBase, ...],
+    taint_state: str | None = None,
 ) -> set[str]:
     """Run all rules on a source fragment, return set of fired rule IDs."""
     tree = ast.parse(source)
+
+    ctx: ScanContext | None = None
+    if taint_state:
+        try:
+            ctx = _build_specimen_context(tree, taint_state)
+        except ValueError:
+            logger.warning("Unknown taint_state '%s', running without context", taint_state)
+
     fired: set[str] = set()
     for rule in rules:
-        rule._file_path = "<specimen>"
         rule.findings.clear()
+        rule.set_context(ctx)
         try:
             rule.visit(tree)
         except Exception as exc:
@@ -95,7 +132,8 @@ def _evaluate_specimen(
     if rule_id not in stats:
         stats[rule_id] = _RuleStats()
 
-    fired = _run_rules_on_fragment(source, rules)
+    taint_state = str(data.get("taint_state", "")) or None
+    fired = _run_rules_on_fragment(source, rules, taint_state=taint_state)
     rule_fired = rule_id in fired
 
     if verdict == "true_positive":
