@@ -106,7 +106,15 @@ class RulePyWl001(RuleBase):
 
     @staticmethod
     def _is_schema_default_arg(node: ast.expr) -> bool:
-        """Check if an argument is ``schema_default(...)``."""
+        """Check if an argument is ``schema_default(...)``.
+
+        Known limitation: only matches the bare name ``schema_default``.
+        Aliased imports (e.g. ``from wardline.core import schema_default as sd``)
+        are NOT detected and will produce a false-positive PY-WL-001 finding
+        instead of the governed PY-WL-001-GOVERNED-DEFAULT. Fixing this would
+        require import-tracking across the AST, which is deferred to the L3
+        call-graph analysis (v0.3.0).
+        """
         return (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)

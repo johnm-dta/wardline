@@ -10,6 +10,7 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from wardline.core.severity import GovernancePath
@@ -90,9 +91,23 @@ class DelegationConfig:
 
 @dataclass(frozen=True)
 class RulesConfig:
-    """Rules configuration — overrides to the default severity matrix."""
+    """Rules configuration — overrides to the default severity matrix.
 
-    overrides: tuple[dict[str, object], ...] = ()
+    The ``overrides`` tuple contains dicts that are deep-frozen in
+    ``__post_init__`` via ``MappingProxyType``, following the same
+    pattern as ``ScanContext.function_level_taint_map``.
+    """
+
+    overrides: tuple[dict[str, object] | MappingProxyType[str, object], ...] = ()
+
+    def __post_init__(self) -> None:
+        # Deep-freeze: convert any mutable dicts inside the tuple to
+        # MappingProxyType so the frozen dataclass is truly immutable.
+        frozen = tuple(
+            MappingProxyType(d) if isinstance(d, dict) else d
+            for d in self.overrides
+        )
+        object.__setattr__(self, "overrides", frozen)
 
 
 @dataclass(frozen=True)

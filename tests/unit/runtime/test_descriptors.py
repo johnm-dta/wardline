@@ -97,7 +97,7 @@ class TestDictBypass:
     def test_dict_bypass_read(self) -> None:
         """Writing to the storage key directly bypasses the descriptor."""
         obj = _SampleEntity()
-        obj.__dict__["_wd_auth_value"] = "sneaky"
+        obj.__dict__["_wd_auth__SampleEntity_value"] = "sneaky"
         # Descriptor reads from the same key, so this returns the value
         assert obj.value == "sneaky"
 
@@ -109,7 +109,7 @@ class TestDictBypass:
         """
         obj = _SampleEntity()
         # Direct write without going through __set__
-        obj.__dict__["_wd_auth_value"] = "bypassed"
+        obj.__dict__["_wd_auth__SampleEntity_value"] = "bypassed"
         assert obj.value == "bypassed"
 
 
@@ -120,13 +120,13 @@ class TestPrefixCollision:
     """The _wd_auth_ prefix must not collide with raw attributes."""
 
     def test_raw_attribute_independent(self) -> None:
-        """A raw attribute named _wd_auth_value doesn't interfere
+        """A raw attribute named _wd_auth__SampleEntity_value doesn't interfere
         with the descriptor when accessed through the descriptor protocol."""
         obj = _SampleEntity()
         obj.value = "via_descriptor"
 
-        # The storage key is _wd_auth_value in __dict__
-        assert obj.__dict__["_wd_auth_value"] == "via_descriptor"
+        # The storage key is _wd_auth__SampleEntity_value in __dict__
+        assert obj.__dict__["_wd_auth__SampleEntity_value"] == "via_descriptor"
 
     def test_no_collision_with_regular_attr(self) -> None:
         """An attribute without the _wd_auth_ prefix is independent."""
@@ -148,7 +148,7 @@ class TestSetName:
         descriptor = _SampleEntity.__dict__["value"]
         assert isinstance(descriptor, AuthoritativeField)
         assert descriptor.name == "value"
-        assert descriptor.storage_name == "_wd_auth_value"
+        assert descriptor.storage_name == "_wd_auth__SampleEntity_value"
 
     def test_class_access_returns_descriptor(self) -> None:
         """Accessing the descriptor on the class returns the descriptor."""

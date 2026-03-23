@@ -460,7 +460,7 @@ def _handle_try(
     for handler in stmt.handlers:
         handler_taints = dict(pre_try)
         if handler.name:
-            handler_taints[handler.name] = TaintState.AUDIT_TRAIL
+            handler_taints[handler.name] = function_taint
         _walk_body(handler.body, function_taint, taint_map, handler_taints)
         handler_branches.append(handler_taints)
 

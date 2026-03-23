@@ -145,24 +145,26 @@ return data
 
         assert len(rule.findings) == 0
 
-    def test_result_in_compound_if_silent(self) -> None:
+    def test_result_in_compound_if_with_raise_silent(self) -> None:
         rule = _run_rule(
             """\
 is_valid = validate(data)
 if is_valid and data:
     process(data)
+else:
+    raise ValueError("invalid")
 """
         )
 
         assert len(rule.findings) == 0
 
-    def test_result_in_nested_if_silent(self) -> None:
+    def test_result_in_nested_if_with_return_silent(self) -> None:
         rule = _run_rule(
             """\
 result = check_input(data)
 if condition:
     if result:
-        process(data)
+        return data
 """
         )
 
@@ -190,11 +192,11 @@ return result
 
         assert len(rule.findings) == 0
 
-    def test_validation_call_not_assigned_silent(self) -> None:
-        """Validation call without capturing result is not a PY-WL-008 pattern."""
+    def test_validation_call_not_assigned_fires(self) -> None:
+        """Bare validation call (result discarded) is worse — fires PY-WL-008."""
         rule = _run_rule("validate(data)\n")
 
-        assert len(rule.findings) == 0
+        assert len(rule.findings) == 1
 
 
 # -- Positive: async function ---------------------------------------------
@@ -289,3 +291,123 @@ return data
         )
 
         assert len(rule.findings) == 0
+
+
+# -- Bug fix: bare validate() calls (wardline-f357c7f) ---------------------
+
+
+class TestBareValidationCalls:
+    """Bare validation calls (expression statements) fire PY-WL-008."""
+
+    def test_bare_validate_fires(self) -> None:
+        rule = _run_rule("validate(data)\n")
+        assert len(rule.findings) == 1
+
+    def test_bare_check_schema_fires(self) -> None:
+        rule = _run_rule("check_schema(data)\n")
+        assert len(rule.findings) == 1
+
+    def test_bare_method_validation_fires(self) -> None:
+        rule = _run_rule("obj.verify_input(data)\n")
+        assert len(rule.findings) == 1
+
+    def test_bare_non_validation_silent(self) -> None:
+        rule = _run_rule("process(data)\n")
+        assert len(rule.findings) == 0
+
+
+# -- Bug fix: tighter rejection path (wardline-383463d) --------------------
+
+
+class TestTighterRejectionPath:
+    """if-test referencing result must have raise/return/reject in body."""
+
+    def test_if_result_log_only_fires(self) -> None:
+        """if result: log.info('ok') has no actual rejection — fires."""
+        rule = _run_rule(
+            """\
+result = validate(data)
+if result:
+    log.info("ok")
+return data
+"""
+        )
+        assert len(rule.findings) == 1
+
+    def test_if_result_with_raise_silent(self) -> None:
+        rule = _run_rule(
+            """\
+result = validate(data)
+if not result:
+    raise ValueError("bad")
+return data
+"""
+        )
+        assert len(rule.findings) == 0
+
+    def test_if_result_with_return_in_else_silent(self) -> None:
+        rule = _run_rule(
+            """\
+result = validate(data)
+if result:
+    process(data)
+else:
+    return None
+"""
+        )
+        assert len(rule.findings) == 0
+
+    def test_if_result_with_reject_call_silent(self) -> None:
+        rule = _run_rule(
+            """\
+result = validate(data)
+if not result:
+    abort("invalid")
+"""
+        )
+        assert len(rule.findings) == 0
+
+    def test_if_result_with_only_assignment_fires(self) -> None:
+        rule = _run_rule(
+            """\
+result = validate(data)
+if result:
+    x = 1
+return data
+"""
+        )
+        assert len(rule.findings) == 1
+
+
+# -- Bug fix: return result delegation (wardline-5ed6fcf) ------------------
+
+
+class TestReturnDelegation:
+    """return result delegates rejection responsibility — suppresses."""
+
+    def test_return_result_silent(self) -> None:
+        rule = _run_rule(
+            """\
+result = validate(data)
+return result
+"""
+        )
+        assert len(rule.findings) == 0
+
+    def test_return_result_in_tuple_silent(self) -> None:
+        rule = _run_rule(
+            """\
+result = validate(data)
+return data, result
+"""
+        )
+        assert len(rule.findings) == 0
+
+    def test_return_unrelated_fires(self) -> None:
+        rule = _run_rule(
+            """\
+result = validate(data)
+return data
+"""
+        )
+        assert len(rule.findings) == 1

@@ -42,7 +42,14 @@ def wardline_decorator(
             )
 
     def decorator(fn: Any) -> Any:
-        # Handle staticmethod/classmethod
+        # Handle staticmethod/classmethod — unwrap before applying.
+        # Known limitation: callable() on descriptors that carry _wardline_*
+        # attributes (e.g. AuthoritativeField instances) may return True even
+        # though the descriptor is not intended to be decorated.  The
+        # isinstance checks below cover the known descriptor types
+        # (staticmethod, classmethod).  Arbitrary third-party descriptors
+        # that happen to be callable are not guarded against — this is
+        # accepted as a very unlikely edge case.
         unwrapped = fn
         wrapper_type: type | None = None
         if isinstance(fn, staticmethod):

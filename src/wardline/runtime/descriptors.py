@@ -53,7 +53,10 @@ class AuthoritativeField:
 
     def __set_name__(self, owner: type, name: str) -> None:
         self.name = name
-        self.storage_name = f"_wd_auth_{name}"
+        # Include owner class name to prevent subclass field collisions:
+        # without it, a subclass field with the same name shares the
+        # storage key with the parent class.
+        self.storage_name = f"_wd_auth_{owner.__name__}_{name}"
 
     def __get__(self, obj: Any, objtype: type | None = None) -> Any:
         if obj is None:

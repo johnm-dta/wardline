@@ -225,8 +225,8 @@ class TestWithAs:
 
 
 class TestExceptAs:
-    def test_except_as_gets_audit_trail(self) -> None:
-        """Exception objects are internally constructed — AUDIT_TRAIL."""
+    def test_except_as_inherits_function_taint(self) -> None:
+        """Exception objects inherit function taint — str(e) may contain attacker input."""
         func = _parse_func("""
             def f():
                 try:
@@ -235,7 +235,7 @@ class TestExceptAs:
                     pass
         """)
         result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
-        assert result["e"] == TaintState.AUDIT_TRAIL
+        assert result["e"] == TaintState.EXTERNAL_RAW
 
 
 # ── Walrus operator ──────────────────────────────────────────────
@@ -378,8 +378,8 @@ class TestTryExceptBranchMerge:
         # try branch: EXTERNAL_RAW, except branch: AUDIT_TRAIL → MIXED_RAW
         assert result["x"] == TaintState.MIXED_RAW
 
-    def test_try_except_handler_name_audit_trail(self) -> None:
-        """Exception variable in handler should be AUDIT_TRAIL."""
+    def test_try_except_handler_name_inherits_function_taint(self) -> None:
+        """Exception variable in handler inherits function taint (conservative)."""
         func = _parse_func("""
             def f():
                 try:
@@ -388,4 +388,4 @@ class TestTryExceptBranchMerge:
                     x = e
         """)
         result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
-        assert result["e"] == TaintState.AUDIT_TRAIL
+        assert result["e"] == TaintState.EXTERNAL_RAW

@@ -75,6 +75,13 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
 )
 
 
+def _severity_rank(severity: Severity) -> int:
+    """Return a numeric rank for severity (higher = worse)."""
+    return {Severity.SUPPRESS: 0, Severity.WARNING: 1, Severity.ERROR: 2}.get(
+        severity, -1
+    )
+
+
 def _clean_none(d: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of *d* with all ``None``-valued keys removed."""
     return {k: v for k, v in d.items() if v is not None}
@@ -176,7 +183,7 @@ class SarifReport:
         rule_severity: dict[RuleId, Severity] = {}
         for f in self.findings:
             existing = rule_severity.get(f.rule_id)
-            if existing is None or f.severity == Severity.ERROR:
+            if existing is None or _severity_rank(f.severity) > _severity_rank(existing):
                 rule_severity[f.rule_id] = f.severity
         # Sort by rule ID string for determinism.
         return [
