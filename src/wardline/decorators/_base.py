@@ -5,13 +5,11 @@ from __future__ import annotations
 import functools
 import inspect
 import logging
-from typing import Any, TypeVar
+from typing import Any
 
 from wardline.core.registry import REGISTRY
 
 logger = logging.getLogger(__name__)
-
-F = TypeVar("F")
 
 
 def wardline_decorator(
@@ -100,15 +98,28 @@ def get_wardline_attrs(fn: Any) -> dict[str, Any] | None:
             break
         seen.add(id(current))
 
-        # Collect wardline attrs from current level
-        for key in dir(current):
+        # Collect wardline attrs from current level only (not inherited via MRO).
+        # Use vars() when available; fall back to dir() for objects without __dict__.
+        try:
+            current_keys = vars(current)
+        except TypeError:
+            current_keys = dir(current)
+        for key in current_keys:
             if key.startswith("_wardline_") and key not in attrs:
                 attrs[key] = getattr(current, key)
 
         # Follow __wrapped__ chain
         next_fn = getattr(current, "__wrapped__", None)
         if next_fn is None:
-            if current is not fn and not attrs:
+            # Only warn about severed chains when the wrapping function
+            # is actually a wardline decorator (has _wardline_ attrs).
+            # Third-party decorators also set __wrapped__ and should not
+            # trigger this warning.
+            if (
+                current is not fn
+                and not attrs
+                and any(k.startswith("_wardline_") for k in vars(fn))
+            ):
                 logger.warning(
                     "Severed __wrapped__ chain on %s — "
                     "wardline attributes may be lost",
