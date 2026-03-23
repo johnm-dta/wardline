@@ -38,7 +38,7 @@ _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
     RuleId.PY_WL_007: "Pipeline stage ordering violation",
     RuleId.PY_WL_008: "Taint state escalation without validation",
     RuleId.PY_WL_009: "Governance registry mismatch",
-    RuleId.PY_WL_001_UNVERIFIED_DEFAULT: "Unverified default value (diagnostic)",
+    RuleId.PY_WL_001_GOVERNED_DEFAULT: "Governed default value (diagnostic)",
     RuleId.WARDLINE_UNRESOLVED_DECORATOR: "Unresolved decorator (diagnostic)",
     RuleId.TOOL_ERROR: "Internal tool error",
     RuleId.GOVERNANCE_REGISTRY_MISMATCH_ALLOWED: (
@@ -53,7 +53,7 @@ _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
 # Pseudo-rule-IDs that should NOT appear in implementedRules.
 _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
     {
-        RuleId.PY_WL_001_UNVERIFIED_DEFAULT,
+        RuleId.PY_WL_001_GOVERNED_DEFAULT,
         RuleId.WARDLINE_UNRESOLVED_DECORATOR,
         RuleId.TOOL_ERROR,
         RuleId.GOVERNANCE_REGISTRY_MISMATCH_ALLOWED,

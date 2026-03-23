@@ -183,6 +183,21 @@ class TestWardlineOverlay:
         assert b.provenance is not None
 
 
+# ── BoundaryEntry overlay_scope ───────────────────────────────────
+
+
+class TestBoundaryEntryOverlayScope:
+    def test_overlay_scope_defaults_to_empty(self) -> None:
+        b = BoundaryEntry(function="fn", transition="construction")
+        assert b.overlay_scope == ""
+
+    def test_overlay_scope_set_at_construction(self) -> None:
+        b = BoundaryEntry(
+            function="fn", transition="construction", overlay_scope="adapters/"
+        )
+        assert b.overlay_scope == "adapters/"
+
+
 # ── DelegationConfig ──────────────────────────────────────────────
 
 

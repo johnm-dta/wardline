@@ -194,9 +194,10 @@ def scan(
     _setup_logging(verbose=verbose, debug=debug)
 
     # --- Load manifest ---
-    manifest_model = _load_manifest(manifest)
-    if manifest_model is None:
+    _manifest_result = _load_manifest(manifest)
+    if _manifest_result is None:
         sys.exit(EXIT_CONFIG_ERROR)
+    manifest_model, manifest_path = _manifest_result
 
     # --- Load optional config ---
     cfg = _load_config(config)
@@ -272,6 +273,14 @@ def scan(
     if cfg is not None and cfg.exclude_paths:
         exclude_paths = cfg.exclude_paths
 
+    # --- Resolve overlay boundaries ---
+    from wardline.manifest.models import BoundaryEntry as _BoundaryEntry
+    from wardline.manifest.resolve import resolve_boundaries
+
+    boundaries: tuple[_BoundaryEntry, ...] = ()
+    # manifest_path is threaded from _load_manifest — no re-discovery needed
+    boundaries = resolve_boundaries(manifest_path.parent, manifest_model)
+
     # --- Create engine and run scan ---
     from wardline.scanner.engine import ScanEngine, ScanResult
 
@@ -280,6 +289,7 @@ def scan(
         exclude_paths=exclude_paths,
         rules=active_rules,
         manifest=manifest_model,
+        boundaries=boundaries,
     )
 
     logger.info("Scanning %d target path(s)...", len(target_paths))
@@ -379,11 +389,13 @@ def _setup_logging(*, verbose: bool, debug: bool) -> None:
     logger.setLevel(level)
 
 
-def _load_manifest(manifest_arg: str | None) -> WardlineManifest | None:
+def _load_manifest(
+    manifest_arg: str | None,
+) -> tuple[WardlineManifest, Path] | None:
     """Load and validate the wardline.yaml manifest.
 
-    Returns the loaded manifest object, or None on error (after printing
-    a structured error message).
+    Returns ``(manifest, resolved_path)`` on success, or ``None`` on
+    error (after printing a structured error message).
     """
     import yaml
 
@@ -420,7 +432,7 @@ def _load_manifest(manifest_arg: str | None) -> WardlineManifest | None:
         return None
 
     logger.info("Loaded manifest: %s", manifest_path)
-    return result
+    return result, manifest_path
 
 
 def _load_config(config_arg: str | None) -> ScannerConfig | None | _ConfigError:

@@ -28,7 +28,7 @@ from wardline.scanner.taint.function_level import assign_function_taints
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from wardline.manifest.models import WardlineManifest
+    from wardline.manifest.models import BoundaryEntry, WardlineManifest
     from wardline.scanner.rules.base import RuleBase
 
 logger = logging.getLogger(__name__)
@@ -61,11 +61,13 @@ class ScanEngine:
         exclude_paths: tuple[Path, ...] = (),
         rules: tuple[RuleBase, ...] = (),
         manifest: WardlineManifest | None = None,
+        boundaries: tuple[BoundaryEntry, ...] = (),
     ) -> None:
         self._target_paths = target_paths
         self._exclude_paths = tuple(p.resolve() for p in exclude_paths)
         self._rules = rules
         self._manifest = manifest
+        self._boundaries = boundaries
 
     def scan(self) -> ScanResult:
         """Run a full scan across all target paths.
@@ -164,7 +166,9 @@ class ScanEngine:
             taint_map = {}
 
         ctx = ScanContext(
-            file_path=str(file_path), function_level_taint_map=taint_map
+            file_path=str(file_path),
+            function_level_taint_map=taint_map,
+            boundaries=self._boundaries,
         )
 
         # Pass 2: Run rules with context

@@ -36,7 +36,7 @@ class TestRuleId:
     def test_pseudo_rule_round_trip(self) -> None:
         """Pseudo-rule-IDs are full members of RuleId."""
         assert str(RuleId.TOOL_ERROR) == "TOOL-ERROR"
-        assert str(RuleId.PY_WL_001_UNVERIFIED_DEFAULT) == "PY-WL-001-UNVERIFIED-DEFAULT"
+        assert str(RuleId.PY_WL_001_GOVERNED_DEFAULT) == "PY-WL-001-GOVERNED-DEFAULT"
         assert str(RuleId.WARDLINE_UNRESOLVED_DECORATOR) == "WARDLINE-UNRESOLVED-DECORATOR"
         assert str(RuleId.GOVERNANCE_REGISTRY_MISMATCH_ALLOWED) == "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED"
 
@@ -52,7 +52,7 @@ class TestRuleId:
     def test_all_pseudo_rules_are_members(self) -> None:
         """Every pseudo-rule-ID that Finding.rule_id can hold must be a member."""
         pseudo_ids = [
-            "PY-WL-001-UNVERIFIED-DEFAULT",
+            "PY-WL-001-GOVERNED-DEFAULT",
             "WARDLINE-UNRESOLVED-DECORATOR",
             "TOOL-ERROR",
             "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED",

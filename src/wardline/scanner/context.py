@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from wardline.core.severity import Exceptionability, RuleId, Severity
     from wardline.core.taints import TaintState
+    from wardline.manifest.models import BoundaryEntry
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,7 @@ class ScanContext:
     file_path: str
     # Maps (module_path, qualname) -> TaintState for each function
     function_level_taint_map: MappingProxyType[str, TaintState] | dict[str, TaintState]
+    boundaries: tuple[BoundaryEntry, ...] = ()
 
     def __post_init__(self) -> None:
         if isinstance(self.function_level_taint_map, dict):
