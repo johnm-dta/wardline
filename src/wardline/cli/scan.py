@@ -274,12 +274,14 @@ def scan(
     # --- Create engine and run scan ---
     from wardline.scanner.engine import ScanEngine, ScanResult
 
+    analysis_level = cfg.analysis_level if cfg is not None else 1
     engine = ScanEngine(
         target_paths=target_paths,
         exclude_paths=exclude_paths,
         rules=active_rules,
         manifest=manifest_model,
         boundaries=boundaries,
+        analysis_level=analysis_level,
     )
 
     logger.info("Scanning %d target path(s)...", len(target_paths))

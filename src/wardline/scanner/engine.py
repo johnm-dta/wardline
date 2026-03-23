@@ -24,10 +24,12 @@ from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner.context import Finding, ScanContext
 from wardline.scanner.discovery import discover_annotations
 from wardline.scanner.taint.function_level import assign_function_taints
+from wardline.scanner.taint.variable_level import compute_variable_taints
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from wardline.core.taints import TaintState
     from wardline.manifest.models import BoundaryEntry, WardlineManifest
     from wardline.scanner.rules.base import RuleBase
 
@@ -62,12 +64,14 @@ class ScanEngine:
         rules: tuple[RuleBase, ...] = (),
         manifest: WardlineManifest | None = None,
         boundaries: tuple[BoundaryEntry, ...] = (),
+        analysis_level: int = 1,
     ) -> None:
         self._target_paths = target_paths
         self._exclude_paths = tuple(p.resolve() for p in exclude_paths)
         self._rules = rules
         self._manifest = manifest
         self._boundaries = boundaries
+        self._analysis_level = analysis_level
 
     def scan(self) -> ScanResult:
         """Run a full scan across all target paths.
@@ -165,16 +169,79 @@ class ScanEngine:
             )
             taint_map = {}
 
+        # Pass 1.5: Level 2 variable-level taint (when analysis_level >= 2)
+        variable_taint_map: dict[str, dict[str, object]] | None = None
+        if self._analysis_level >= 2 and taint_map:
+            variable_taint_map = self._run_variable_taint(
+                tree, taint_map, file_path, result
+            )
+
         ctx = ScanContext(
             file_path=str(file_path),
             function_level_taint_map=taint_map,
             boundaries=self._boundaries,
+            variable_taint_map=variable_taint_map,
         )
 
         # Pass 2: Run rules with context
         for rule in self._rules:
             rule.set_context(ctx)
             self._run_rule(rule, tree, file_path, result)
+
+    def _run_variable_taint(
+        self,
+        tree: ast.Module,
+        taint_map: dict[str, TaintState],
+        file_path: Path,
+        result: ScanResult,
+    ) -> dict[str, dict[str, TaintState]] | None:
+        """Run Level 2 variable-level taint on all functions in the AST.
+
+        Returns a dict mapping qualname -> {variable: TaintState}, or None
+        on failure.
+        """
+        from wardline.core.taints import TaintState as _TS
+
+        var_map: dict[str, dict[str, _TS]] = {}
+        try:
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    # Find the qualname for this function in the taint_map.
+                    # Match by function name — works for top-level functions.
+                    # For nested, we match any key ending with the name.
+                    qualname = self._find_qualname(node.name, taint_map)
+                    if qualname is not None:
+                        func_taint = taint_map[qualname]
+                        var_taints = compute_variable_taints(
+                            node, func_taint, taint_map
+                        )
+                        var_map[qualname] = var_taints
+        except Exception as exc:
+            logger.warning(
+                "Variable-level taint failed for %s: %s", file_path, exc
+            )
+            result.errors.append(
+                f"Variable-level taint failed for {file_path}: {exc}"
+            )
+            return None
+
+        return var_map if var_map else None
+
+    @staticmethod
+    def _find_qualname(
+        name: str, taint_map: dict[str, TaintState]
+    ) -> str | None:
+        """Find the qualname key in taint_map for a function by name.
+
+        Prefers exact match, then falls back to suffix match.
+        """
+        if name in taint_map:
+            return name
+        # Suffix match for nested functions (e.g., "Class.method")
+        for key in taint_map:
+            if key.endswith(f".{name}"):
+                return key
+        return None
 
     def _run_rule(
         self,

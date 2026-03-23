@@ -79,6 +79,10 @@ class ScanContext:
     # Maps (module_path, qualname) -> TaintState for each function
     function_level_taint_map: MappingProxyType[str, TaintState] | dict[str, TaintState]
     boundaries: tuple[BoundaryEntry, ...] = ()
+    # Level 2: maps qualname -> {variable_name: TaintState}. None when L2 is off.
+    variable_taint_map: (
+        MappingProxyType[str, MappingProxyType[str, TaintState]] | None
+    ) = None
 
     def __post_init__(self) -> None:
         if isinstance(self.function_level_taint_map, dict):
@@ -86,6 +90,16 @@ class ScanContext:
                 self,
                 "function_level_taint_map",
                 MappingProxyType(self.function_level_taint_map),
+            )
+        if isinstance(self.variable_taint_map, dict):
+            frozen = {
+                k: MappingProxyType(v) if isinstance(v, dict) else v
+                for k, v in self.variable_taint_map.items()
+            }
+            object.__setattr__(
+                self,
+                "variable_taint_map",
+                MappingProxyType(frozen),
             )
 
 
