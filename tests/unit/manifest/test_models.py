@@ -73,6 +73,57 @@ class TestExceptionEntry:
         assert e.provenance == "manual"
 
 
+class TestExceptionEntryNewFields:
+    """Verify new governance and fingerprint fields on ExceptionEntry."""
+
+    def _make_entry(self, **overrides: object) -> ExceptionEntry:
+        defaults = dict(
+            id="EXC-NEW",
+            rule="PY-WL-004",
+            taint_state="EXTERNAL_RAW",
+            location="src/a.py:1",
+            exceptionability="STANDARD",
+            severity_at_grant="WARNING",
+            rationale="reason",
+            reviewer="r",
+        )
+        defaults.update(overrides)
+        return ExceptionEntry(**defaults)  # type: ignore[arg-type]
+
+    def test_ast_fingerprint_defaults_empty(self) -> None:
+        assert self._make_entry().ast_fingerprint == ""
+
+    def test_recurrence_count_defaults_zero(self) -> None:
+        assert self._make_entry().recurrence_count == 0
+
+    def test_governance_path_defaults_standard(self) -> None:
+        assert self._make_entry().governance_path == "standard"
+
+    def test_last_refreshed_by_defaults_none(self) -> None:
+        assert self._make_entry().last_refreshed_by is None
+
+    def test_last_refresh_rationale_defaults_none(self) -> None:
+        assert self._make_entry().last_refresh_rationale is None
+
+    def test_last_refreshed_at_defaults_none(self) -> None:
+        assert self._make_entry().last_refreshed_at is None
+
+    def test_new_fields_are_frozen(self) -> None:
+        e = self._make_entry()
+        with pytest.raises(FrozenInstanceError):
+            e.ast_fingerprint = "CHANGED"  # type: ignore[misc]
+        with pytest.raises(FrozenInstanceError):
+            e.recurrence_count = 99  # type: ignore[misc]
+        with pytest.raises(FrozenInstanceError):
+            e.governance_path = "CHANGED"  # type: ignore[misc]
+        with pytest.raises(FrozenInstanceError):
+            e.last_refreshed_by = "CHANGED"  # type: ignore[misc]
+        with pytest.raises(FrozenInstanceError):
+            e.last_refresh_rationale = "CHANGED"  # type: ignore[misc]
+        with pytest.raises(FrozenInstanceError):
+            e.last_refreshed_at = "CHANGED"  # type: ignore[misc]
+
+
 # ── FingerprintEntry ──────────────────────────────────────────────
 
 

@@ -20,6 +20,12 @@ class Exceptionability(StrEnum):
     TRANSPARENT = "TRANSPARENT"
 
 
+class GovernancePath(StrEnum):
+    """Governance path for exception grants."""
+    STANDARD = "standard"
+    EXPEDITED = "expedited"
+
+
 class RuleId(StrEnum):
     """Rule identifiers — canonical and pseudo-rule-IDs.
 
