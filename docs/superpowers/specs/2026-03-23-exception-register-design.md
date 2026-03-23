@@ -284,14 +284,47 @@ For each exception:
    recurrence only increments on an explicit `expire` + `add` renewal cycle.
 5. If qualname no longer exists: report as stale (do not update)
 
-This is the zero-friction path for MCP-connected agents:
-1. Agent sees `GOVERNANCE-STALE-EXCEPTION` in scan output
-2. Agent reviews the code change
-3. If benign: `wardline exception refresh <id> --actor bot-1 --rationale "..."`
-4. If exception no longer valid: `wardline exception expire <id>`
+**Rule context display:** Before accepting the refresh, the command displays
+the rule being excepted, a short explanation of why it matters, and why an
+exception requires justification. This is the cognitive forcing function —
+an LLM will follow the governance rule if you explain it clearly:
 
-The governance decision (step 2) is the friction point. Steps 1, 3, 4
-are mechanical.
+```
+Exception EXC-001 for PY-WL-001 (Dict key access with fallback default)
+
+  This rule detects code that silently fabricates values for missing dictionary
+  keys, bypassing validation. In a security context, fabricated defaults can
+  mask data corruption or inject unvalidated values into trusted pipelines.
+
+  This exception was granted because: "Schema fallback approved by security review"
+  Code at: src/adapters/client.py::Client.handle
+
+  The AST fingerprint has changed — the function's code structure was modified
+  since this exception was last reviewed.
+
+  To refresh, you must explain why the code change does not affect the security
+  finding. If the change alters data flow, validation logic, or the default
+  value being fabricated, the exception may no longer be valid.
+
+  --rationale is required.
+```
+
+The rule short descriptions come from `_RULE_SHORT_DESCRIPTIONS` in `sarif.py`.
+The explanatory paragraph is a new `_RULE_GOVERNANCE_CONTEXT` dict in
+`exception_cmds.py` — one paragraph per rule explaining the security
+relevance and what to look for when reviewing a code change.
+
+**MCP workflow:**
+1. Agent sees `GOVERNANCE-STALE-EXCEPTION` in scan output
+2. `wardline exception refresh <id> --dry-run` displays the rule context above
+3. Agent reviews the code change in light of the rule explanation
+4. Agent must formulate a rationale addressing why the change is safe
+5. If safe: `wardline exception refresh <id> --actor agent-name --rationale "..."`
+6. If exception no longer valid: `wardline exception expire <id>`
+
+The rationale is the governance gate. An agent that cannot articulate why
+a code change is safe with respect to the specific rule should not refresh
+the exception.
 
 ### `wardline exception expire`
 
