@@ -77,7 +77,7 @@ class ScanContext:
 
     file_path: str
     # Maps (module_path, qualname) -> TaintState for each function
-    function_level_taint_map: MappingProxyType[str, TaintState] | dict[str, TaintState]
+    function_level_taint_map: MappingProxyType[str, TaintState]
     boundaries: tuple[BoundaryEntry, ...] = ()
     # Level 2: maps qualname -> {variable_name: TaintState}. None when L2 is off.
     variable_taint_map: (

@@ -68,7 +68,9 @@ class _FailFastMarker:
         return "FailFast"
 
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, _FailFastMarker)
+        if not isinstance(other, _FailFastMarker):
+            return NotImplemented
+        return True
 
     def __hash__(self) -> int:
         return hash("FailFast")

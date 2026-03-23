@@ -22,8 +22,7 @@ class RegistryEntry:
 
     canonical_name: str
     group: int
-    # Accept dicts at construction, wrapped to MappingProxyType in __post_init__
-    attrs: MappingProxyType[str, type] | dict[str, type]
+    attrs: MappingProxyType[str, type]
 
     def __post_init__(self) -> None:
         # Frozen dataclass prevents direct assignment — use object.__setattr__
