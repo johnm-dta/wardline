@@ -108,6 +108,7 @@ class BoundaryEntry:
     restored_tier: int | None = None
     provenance: dict[str, object] | None = None
     bounded_context: dict[str, object] | None = None
+    overlay_scope: str = ""
 
 
 @dataclass(frozen=True)
