@@ -54,6 +54,10 @@ def _make_rules() -> tuple[RuleBase, ...]:
     from wardline.scanner.rules.py_wl_003 import RulePyWl003
     from wardline.scanner.rules.py_wl_004 import RulePyWl004
     from wardline.scanner.rules.py_wl_005 import RulePyWl005
+    from wardline.scanner.rules.py_wl_006 import RulePyWl006
+    from wardline.scanner.rules.py_wl_007 import RulePyWl007
+    from wardline.scanner.rules.py_wl_008 import RulePyWl008
+    from wardline.scanner.rules.py_wl_009 import RulePyWl009
 
     return (
         RulePyWl001(),
@@ -61,6 +65,10 @@ def _make_rules() -> tuple[RuleBase, ...]:
         RulePyWl003(),
         RulePyWl004(),
         RulePyWl005(),
+        RulePyWl006(),
+        RulePyWl007(),
+        RulePyWl008(),
+        RulePyWl009(),
     )
 
 
