@@ -301,8 +301,8 @@ default_taint = "EXTERNAL_RAW"
 analysis_level = 2
 """)
         config = ScannerConfig.from_toml(toml_file)
-        assert config.target_paths == (Path("src/"), Path("lib/"))
-        assert config.exclude_paths == (Path("src/vendor/"),)
+        assert config.target_paths == (tmp_path / "src", tmp_path / "lib")
+        assert config.exclude_paths == (tmp_path / "src" / "vendor",)
         assert config.enabled_rules == (
             RuleId.PY_WL_001,
             RuleId.PY_WL_004,
@@ -326,7 +326,7 @@ analysis_level = 2
             b'[wardline]\ntarget_paths = ["src/m\xc3\xb6dule/"]\n'
         )
         config = ScannerConfig.from_toml(toml_file)
-        assert config.target_paths == (Path("src/mödule/"),)
+        assert config.target_paths == (tmp_path / "src/mödule",)
 
     def test_from_toml_result_is_frozen(self, tmp_path: Path) -> None:
         toml_file = tmp_path / "wardline.toml"

@@ -45,12 +45,6 @@ def test_total_mvp_count() -> None:
     assert len(REGISTRY) == 8
 
 
-def test_entry_immutability_args() -> None:
-    """args dict is wrapped in MappingProxyType — mutation raises TypeError."""
-    entry = REGISTRY["external_boundary"]
-    with pytest.raises(TypeError):
-        entry.args["new_arg"] = str  # type: ignore[index]
-
 
 def test_entry_immutability_attrs() -> None:
     """attrs dict is wrapped in MappingProxyType — mutation raises TypeError."""

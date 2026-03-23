@@ -34,6 +34,7 @@ def explain(qualname: str, manifest: str | None, scan_path: str) -> None:
     from wardline.manifest.discovery import discover_manifest
     from wardline.manifest.loader import load_manifest
     from wardline.scanner.discovery import discover_annotations
+    from wardline.scanner.sarif import _PSEUDO_RULE_IDS
     from wardline.scanner.taint.function_level import (
         DECORATOR_TAINT_MAP,
         assign_function_taints,
@@ -155,8 +156,7 @@ def explain(qualname: str, manifest: str | None, scan_path: str) -> None:
         canonical_rules = [
             r
             for r in RuleId
-            if r.value.startswith("PY-WL-")
-            and not r.value.endswith("-UNVERIFIED-DEFAULT")
+            if r not in _PSEUDO_RULE_IDS
         ]
         for rule_id in sorted(canonical_rules, key=lambda r: r.value):
             try:

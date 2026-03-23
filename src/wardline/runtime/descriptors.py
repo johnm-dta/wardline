@@ -44,6 +44,13 @@ class AuthoritativeField:
 
     __slots__ = ("name", "storage_name")
 
+    def __init__(self, *, name: str | None = None) -> None:
+        # Allow pre-setting the name for dynamic assignment via setattr().
+        # When used in a class body, __set_name__ overwrites these.
+        if name is not None:
+            self.name = name
+            self.storage_name = f"_wd_auth_{name}"
+
     def __set_name__(self, owner: type, name: str) -> None:
         self.name = name
         self.storage_name = f"_wd_auth_{name}"
@@ -52,6 +59,11 @@ class AuthoritativeField:
         if obj is None:
             # Class-level access returns the descriptor itself
             return self
+        if not hasattr(self, "storage_name"):
+            raise AuthoritativeAccessError(
+                "AuthoritativeField has no name — was it dynamically assigned "
+                "without passing name= to __init__?"
+            )
         try:
             return obj.__dict__[self.storage_name]
         except KeyError:

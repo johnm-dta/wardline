@@ -109,7 +109,11 @@ def merge(
                     base_value=base_severity,
                     attempted_value=overlay_severity,
                 )
-        # Overlay wins — update or insert
+        # Overlay wins — update or insert.
+        # NOTE: narrow-only semantics — the overlay can add or tighten fields
+        # but can never *remove* a field present in the base override.  This is
+        # intentional: overlays are additive refinements.  To "undo" a base
+        # field, the base manifest itself must be changed.
         merged = dict(base_ovr) if base_ovr else {}
         merged.update(ovr)
         base_overrides_by_rule[rule_id] = merged

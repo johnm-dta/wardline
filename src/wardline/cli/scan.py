@@ -398,6 +398,13 @@ def scan(
     )
 
     # --- Determine exit code ---
+    # Exit code priority (highest wins):
+    #   EXIT_TOOL_ERROR (3) — a rule or scanner component raised an
+    #       unhandled exception; signals infrastructure failure.
+    #   EXIT_FINDINGS   (1) — at least one scan finding exists, or the
+    #       max_unknown_raw_percent ceiling was exceeded.
+    #   EXIT_CLEAN      (0) — no findings, no errors.
+    #
     # GOVERNANCE findings are diagnostic metadata in SARIF; they do NOT
     # drive the exit code. Only scan findings + max_pct ceiling matter.
     has_tool_error = any(

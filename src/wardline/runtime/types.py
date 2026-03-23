@@ -57,6 +57,12 @@ class _FailFastMarker:
     """
 
     __slots__ = ()
+    _instance: _FailFastMarker | None = None  # class var, not in __slots__
+
+    def __new__(cls) -> _FailFastMarker:
+        if cls._instance is None:
+            cls._instance = object.__new__(cls)
+        return cls._instance
 
     def __repr__(self) -> str:
         return "FailFast"

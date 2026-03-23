@@ -38,8 +38,13 @@ def _check_decorated_methods(cls: type) -> None:
     looks for ``_wardline_groups`` on each callable — the attribute
     set by the wardline decorator factory.
     """
-    for name, value in cls.__dict__.items():
-        if name.startswith("_"):
+    # Snapshot dict items — cls.__dict__ is only mutated at class
+    # definition time so this is safe, but a list() copy is cheap
+    # insurance against future metaclass surprises.
+    for name, value in list(cls.__dict__.items()):
+        # Skip single-underscore private names but NOT dunders —
+        # __init__, __call__, etc. can legitimately carry decorators.
+        if name.startswith("_") and not name.startswith("__"):
             continue
         if not callable(value):
             continue

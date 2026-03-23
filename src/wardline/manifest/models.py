@@ -211,12 +211,17 @@ class ScannerConfig:
                 f"unknown keys in wardline.toml: {sorted(unknown)}"
             )
 
-        # Parse and validate target_paths
+        # Parse and validate target_paths — resolve relative to config
+        # file's directory, not CWD, so paths work regardless of where
+        # the user invokes ``wardline scan``.
+        config_dir = path.resolve().parent
         target_paths = tuple(
-            Path(p) for p in wardline_section.get("target_paths", [])
+            (config_dir / p).resolve() if not Path(p).is_absolute() else Path(p)
+            for p in wardline_section.get("target_paths", [])
         )
         exclude_paths = tuple(
-            Path(p) for p in wardline_section.get("exclude_paths", [])
+            (config_dir / p).resolve() if not Path(p).is_absolute() else Path(p)
+            for p in wardline_section.get("exclude_paths", [])
         )
 
         # Parse and validate rule IDs
