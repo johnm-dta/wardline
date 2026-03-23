@@ -1,5 +1,6 @@
 """Tests for TaintState enum and taint_join lattice."""
 
+import itertools
 import json
 
 import pytest
@@ -121,3 +122,31 @@ def test_specific_join_results(a: TaintState, b: TaintState, expected: TaintStat
     """Verify specific join results from the spec's join table."""
     assert taint_join(a, b) is expected
     assert taint_join(b, a) is expected  # commutativity
+
+
+# --- Bug fix: exhaustive associativity (wardline-c69e58f) ---
+
+
+def test_associativity_exhaustive_8x8x8() -> None:
+    """Associativity: join(join(a, b), c) == join(a, join(b, c)) for all 512 triples."""
+    for a, b, c in itertools.product(ALL_STATES, repeat=3):
+        left = taint_join(taint_join(a, b), c)
+        right = taint_join(a, taint_join(b, c))
+        assert left is right, (
+            f"Associativity failed: join(join({a}, {b}), {c}) = {left} "
+            f"!= {right} = join({a}, join({b}, {c}))"
+        )
+
+
+# --- Bug fix: string round-trip safety (wardline-81e7255) ---
+
+
+def test_taint_join_string_round_trip() -> None:
+    """taint_join(TaintState(str(a)), TaintState(str(b))) == taint_join(a, b) for all pairs."""
+    for a, b in itertools.product(ALL_STATES, repeat=2):
+        from_str = taint_join(TaintState(str(a)), TaintState(str(b)))
+        direct = taint_join(a, b)
+        assert from_str is direct, (
+            f"String round-trip mismatch: taint_join(TaintState('{a}'), "
+            f"TaintState('{b}')) = {from_str} != {direct} = taint_join({a}, {b})"
+        )

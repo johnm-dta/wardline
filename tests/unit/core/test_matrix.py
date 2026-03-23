@@ -163,6 +163,53 @@ def test_severity_matrix_is_immutable() -> None:
         SEVERITY_MATRIX[(RuleId.PY_WL_001, TaintState.AUDIT_TRAIL)] = None  # type: ignore[index]
 
 
+# Canonical analysis rules (those with matrix entries)
+_CANONICAL_RULES = [
+    RuleId.PY_WL_001, RuleId.PY_WL_002, RuleId.PY_WL_003,
+    RuleId.PY_WL_004, RuleId.PY_WL_005, RuleId.PY_WL_006,
+    RuleId.PY_WL_007, RuleId.PY_WL_008, RuleId.PY_WL_009,
+]
+
+
+# --- Bug fix: matrix well-formedness (wardline-dcb29c1) ---
+
+
+def test_every_canonical_pair_has_entry() -> None:
+    """Every (RuleId, TaintState) canonical pair must have a matrix entry."""
+    from wardline.core.matrix import SEVERITY_MATRIX
+
+    for rule in _CANONICAL_RULES:
+        for taint in TaintState:
+            assert (rule, taint) in SEVERITY_MATRIX, (
+                f"Missing matrix entry for ({rule}, {taint})"
+            )
+
+
+def test_every_cell_has_valid_severity_and_exceptionability() -> None:
+    """Every cell must contain valid Severity and Exceptionability values."""
+    from wardline.core.matrix import SEVERITY_MATRIX, SeverityCell
+
+    for (rule, taint), cell in SEVERITY_MATRIX.items():
+        assert isinstance(cell, SeverityCell), (
+            f"({rule}, {taint}): cell is not a SeverityCell"
+        )
+        assert isinstance(cell.severity, Severity), (
+            f"({rule}, {taint}): severity {cell.severity!r} is not a Severity"
+        )
+        assert isinstance(cell.exceptionability, Exceptionability), (
+            f"({rule}, {taint}): exceptionability {cell.exceptionability!r} "
+            f"is not an Exceptionability"
+        )
+
+
+def test_no_duplicate_keys() -> None:
+    """Matrix must not have duplicate (rule, taint) keys."""
+    from wardline.core.matrix import SEVERITY_MATRIX
+
+    keys = list(SEVERITY_MATRIX.keys())
+    assert len(keys) == len(set(keys)), "Duplicate keys found in SEVERITY_MATRIX"
+
+
 def test_no_matrix_import_at_module_level() -> None:
     """Verify this test file does not import from wardline.core.matrix at module level."""
     import ast

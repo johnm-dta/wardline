@@ -52,6 +52,10 @@ def resolve_boundaries(
         # merge() is OUTSIDE the try — ManifestWidenError propagates
         resolved = merge(manifest, overlay)
 
+        # Surface governance signals so they appear in verbose output.
+        for signal in resolved.governance_signals:
+            logger.warning("Governance signal [%s]: %s", overlay_path, signal)
+
         # Tag each boundary with the overlay's ABSOLUTE scope path
         scope = str((root / overlay.overlay_for).resolve())
         for boundary in resolved.boundaries:
