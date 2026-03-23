@@ -1,2 +1,2 @@
-def get_audit_status(record):
-    x = getattr(record, "status")
+def process(obj):
+    x = getattr(obj, "name")

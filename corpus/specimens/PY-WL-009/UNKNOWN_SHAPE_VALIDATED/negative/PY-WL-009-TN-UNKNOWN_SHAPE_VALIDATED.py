@@ -1,4 +1,5 @@
 def process(data):
-    data = ensure_shape(data, required=["status"])
+    if isinstance(data, dict):
+        pass
     if data["status"] == "active":
         pass

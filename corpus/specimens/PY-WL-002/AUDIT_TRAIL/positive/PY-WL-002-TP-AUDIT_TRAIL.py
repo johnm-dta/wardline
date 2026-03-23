@@ -1,2 +1,2 @@
-def resolve_audit_field(record):
-    x = getattr(record, "verified_by", "system")
+def process(obj):
+    x = getattr(obj, "name", None)

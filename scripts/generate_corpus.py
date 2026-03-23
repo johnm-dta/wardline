@@ -71,10 +71,18 @@ def _sha256(text: str) -> str:
 
 
 def _write_specimen(path: str, data: dict) -> None:
+    """Write YAML metadata and matching .py code file."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         f.write("---\n")
         yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+
+    # Generate matching .py file from the fragment
+    fragment = data.get("fragment", "")
+    if fragment:
+        py_path = path.rsplit(".", 1)[0] + ".py"
+        with open(py_path, "w") as f:
+            f.write(fragment)
 
 
 def generate_matrix_specimens() -> dict[str, dict]:
@@ -365,13 +373,44 @@ def generate_adversarial_specimens() -> dict[str, dict]:
 
 
 def write_manifest(manifest: dict[str, dict]) -> None:
-    """Write the corpus manifest JSON."""
-    out = {"schema_version": "0.1", "specimens": manifest}
+    """Write the corpus manifest JSON from actual files on disk.
+
+    Regenerates from disk to catch any manually-added specimens and
+    prevent manifest drift.
+    """
+    # Scan disk for all YAML specimens (authoritative source)
+    import glob
+
+    disk_entries = []
+    for yaml_path in sorted(glob.glob(f"{BASE}/**/*.yaml", recursive=True)):
+        with open(yaml_path) as f:
+            data = yaml.safe_load(f)
+        if not isinstance(data, dict):
+            continue
+        py_path = yaml_path.rsplit(".", 1)[0] + ".py"
+        rel = os.path.relpath(yaml_path, "corpus")
+        disk_entries.append({
+            "specimen_id": data.get("specimen_id", os.path.splitext(os.path.basename(yaml_path))[0]),
+            "path": rel,
+            "py_exists": os.path.exists(py_path),
+            "rule": data.get("rule", ""),
+            "taint_state": data.get("taint_state", ""),
+            "verdict": data.get("verdict", ""),
+            "expected_match": data.get("expected_match"),
+            "sha256": data.get("sha256", ""),
+        })
+
+    out = {
+        "version": "1.0",
+        "generated": __import__("datetime").date.today().isoformat(),
+        "specimen_count": len(disk_entries),
+        "specimens": disk_entries,
+    }
     path = "corpus/corpus_manifest.json"
     with open(path, "w") as f:
-        json.dump(out, f, indent=2, sort_keys=True)
+        json.dump(out, f, indent=2)
         f.write("\n")
-    print(f"Manifest written: {len(manifest)} entries -> {path}")
+    print(f"Manifest written: {len(disk_entries)} entries -> {path}")
 
 
 def main() -> None:

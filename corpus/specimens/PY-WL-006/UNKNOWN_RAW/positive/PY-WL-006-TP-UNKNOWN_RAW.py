@@ -1,5 +1,5 @@
-def process(data):
+def process():
     try:
         risky()
     except Exception:
-        db.record_failure(data)
+        logger.error("failed")

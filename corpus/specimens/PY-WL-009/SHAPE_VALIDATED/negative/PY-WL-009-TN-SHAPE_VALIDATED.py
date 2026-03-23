@@ -1,5 +1,5 @@
 def process(data):
-    if "status" not in data:
-        raise KeyError("missing status")
+    if isinstance(data, dict):
+        pass
     if data["status"] == "active":
         pass

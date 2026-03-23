@@ -1,5 +1,5 @@
 def process():
     try:
         pass
-    except (ValueError, TypeError):
+    except Exception:
         pass

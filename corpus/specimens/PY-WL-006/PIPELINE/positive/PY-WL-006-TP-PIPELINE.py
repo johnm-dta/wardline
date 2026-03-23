@@ -1,5 +1,5 @@
-def process(data):
+def process():
     try:
         risky()
     except Exception:
-        audit.emit("pipeline_error", data)
+        logger.error("failed")

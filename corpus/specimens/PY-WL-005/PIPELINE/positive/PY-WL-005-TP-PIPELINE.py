@@ -1,6 +1,5 @@
-def process(data):
-    for x in data:
-        try:
-            handle(x)
-        except TypeError:
-            continue
+def process():
+    try:
+        pass
+    except Exception:
+        pass

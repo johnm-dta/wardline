@@ -2,13 +2,12 @@
 specimen_id: PY-WL-001-TP-AUDIT_TRAIL
 description: PY-WL-001 true_positive at AUDIT_TRAIL
 rule: PY-WL-001
-fragment: "def reconstruct_ledger_entry(record):\n    x = record.get(\"transaction_id\"\
-  , \"UNKNOWN\")\n"
+fragment: "def process(data):\n    x = data.get(\"key\", \"default\")\n"
 taint_state: AUDIT_TRAIL
 expected_rules:
 - PY-WL-001
 expected_severity: ERROR
 expected_exceptionability: UNCONDITIONAL
 expected_match: true
-sha256: be65da62ade5354261f4921d25936cc2ae335983a41a36a8bb930a64c217bfb6
+sha256: fde5ab3dd8c9e06f9da8a26d1cfe64280ee6e33d25e69bfa541b06a4764517b5
 verdict: true_positive

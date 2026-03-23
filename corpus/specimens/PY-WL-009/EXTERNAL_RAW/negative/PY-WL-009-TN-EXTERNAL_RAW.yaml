@@ -2,12 +2,12 @@
 specimen_id: PY-WL-009-TN-EXTERNAL_RAW
 description: PY-WL-009 true negative at EXTERNAL_RAW
 rule: PY-WL-009
-fragment: "def process(data):\n    if \"status\" in data:\n        pass\n    if data[\"\
-  status\"] == \"active\":\n        pass\n"
+fragment: "def process(data):\n    if isinstance(data, dict):\n        pass\n    if\
+  \ data[\"status\"] == \"active\":\n        pass\n"
 taint_state: EXTERNAL_RAW
 expected_rules: []
 expected_severity: null
 expected_exceptionability: null
 expected_match: false
-sha256: a2ef8b7429c4f8b8f76685941fae5632b141889d61f945c93e0a0401859ec134
+sha256: 965d3796983070162f1b4ac0b2b7b0e022c245da1eba9f272b9a13b4a317894d
 verdict: true_negative

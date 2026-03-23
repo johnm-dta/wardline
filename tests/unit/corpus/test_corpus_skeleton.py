@@ -68,6 +68,6 @@ class TestCorpusSkeleton:
         with open(manifest_path) as f:
             data = json.load(f)
         assert isinstance(data, dict)
-        assert "schema_version" in data
+        assert "version" in data
         assert "specimens" in data
         assert len(data["specimens"]) > 0

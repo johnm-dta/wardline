@@ -2,12 +2,12 @@
 specimen_id: PY-WL-009-TN-SHAPE_VALIDATED
 description: PY-WL-009 true negative at SHAPE_VALIDATED
 rule: PY-WL-009
-fragment: "def process(data):\n    if \"status\" not in data:\n        raise KeyError(\"\
-  missing status\")\n    if data[\"status\"] == \"active\":\n        pass\n"
+fragment: "def process(data):\n    if isinstance(data, dict):\n        pass\n    if\
+  \ data[\"status\"] == \"active\":\n        pass\n"
 taint_state: SHAPE_VALIDATED
 expected_rules: []
 expected_severity: null
 expected_exceptionability: null
 expected_match: false
-sha256: 40493365c5e4c1d9074da204bb3be7a51aa239074f9f6d2281605987bffc9241
+sha256: 965d3796983070162f1b4ac0b2b7b0e022c245da1eba9f272b9a13b4a317894d
 verdict: true_negative

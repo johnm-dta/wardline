@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "generated": "2026-03-24",
-  "specimen_count": 188,
+  "specimen_count": 197,
   "specimens": [
     {
       "specimen_id": "PY-WL-001-TN-AUDIT_TRAIL",
@@ -11,7 +11,7 @@
       "taint_state": "AUDIT_TRAIL",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "16ff7eae4688f3e5046eaa6f68d4316915193683622d48b6138fe5881f4416f3"
+      "sha256": "e32a7a05619471256f0fd952576e21a72ff3f5952c687fc782626247ca798e19"
     },
     {
       "specimen_id": "PY-WL-001-TP-AUDIT_TRAIL",
@@ -21,7 +21,7 @@
       "taint_state": "AUDIT_TRAIL",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "be65da62ade5354261f4921d25936cc2ae335983a41a36a8bb930a64c217bfb6"
+      "sha256": "fde5ab3dd8c9e06f9da8a26d1cfe64280ee6e33d25e69bfa541b06a4764517b5"
     },
     {
       "specimen_id": "PY-WL-001-KFN-01",
@@ -301,7 +301,7 @@
       "taint_state": "AUDIT_TRAIL",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "c1466619826b1d04897507ea912e6349bd7d10dcb3d53e4ee3faa121794b2398"
+      "sha256": "1970dc85fea70d8a183f420151271333aef99e01453c47c0ffa9ea39f2a4d738"
     },
     {
       "specimen_id": "PY-WL-002-TP-AUDIT_TRAIL",
@@ -311,7 +311,7 @@
       "taint_state": "AUDIT_TRAIL",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "9803ae1b6e65e56f4c3736501ba82bd9dfe887ce57d7a12ad1f99f1ee77897c9"
+      "sha256": "81262cfdd145242d53158977787ca82583cf2df86bf100658db8414c1296cfda"
     },
     {
       "specimen_id": "PY-WL-002-TN-01",
@@ -961,7 +961,7 @@
       "taint_state": "AUDIT_TRAIL",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "3d59de76e0952ad670d2c53d9413a7ae26b779ca8b3fa1bfc64dd1f04e40bd24"
+      "sha256": "2fc262ee2b3d7c221393e6d7cbb220b7a176122a5859e1fb37268fe92c11cd5c"
     },
     {
       "specimen_id": "PY-WL-005-TP-AUDIT_TRAIL",
@@ -1001,7 +1001,7 @@
       "taint_state": "EXTERNAL_RAW",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "3d59de76e0952ad670d2c53d9413a7ae26b779ca8b3fa1bfc64dd1f04e40bd24"
+      "sha256": "2fc262ee2b3d7c221393e6d7cbb220b7a176122a5859e1fb37268fe92c11cd5c"
     },
     {
       "specimen_id": "PY-WL-005-TP-01",
@@ -1051,7 +1051,7 @@
       "taint_state": "MIXED_RAW",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "3d59de76e0952ad670d2c53d9413a7ae26b779ca8b3fa1bfc64dd1f04e40bd24"
+      "sha256": "2fc262ee2b3d7c221393e6d7cbb220b7a176122a5859e1fb37268fe92c11cd5c"
     },
     {
       "specimen_id": "PY-WL-005-TP-MIXED_RAW",
@@ -1061,7 +1061,7 @@
       "taint_state": "MIXED_RAW",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "756a7edd25e61f3cd299a6c113f813c8a69addaf940bb9d20bda276ba2cae431"
+      "sha256": "f45f081293981a52107c95479cbc55aee5b545b62f7fa64d173723e8427ff314"
     },
     {
       "specimen_id": "PY-WL-005-TP-async-silent",
@@ -1081,7 +1081,7 @@
       "taint_state": "PIPELINE",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "3d59de76e0952ad670d2c53d9413a7ae26b779ca8b3fa1bfc64dd1f04e40bd24"
+      "sha256": "2fc262ee2b3d7c221393e6d7cbb220b7a176122a5859e1fb37268fe92c11cd5c"
     },
     {
       "specimen_id": "PY-WL-005-TP-PIPELINE",
@@ -1091,7 +1091,7 @@
       "taint_state": "PIPELINE",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "6f03bb5672c8ba946ebf9b35cc6649f254f7a079e2e41c75f488164467e9d50e"
+      "sha256": "f45f081293981a52107c95479cbc55aee5b545b62f7fa64d173723e8427ff314"
     },
     {
       "specimen_id": "PY-WL-005-TN-SHAPE_VALIDATED",
@@ -1101,7 +1101,7 @@
       "taint_state": "SHAPE_VALIDATED",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "3d59de76e0952ad670d2c53d9413a7ae26b779ca8b3fa1bfc64dd1f04e40bd24"
+      "sha256": "2fc262ee2b3d7c221393e6d7cbb220b7a176122a5859e1fb37268fe92c11cd5c"
     },
     {
       "specimen_id": "PY-WL-005-TP-SHAPE_VALIDATED",
@@ -1111,7 +1111,7 @@
       "taint_state": "SHAPE_VALIDATED",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "953fc33abd033ad0fa3fe4111831180f834d8b290a06ad58535543a138c961a9"
+      "sha256": "f45f081293981a52107c95479cbc55aee5b545b62f7fa64d173723e8427ff314"
     },
     {
       "specimen_id": "PY-WL-005-TN-UNKNOWN_RAW",
@@ -1121,7 +1121,7 @@
       "taint_state": "UNKNOWN_RAW",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "3d59de76e0952ad670d2c53d9413a7ae26b779ca8b3fa1bfc64dd1f04e40bd24"
+      "sha256": "2fc262ee2b3d7c221393e6d7cbb220b7a176122a5859e1fb37268fe92c11cd5c"
     },
     {
       "specimen_id": "PY-WL-005-TP-02",
@@ -1141,7 +1141,7 @@
       "taint_state": "UNKNOWN_RAW",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "fd6794546a6ef6c8f647fa212b301eef5f677b16abcd7b9283af0d2ddde04369"
+      "sha256": "f45f081293981a52107c95479cbc55aee5b545b62f7fa64d173723e8427ff314"
     },
     {
       "specimen_id": "PY-WL-005-TN-UNKNOWN_SEM_VALIDATED",
@@ -1151,7 +1151,7 @@
       "taint_state": "UNKNOWN_SEM_VALIDATED",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "3d59de76e0952ad670d2c53d9413a7ae26b779ca8b3fa1bfc64dd1f04e40bd24"
+      "sha256": "2fc262ee2b3d7c221393e6d7cbb220b7a176122a5859e1fb37268fe92c11cd5c"
     },
     {
       "specimen_id": "PY-WL-005-TP-UNKNOWN_SEM_VALIDATED",
@@ -1161,7 +1161,7 @@
       "taint_state": "UNKNOWN_SEM_VALIDATED",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "b8a8cc167f61a002e25a32946aa7a6d916356bfc7b9aae0d95b2e0701ab130c1"
+      "sha256": "f45f081293981a52107c95479cbc55aee5b545b62f7fa64d173723e8427ff314"
     },
     {
       "specimen_id": "PY-WL-005-TN-UNKNOWN_SHAPE_VALIDATED",
@@ -1171,7 +1171,7 @@
       "taint_state": "UNKNOWN_SHAPE_VALIDATED",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "3d59de76e0952ad670d2c53d9413a7ae26b779ca8b3fa1bfc64dd1f04e40bd24"
+      "sha256": "2fc262ee2b3d7c221393e6d7cbb220b7a176122a5859e1fb37268fe92c11cd5c"
     },
     {
       "specimen_id": "PY-WL-005-TP-UNKNOWN_SHAPE_VALIDATED",
@@ -1181,7 +1181,7 @@
       "taint_state": "UNKNOWN_SHAPE_VALIDATED",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "54ad325e073caa8fa76aa7f73555cd21ea6b851d9bf1c38424a4a0e9b425cbda"
+      "sha256": "f45f081293981a52107c95479cbc55aee5b545b62f7fa64d173723e8427ff314"
     },
     {
       "specimen_id": "PY-WL-006-TN-AUDIT_TRAIL",
@@ -1241,7 +1241,7 @@
       "taint_state": "MIXED_RAW",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "1b5d4394ac82779f4ab16e4d1364a84d692f1c9f481214f89bc4dd1062cd605e"
+      "sha256": "c7eae2aef49a3d7b1b4dab451d1cd931556aabbae7fdf9aafb04b6c7bbe11f12"
     },
     {
       "specimen_id": "PY-WL-006-TN-PIPELINE",
@@ -1261,7 +1261,7 @@
       "taint_state": "PIPELINE",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "9d87b7d487b1cf19888daac75f71543a8366ae2be02d71cc31f21e8cbcc520e0"
+      "sha256": "c7eae2aef49a3d7b1b4dab451d1cd931556aabbae7fdf9aafb04b6c7bbe11f12"
     },
     {
       "specimen_id": "PY-WL-006-TN-SHAPE_VALIDATED",
@@ -1281,7 +1281,7 @@
       "taint_state": "SHAPE_VALIDATED",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "ec8b898a01e23e03c6756573c35da37ccb480bde7338b1ce038127c70e999661"
+      "sha256": "c7eae2aef49a3d7b1b4dab451d1cd931556aabbae7fdf9aafb04b6c7bbe11f12"
     },
     {
       "specimen_id": "PY-WL-006-TN-UNKNOWN_RAW",
@@ -1301,7 +1301,7 @@
       "taint_state": "UNKNOWN_RAW",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "53e86d094eaaf2905d2472707b366b42a6958580e3d6106e7cbe969728164c1a"
+      "sha256": "c7eae2aef49a3d7b1b4dab451d1cd931556aabbae7fdf9aafb04b6c7bbe11f12"
     },
     {
       "specimen_id": "PY-WL-006-TN-UNKNOWN_SEM_VALIDATED",
@@ -1321,7 +1321,7 @@
       "taint_state": "UNKNOWN_SEM_VALIDATED",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "0cf595df00d0110ebba712126a8f1a85f172effc9d5203f8ef038d3e87dca7a1"
+      "sha256": "c7eae2aef49a3d7b1b4dab451d1cd931556aabbae7fdf9aafb04b6c7bbe11f12"
     },
     {
       "specimen_id": "PY-WL-006-TN-UNKNOWN_SHAPE_VALIDATED",
@@ -1341,7 +1341,7 @@
       "taint_state": "UNKNOWN_SHAPE_VALIDATED",
       "verdict": "true_positive",
       "expected_match": true,
-      "sha256": "9526ed29565faeb85876b94635a5f3d3a1f52eea3205f9e6acee59150dfd6dc6"
+      "sha256": "c7eae2aef49a3d7b1b4dab451d1cd931556aabbae7fdf9aafb04b6c7bbe11f12"
     },
     {
       "specimen_id": "PY-WL-007-TN-AUDIT_TRAIL",
@@ -1671,7 +1671,7 @@
       "taint_state": "AUDIT_TRAIL",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "d12ce16c0f89e39c84c67bf339517ab441a647f4c130383f79f5d1a24c982d6c"
+      "sha256": "965d3796983070162f1b4ac0b2b7b0e022c245da1eba9f272b9a13b4a317894d"
     },
     {
       "specimen_id": "PY-WL-009-TP-AUDIT_TRAIL",
@@ -1691,7 +1691,7 @@
       "taint_state": "EXTERNAL_RAW",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "a2ef8b7429c4f8b8f76685941fae5632b141889d61f945c93e0a0401859ec134"
+      "sha256": "965d3796983070162f1b4ac0b2b7b0e022c245da1eba9f272b9a13b4a317894d"
     },
     {
       "specimen_id": "PY-WL-009-TP-EXTERNAL_RAW",
@@ -1711,7 +1711,7 @@
       "taint_state": "MIXED_RAW",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "fba5ca76725668e3a177c80528e19dc87ae6b10a7ffc0bc9e45ed2840ec2f76b"
+      "sha256": "965d3796983070162f1b4ac0b2b7b0e022c245da1eba9f272b9a13b4a317894d"
     },
     {
       "specimen_id": "PY-WL-009-TP-MIXED_RAW",
@@ -1751,7 +1751,7 @@
       "taint_state": "SHAPE_VALIDATED",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "40493365c5e4c1d9074da204bb3be7a51aa239074f9f6d2281605987bffc9241"
+      "sha256": "965d3796983070162f1b4ac0b2b7b0e022c245da1eba9f272b9a13b4a317894d"
     },
     {
       "specimen_id": "PY-WL-009-TP-SHAPE_VALIDATED",
@@ -1771,7 +1771,7 @@
       "taint_state": "UNKNOWN_RAW",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "8fe08eb24120ba4bb20415bc361cad0261a6ad9a0c1338a7c067b683eb2b16cb"
+      "sha256": "965d3796983070162f1b4ac0b2b7b0e022c245da1eba9f272b9a13b4a317894d"
     },
     {
       "specimen_id": "PY-WL-009-TP-UNKNOWN_RAW",
@@ -1791,7 +1791,7 @@
       "taint_state": "UNKNOWN_SEM_VALIDATED",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "3a1893f412d1d28bd42c67ba9fa015807531a138ab87b22b26321dd948ec671f"
+      "sha256": "965d3796983070162f1b4ac0b2b7b0e022c245da1eba9f272b9a13b4a317894d"
     },
     {
       "specimen_id": "PY-WL-009-TP-UNKNOWN_SEM_VALIDATED",
@@ -1811,7 +1811,7 @@
       "taint_state": "UNKNOWN_SHAPE_VALIDATED",
       "verdict": "true_negative",
       "expected_match": false,
-      "sha256": "f28a7e04b40687b2b460804a27eaf1dbcbf9f9e9f83f3f4e9c8b93dd9be8e17c"
+      "sha256": "965d3796983070162f1b4ac0b2b7b0e022c245da1eba9f272b9a13b4a317894d"
     },
     {
       "specimen_id": "PY-WL-009-TP-UNKNOWN_SHAPE_VALIDATED",
@@ -1862,6 +1862,96 @@
       "verdict": "true_positive",
       "expected_match": true,
       "sha256": "fe070f6f2d44e6254611799398b048726a874aa4e35274d8efac0e54cab1ec30"
+    },
+    {
+      "specimen_id": "ADV-005-long-function",
+      "path": "specimens/adversarial/ADV-005-long-function.yaml",
+      "py_exists": true,
+      "rule": "PY-WL-005",
+      "taint_state": "EXTERNAL_RAW",
+      "verdict": "true_positive",
+      "expected_match": true,
+      "sha256": "9bddf2557fa2ae1e5677cad3af71ad356af5563f2e49e2f79ce7316593c3fea8"
+    },
+    {
+      "specimen_id": "ADV-006-decorator-stack",
+      "path": "specimens/adversarial/ADV-006-decorator-stack.yaml",
+      "py_exists": true,
+      "rule": "PY-WL-001",
+      "taint_state": "PIPELINE",
+      "verdict": "true_positive",
+      "expected_match": true,
+      "sha256": "79729ceb608a77ed594033dfa698c9ba72e12663deb134318fc5c5d6bd4e8c8d"
+    },
+    {
+      "specimen_id": "ADV-007-async-get",
+      "path": "specimens/adversarial/ADV-007-async-get.yaml",
+      "py_exists": true,
+      "rule": "PY-WL-001",
+      "taint_state": "EXTERNAL_RAW",
+      "verdict": "true_positive",
+      "expected_match": true,
+      "sha256": "26d9f988e68efc350bbe1d8e16af1a75a6cceb1aeed6ae528bcff2d8770ef3ca"
+    },
+    {
+      "specimen_id": "ADV-008-async-except",
+      "path": "specimens/adversarial/ADV-008-async-except.yaml",
+      "py_exists": true,
+      "rule": "PY-WL-004",
+      "taint_state": "UNKNOWN_RAW",
+      "verdict": "true_positive",
+      "expected_match": true,
+      "sha256": "d7a55b803438be519d8d2a17c91cf7b8891a96d42fa958046b3895279a989973"
+    },
+    {
+      "specimen_id": "ADV-009-async-silent",
+      "path": "specimens/adversarial/ADV-009-async-silent.yaml",
+      "py_exists": true,
+      "rule": "PY-WL-005",
+      "taint_state": "MIXED_RAW",
+      "verdict": "true_positive",
+      "expected_match": true,
+      "sha256": "9f632c8cbd3ff856c4ee6cf32063d1aa2f32238d189c3e8183c94b147d4d2477"
+    },
+    {
+      "specimen_id": "ADV-010-async-getattr",
+      "path": "specimens/adversarial/ADV-010-async-getattr.yaml",
+      "py_exists": true,
+      "rule": "PY-WL-002",
+      "taint_state": "PIPELINE",
+      "verdict": "true_positive",
+      "expected_match": true,
+      "sha256": "108360958fe9ef1d9af9b3b8518c115dbd94e3a47731753d99f5a67e8d382c92"
+    },
+    {
+      "specimen_id": "ADV-011-class-method",
+      "path": "specimens/adversarial/ADV-011-class-method.yaml",
+      "py_exists": true,
+      "rule": "PY-WL-001",
+      "taint_state": "SHAPE_VALIDATED",
+      "verdict": "true_positive",
+      "expected_match": true,
+      "sha256": "f8f1531788c0c811f5874e9b447c1cf6440e2ad5ce3b16e041f71e383ed5c113"
+    },
+    {
+      "specimen_id": "ADV-012-setdefault",
+      "path": "specimens/adversarial/ADV-012-setdefault.yaml",
+      "py_exists": true,
+      "rule": "PY-WL-001",
+      "taint_state": "EXTERNAL_RAW",
+      "verdict": "true_positive",
+      "expected_match": true,
+      "sha256": "9ca53318246017be037df9afa506ae736e068440aa69f5d133ab50c1717636f5"
+    },
+    {
+      "specimen_id": "ADV-013-defaultdict",
+      "path": "specimens/adversarial/ADV-013-defaultdict.yaml",
+      "py_exists": true,
+      "rule": "PY-WL-001",
+      "taint_state": "UNKNOWN_RAW",
+      "verdict": "true_positive",
+      "expected_match": true,
+      "sha256": "c0088880862f3022c94a7496808be3aebafc7ec6aae565327f054687ea56bb93"
     },
     {
       "specimen_id": "ADV-014-hasattr-taint-gate",

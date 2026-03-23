@@ -1,5 +1,5 @@
 def process():
     try:
         pass
-    except BaseException:
+    except Exception:
         pass
