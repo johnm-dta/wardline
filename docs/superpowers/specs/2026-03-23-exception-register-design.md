@@ -32,7 +32,10 @@ governance_path: str = "standard"  # "standard" or "expedited"
 ### Schema changes
 
 Update `exceptions.schema.json`:
-- Add `ast_fingerprint` to `required` array
+- Add `ast_fingerprint` as an optional field (NOT in the `required` array).
+  Empty string = always treated as stale. The CLI `add` command always computes
+  and sets it. Old entries without fingerprints will trigger
+  GOVERNANCE-STALE-EXCEPTION on first scan, prompting `refresh`.
 - Add `recurrence_count` (integer, minimum 0, default 0)
 - Add `governance_path` (enum: `["standard", "expedited"]`)
 
@@ -46,6 +49,11 @@ def load_exceptions(manifest_dir: Path) -> tuple[ExceptionEntry, ...]:
 
     Returns empty tuple if the file does not exist (no exceptions = valid state).
     Raises ManifestLoadError on schema validation failure.
+
+    Load-time UNCONDITIONAL re-validation: each entry's (rule, taint_state) is
+    validated against the severity matrix. Entries targeting UNCONDITIONAL cells
+    are rejected with ManifestLoadError — these exceptions should never have been
+    granted and indicate register corruption or manual tampering.
     """
 ```
 
@@ -53,11 +61,21 @@ Discovery convention: `wardline.exceptions.json` lives alongside
 `wardline.yaml` (project-level governance, not per-overlay). Absence of
 the file is not an error — it means no exceptions are granted.
 
+`governance_path` should be a `StrEnum`. Add `GovernancePath` enum to
+`src/wardline/core/severity.py`:
+
+```python
+class GovernancePath(StrEnum):
+    STANDARD = "standard"
+    EXPEDITED = "expedited"
+```
+
 **Tests (unit):**
 - File exists with valid entries → returns tuple of ExceptionEntry
 - File does not exist → returns `()`
 - Invalid schema → raises `ManifestLoadError`
-- Missing required field (`ast_fingerprint`) → raises `ManifestLoadError`
+- Entry with missing `ast_fingerprint` → loads with default empty string
+- Entry targeting UNCONDITIONAL cell → raises `ManifestLoadError`
 - Valid entries with optional fields omitted → defaults applied
 
 ## Change 2: AST Fingerprint Computation
@@ -72,7 +90,10 @@ def compute_ast_fingerprint(file_path: Path, qualname: str) -> str | None:
     structure, not a specific finding. Any structural change to the function
     invalidates ALL exceptions targeting it.
 
-    Algorithm: sha256(file_path | qualname | ast.dump(node, include_attributes=False))[:16]
+    Algorithm: sha256(f"{sys.version_info.major}.{sys.version_info.minor}|{file_path}|{qualname}|{dump}")[:16]
+
+    Python version is included because AST representations can change between
+    minor versions. Python version upgrades require `wardline exception refresh --all`.
 
     include_attributes=False strips line numbers and column offsets, making
     the fingerprint immune to whitespace/formatting changes but sensitive
@@ -87,7 +108,11 @@ The function:
 2. Walks the AST to find the function matching `qualname` (using the same
    scope-stack logic as `RuleBase._dispatch`)
 3. Computes `ast.dump(func_node, include_attributes=False, annotate_fields=True)`
-4. Returns `sha256(f"{file_path}|{qualname}|{dump}")[:16]`
+4. Returns `sha256(f"{sys.version_info.major}.{sys.version_info.minor}|{file_path}|{qualname}|{dump}")[:16]`
+
+**Scope-stack extraction:** Extract qualname resolution into
+`src/wardline/scanner/_scope.py`, shared by `RuleBase` and `fingerprint.py`.
+This avoids duplicating the scope-stack walk logic across two modules.
 
 **Why rule-independent:** The same function may have multiple exceptions for
 different rules. A code change should invalidate all of them — the reviewer
@@ -122,12 +147,19 @@ def apply_exceptions(
     5. Exception is not expired
     6. Finding exceptionability is not UNCONDITIONAL
 
-    On match: finding severity downgraded to SUPPRESS, exceptionability set to
-    TRANSPARENT, exception metadata added (wardline.exceptionId, wardline.exceptionExpires).
+    Finding is frozen (dataclass). Suppressed findings are created via
+    `dataclasses.replace()` — the original Finding is never mutated. The
+    replacement carries `exception_id` and `exception_expires` fields that
+    flow through to SARIF serialization.
+
+    On match: a new Finding is created via `dataclasses.replace(finding,
+    severity=SUPPRESS, exceptionability=TRANSPARENT,
+    exception_id=exception.id, exception_expires=exception.expires)`.
 
     On fingerprint mismatch: GOVERNANCE-STALE-EXCEPTION finding emitted (WARNING).
     On agent_originated=None: GOVERNANCE-UNKNOWN-PROVENANCE finding emitted (WARNING).
     On recurrence_count >= 2: GOVERNANCE-RECURRING-EXCEPTION finding emitted (WARNING).
+    On expires=null: GOVERNANCE-NO-EXPIRY-EXCEPTION finding emitted (WARNING).
     """
 ```
 
@@ -135,13 +167,18 @@ def apply_exceptions(
 scan and SARIF serialization. The engine does not know about exceptions —
 clean separation of concerns.
 
-**New pseudo-rule IDs** (add to `RuleId` enum):
+**New pseudo-rule IDs** (add to `RuleId` enum, 5 total):
 - `GOVERNANCE_STALE_EXCEPTION = "GOVERNANCE-STALE-EXCEPTION"`
 - `GOVERNANCE_UNKNOWN_PROVENANCE = "GOVERNANCE-UNKNOWN-PROVENANCE"`
 - `GOVERNANCE_RECURRING_EXCEPTION = "GOVERNANCE-RECURRING-EXCEPTION"`
+- `GOVERNANCE_BATCH_REFRESH = "GOVERNANCE-BATCH-REFRESH"`
+- `GOVERNANCE_NO_EXPIRY_EXCEPTION = "GOVERNANCE-NO-EXPIRY-EXCEPTION"`
 
-All three are pseudo-rules: they appear in SARIF `results` but NOT in
+All five are pseudo-rules: they appear in SARIF `results` but NOT in
 `wardline.implementedRules`. Add to `_PSEUDO_RULE_IDS` in `sarif.py`.
+
+`RuleId` enum count goes from 15 to 20 (15 current + 5 new governance IDs).
+`test_severity.py` count assertion must be updated accordingly.
 
 **Location format:** `file_path::qualname` (e.g.,
 `"src/adapters/client.py::Client.handle"`). The `::` separator is
@@ -159,6 +196,20 @@ line/col back to a qualname. Two options:
 match time. The field is optional (`None` for findings not inside a function,
 e.g., module-level findings).
 
+**New Finding fields** (all added to `Finding` dataclass in `context.py`):
+- `qualname: str | None = None` — populated from `self._current_qualname`
+- `exception_id: str | None = None` — set by `apply_exceptions` via `replace()`
+- `exception_expires: str | None = None` — set by `apply_exceptions` via `replace()`
+
+Adding these defaulted fields requires `kw_only=True` on Finding's
+`@dataclass` decorator to prevent silent positional omission of earlier fields.
+
+**Match index:** Build `dict[tuple[str, str, str], list[ExceptionEntry]]` keyed
+on `(rule, taint_state, location)` for O(n+m) matching instead of O(n*m).
+
+**File parse caching:** Cache parsed ASTs per-file within `apply_exceptions` to
+avoid re-parsing the same file for multiple findings/exceptions.
+
 **Tests (unit):**
 - Finding with matching active exception → SUPPRESS + metadata
 - Finding with expired exception → not suppressed
@@ -167,6 +218,7 @@ e.g., module-level findings).
 - Finding with no matching exception → unchanged
 - Exception with `agent_originated=None` → GOVERNANCE-UNKNOWN-PROVENANCE
 - Exception with `recurrence_count >= 2` → GOVERNANCE-RECURRING-EXCEPTION
+- Exception with `expires: null` → GOVERNANCE-NO-EXPIRY-EXCEPTION (WARNING)
 - Multiple findings, some matched, some not → correct partition
 
 ## Change 4: CLI Exception Commands
@@ -202,6 +254,9 @@ Refuses to create exceptions for:
 - UNCONDITIONAL findings (exceptionability check)
 - Nonexistent files or qualnames
 - Invalid rule IDs or taint states
+- Agent-originated exceptions without `--expires` (null expiry disallowed
+  for agents; during `apply_exceptions`, exceptions with `expires: null`
+  emit GOVERNANCE-NO-EXPIRY-EXCEPTION WARNING regardless of origin)
 
 ### `wardline exception refresh`
 
@@ -209,21 +264,30 @@ Refuses to create exceptions for:
 exceptions against current code:
 
 ```
-wardline exception refresh EXC-001 EXC-002 EXC-003
-wardline exception refresh --all
+wardline exception refresh EXC-001 EXC-002 EXC-003 \
+  --actor jsmith --rationale "Reviewed: whitespace-only change"
+wardline exception refresh --all --actor bot-1 --rationale "Post-upgrade recompute" --confirm
 ```
+
+**Required flags:** `--actor` and `--rationale` are mandatory on every refresh.
+Records `last_refreshed_by` and `last_refresh_rationale` on the exception entry.
+If the refresher is an agent, sets `refresh_agent_originated: bool = true`.
+
+**`--all` requires `--confirm`** and emits a `GOVERNANCE-BATCH-REFRESH` finding
+(WARNING level) to the next scan output as an audit trail.
 
 For each exception:
 1. Parse the file at the exception's location
 2. Find the function at the qualname
 3. Compute the current AST fingerprint
-4. If changed: update `ast_fingerprint`, increment `recurrence_count`
+4. If changed: update `ast_fingerprint`. Do NOT increment `recurrence_count` —
+   recurrence only increments on an explicit `expire` + `add` renewal cycle.
 5. If qualname no longer exists: report as stale (do not update)
 
 This is the zero-friction path for MCP-connected agents:
 1. Agent sees `GOVERNANCE-STALE-EXCEPTION` in scan output
 2. Agent reviews the code change
-3. If benign: `wardline exception refresh <id>`
+3. If benign: `wardline exception refresh <id> --actor bot-1 --rationale "..."`
 4. If exception no longer valid: `wardline exception expire <id>`
 
 The governance decision (step 2) is the friction point. Steps 1, 3, 4
@@ -260,9 +324,13 @@ All commands support `--json` for machine consumption.
 
 **Tests (integration):**
 - `add` → `review` → `expire` lifecycle
-- `add` → code change → `refresh` increments `recurrence_count`
+- `add` → code change → `refresh` does NOT increment `recurrence_count`
+- `expire` → `add` (renewal) increments `recurrence_count`
 - `add` with UNCONDITIONAL finding → refused
-- `refresh --all` updates all non-expired exceptions
+- `refresh` without `--actor` or `--rationale` → error
+- `refresh --all` without `--confirm` → error
+- `refresh --all --confirm` updates all non-expired exceptions + emits GOVERNANCE-BATCH-REFRESH
+- `add` agent-originated without `--expires` → refused
 - `--json` output is valid JSON
 
 ## Change 5: SARIF Integration
@@ -285,7 +353,7 @@ Add to SARIF run properties:
 
 ### Pseudo-rule descriptors
 
-Add short descriptions for the three new governance rule IDs to
+Add short descriptions for the five new governance rule IDs to
 `_RULE_SHORT_DESCRIPTIONS` and add them to `_PSEUDO_RULE_IDS`.
 
 ## Change 6: CLI Scan Pipeline Wiring
@@ -312,12 +380,18 @@ manifest.
 | File | Change |
 |------|--------|
 | `src/wardline/manifest/models.py` | Add `ast_fingerprint`, `recurrence_count`, `governance_path` to `ExceptionEntry` |
-| `src/wardline/manifest/schemas/exceptions.schema.json` | Add required `ast_fingerprint`, add `recurrence_count`, `governance_path` |
+| `src/wardline/manifest/schemas/exceptions.schema.json` | Add optional `ast_fingerprint`, add `recurrence_count`, `governance_path` |
 | `src/wardline/manifest/exceptions.py` | **New** — `load_exceptions()` |
 | `src/wardline/scanner/fingerprint.py` | **New** — `compute_ast_fingerprint()` |
 | `src/wardline/scanner/exceptions.py` | **New** — `apply_exceptions()` |
-| `src/wardline/scanner/context.py` | Add `qualname: str \| None = None` to `Finding` |
-| `src/wardline/core/severity.py` | Add 3 governance pseudo-rule IDs |
+| `src/wardline/scanner/context.py` | Add `qualname`, `exception_id`, `exception_expires` to `Finding`; add `kw_only=True` |
+| `src/wardline/scanner/_scope.py` | **New** — extracted qualname scope-stack utility shared by `RuleBase` and `fingerprint.py` |
+| `src/wardline/core/severity.py` | Add 5 governance pseudo-rule IDs + `GovernancePath` StrEnum |
+| `src/wardline/rules/py_wl_001.py` | Backfill `qualname=self._current_qualname` in all Finding constructions |
+| `src/wardline/rules/py_wl_002.py` | Backfill `qualname=self._current_qualname` in all Finding constructions |
+| `src/wardline/rules/py_wl_003.py` | Backfill `qualname=self._current_qualname` in all Finding constructions |
+| `src/wardline/rules/py_wl_004.py` | Backfill `qualname=self._current_qualname` in all Finding constructions |
+| `src/wardline/rules/py_wl_005.py` | Backfill `qualname=self._current_qualname` in all Finding constructions |
 | `src/wardline/scanner/sarif.py` | Property bags, pseudo-rule descriptors |
 | `src/wardline/cli/exception_cmds.py` | **New** — `add`, `refresh`, `expire`, `review` commands |
 | `src/wardline/cli/scan.py` | Wire exception loading + matching into scan pipeline |
@@ -326,7 +400,7 @@ manifest.
 | `tests/unit/scanner/test_fingerprint.py` | **New** — fingerprint computation tests |
 | `tests/unit/scanner/test_exception_matching.py` | **New** — matching + suppression tests |
 | `tests/integration/test_exception_cmds.py` | **New** — CLI lifecycle tests |
-| `tests/unit/core/test_severity.py` | Enum count + pseudo-rule membership |
+| `tests/unit/core/test_severity.py` | Enum count (15 → 20) + pseudo-rule membership |
 | `tests/unit/scanner/test_sarif.py` | Property bag + pseudo-rule exclusion |
 
 ## Out of Scope
@@ -337,3 +411,4 @@ manifest.
 - Exception delegation authority enforcement (DelegationConfig exists but
   enforcement is deferred to a governance hardening pass)
 - `wardline exception review --migrate-mvp` (deferred to WP 1.7)
+- `wardline.propertyBagVersion` increment decision (deferred)
