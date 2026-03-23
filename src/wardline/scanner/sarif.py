@@ -48,6 +48,11 @@ _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
     RuleId.GOVERNANCE_PERMISSIVE_DISTRIBUTION: (
         "Permissive distribution allowed (governance)"
     ),
+    RuleId.GOVERNANCE_STALE_EXCEPTION: "Stale exception — AST fingerprint mismatch (governance)",
+    RuleId.GOVERNANCE_UNKNOWN_PROVENANCE: "Unknown agent provenance on exception (governance)",
+    RuleId.GOVERNANCE_RECURRING_EXCEPTION: "Recurring exception — multiple renewals (governance)",
+    RuleId.GOVERNANCE_BATCH_REFRESH: "Batch exception refresh performed (governance)",
+    RuleId.GOVERNANCE_NO_EXPIRY_EXCEPTION: "Exception has no expiry date (governance)",
 }
 
 # Pseudo-rule-IDs that should NOT appear in implementedRules.
@@ -59,6 +64,11 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
         RuleId.GOVERNANCE_REGISTRY_MISMATCH_ALLOWED,
         RuleId.GOVERNANCE_RULE_DISABLED,
         RuleId.GOVERNANCE_PERMISSIVE_DISTRIBUTION,
+        RuleId.GOVERNANCE_STALE_EXCEPTION,
+        RuleId.GOVERNANCE_UNKNOWN_PROVENANCE,
+        RuleId.GOVERNANCE_RECURRING_EXCEPTION,
+        RuleId.GOVERNANCE_BATCH_REFRESH,
+        RuleId.GOVERNANCE_NO_EXPIRY_EXCEPTION,
     }
 )
 
