@@ -211,3 +211,70 @@ class TestContextFilePathCorrect:
         ctx = rule.captured_contexts[0]
         assert ctx is not None
         assert ctx.file_path == str(target.resolve())
+
+
+# ── TestVariableTaintGating ───────────────────────────────────────
+
+
+class TestVariableTaintGating:
+    """Level 2 variable-level taint only runs when analysis_level >= 2."""
+
+    def test_l1_does_not_populate_variable_taint(self, tmp_path: Path) -> None:
+        _write_py(tmp_path / "mod.py", "def fn():\n    x = 42\n")
+
+        rule = _ContextCapturingRule()
+        engine = ScanEngine(
+            target_paths=(tmp_path,),
+            rules=(rule,),
+            analysis_level=1,
+        )
+        engine.scan()
+
+        assert len(rule.captured_contexts) == 1
+        ctx = rule.captured_contexts[0]
+        assert ctx is not None
+        assert ctx.variable_taint_map is None
+
+    def test_l2_populates_variable_taint(self, tmp_path: Path) -> None:
+        _write_py(tmp_path / "mod.py", "def fn():\n    x = 42\n")
+
+        rule = _ContextCapturingRule()
+        engine = ScanEngine(
+            target_paths=(tmp_path,),
+            rules=(rule,),
+            analysis_level=2,
+        )
+        engine.scan()
+
+        assert len(rule.captured_contexts) == 1
+        ctx = rule.captured_contexts[0]
+        assert ctx is not None
+        assert ctx.variable_taint_map is not None
+        assert "fn" in ctx.variable_taint_map
+        assert ctx.variable_taint_map["fn"]["x"] == TaintState.AUDIT_TRAIL
+
+    def test_l2_variable_taint_failure_is_fault_tolerant(
+        self, tmp_path: Path
+    ) -> None:
+        _write_py(tmp_path / "mod.py", "def fn():\n    x = 42\n")
+
+        rule = _ContextCapturingRule()
+        engine = ScanEngine(
+            target_paths=(tmp_path,),
+            rules=(rule,),
+            analysis_level=2,
+        )
+
+        with patch(
+            "wardline.scanner.engine.compute_variable_taints",
+            side_effect=RuntimeError("boom"),
+        ):
+            result = engine.scan()
+
+        # Scan should still succeed
+        assert result.files_scanned == 1
+        assert any("Variable-level taint failed" in e for e in result.errors)
+        # Context has None variable_taint_map
+        ctx = rule.captured_contexts[0]
+        assert ctx is not None
+        assert ctx.variable_taint_map is None
