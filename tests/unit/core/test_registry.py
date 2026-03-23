@@ -40,9 +40,9 @@ def test_registry_has_group2_decorator() -> None:
     assert REGISTRY["audit_critical"].group == 2
 
 
-def test_total_mvp_count() -> None:
-    """8 decorators total (7 Group 1 + 1 Group 2)."""
-    assert len(REGISTRY) == 8
+def test_total_count() -> None:
+    """32 decorators total (Groups 1-14)."""
+    assert len(REGISTRY) == 32
 
 
 

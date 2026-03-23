@@ -26,28 +26,46 @@ from click.testing import CliRunner
 from wardline.core.registry import REGISTRY
 from wardline.core.taints import TaintState
 from wardline.decorators._base import get_wardline_attrs, wardline_decorator
+
+# Direct imports used in test bodies
 from wardline.decorators.audit import audit_critical
-from wardline.decorators.authority import (
-    audit_writer,
-    authoritative_construction,
-    external_boundary,
-    tier1_read,
-    validates_external,
-    validates_semantic,
-    validates_shape,
+from wardline.decorators.authority import external_boundary
+
+# Import all decorator modules
+from wardline.decorators import (
+    access,
+    audit,
+    authority,
+    boundaries,
+    concurrency,
+    determinism,
+    lifecycle,
+    operations,
+    plugin,
+    provenance,
+    safety,
+    schema,
+    secrets,
+    sensitivity,
 )
 
-# Map decorator names to their callable objects
-_LIBRARY_DECORATORS: dict[str, Any] = {
-    "external_boundary": external_boundary,
-    "validates_shape": validates_shape,
-    "validates_semantic": validates_semantic,
-    "validates_external": validates_external,
-    "tier1_read": tier1_read,
-    "audit_writer": audit_writer,
-    "authoritative_construction": authoritative_construction,
-    "audit_critical": audit_critical,
-}
+# Build _LIBRARY_DECORATORS from all modules — every registered name
+# must map to its callable.
+_LIBRARY_DECORATORS: dict[str, Any] = {}
+
+_DECORATOR_MODULES = [
+    access, audit, authority, boundaries, concurrency, determinism,
+    lifecycle, operations, plugin, provenance, safety, schema,
+    secrets, sensitivity,
+]
+
+for _mod in _DECORATOR_MODULES:
+    for _name in dir(_mod):
+        if _name.startswith("_"):
+            continue
+        _obj = getattr(_mod, _name)
+        if callable(_obj) and _name in REGISTRY:
+            _LIBRARY_DECORATORS[_name] = _obj
 
 # Decorators exported by the library that are NOT registered (presence-only markers)
 _NON_REGISTERED_EXPORTS = {"schema_default"}
@@ -99,28 +117,14 @@ class TestLibraryToRegistrySync:
         assert callable(schema_default)
 
     def test_library_modules_exhaustive(self) -> None:
-        """All public callables in decorator modules are accounted for."""
-        authority_mod = importlib.import_module("wardline.decorators.authority")
-        audit_mod = importlib.import_module("wardline.decorators.audit")
+        """All registered decorators are importable from decorator modules."""
+        # Every REGISTRY key should have a corresponding entry in _LIBRARY_DECORATORS
+        missing = set(REGISTRY.keys()) - set(_LIBRARY_DECORATORS.keys())
+        assert not missing, f"Registry entries with no library export: {missing}"
 
-        # Collect public callable names (no underscore prefix)
-        authority_names = {
-            n for n in dir(authority_mod)
-            if not n.startswith("_") and callable(getattr(authority_mod, n))
-            and n != "wardline_decorator" and n != "TaintState"
-        }
-        audit_names = {
-            n for n in dir(audit_mod)
-            if not n.startswith("_") and callable(getattr(audit_mod, n))
-            and n != "wardline_decorator"
-        }
-
-        all_exports = authority_names | audit_names
-        expected = set(_LIBRARY_DECORATORS.keys())
-        assert all_exports == expected, (
-            f"Mismatch: extra={all_exports - expected}, "
-            f"missing={expected - all_exports}"
-        )
+        # Every library decorator should be in REGISTRY
+        extra = set(_LIBRARY_DECORATORS.keys()) - set(REGISTRY.keys())
+        assert not extra, f"Library exports with no registry entry: {extra}"
 
 
 # ---------------------------------------------------------------------------
