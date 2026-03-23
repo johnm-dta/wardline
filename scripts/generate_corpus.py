@@ -1,0 +1,386 @@
+#!/usr/bin/env python3
+"""Generate the full WP-1.8 test corpus.
+
+Creates TP+TN specimens for every non-SUPPRESS cell in the 9x8 matrix,
+plus adversarial specimens.  Run from the repo root:
+
+    uv run python scripts/generate_corpus.py
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import sys
+
+import yaml
+
+from wardline.core.matrix import SEVERITY_MATRIX
+from wardline.core.severity import Exceptionability, RuleId, Severity
+from wardline.core.taints import TaintState
+
+TAINT_ORDER = [
+    TaintState.AUDIT_TRAIL,
+    TaintState.PIPELINE,
+    TaintState.SHAPE_VALIDATED,
+    TaintState.EXTERNAL_RAW,
+    TaintState.UNKNOWN_RAW,
+    TaintState.UNKNOWN_SHAPE_VALIDATED,
+    TaintState.UNKNOWN_SEM_VALIDATED,
+    TaintState.MIXED_RAW,
+]
+RULES = [getattr(RuleId, f"PY_WL_{i:03d}") for i in range(1, 10)]
+BASE = "corpus/specimens"
+
+# ---------------------------------------------------------------------------
+# TP fragments — code that SHOULD trigger the rule
+# ---------------------------------------------------------------------------
+TP_FRAGMENTS: dict[str, str] = {
+    "PY-WL-001": 'def process(data):\n    x = data.get("key", "default")\n',
+    "PY-WL-002": 'def process(obj):\n    x = getattr(obj, "name", None)\n',
+    "PY-WL-003": 'def process(data):\n    if "key" in data:\n        pass\n',
+    "PY-WL-004": "def process():\n    try:\n        pass\n    except Exception:\n        handle()\n",
+    "PY-WL-005": "def process():\n    try:\n        pass\n    except Exception:\n        pass\n",
+    "PY-WL-006": 'def process():\n    try:\n        risky()\n    except Exception:\n        logger.error("failed")\n',
+    "PY-WL-007": "def process(data):\n    if isinstance(data, dict):\n        pass\n",
+    "PY-WL-008": "def process(data):\n    result = validate(data)\n    return data\n",
+    "PY-WL-009": 'def process(data):\n    if data["status"] == "active":\n        pass\n',
+}
+
+# ---------------------------------------------------------------------------
+# TN fragments — code that should NOT trigger the rule
+# ---------------------------------------------------------------------------
+TN_FRAGMENTS: dict[str, str] = {
+    "PY-WL-001": 'def process(data):\n    x = data.get("key")\n',
+    "PY-WL-002": 'def process(obj):\n    x = getattr(obj, "name")\n',
+    "PY-WL-003": 'def process(data):\n    x = data["key"]\n',
+    "PY-WL-004": "def process():\n    try:\n        pass\n    except ValueError:\n        handle()\n",
+    "PY-WL-005": "def process():\n    try:\n        pass\n    except ValueError:\n        pass\n",
+    "PY-WL-006": 'def process():\n    try:\n        risky()\n    except ValueError:\n        logger.error("failed")\n',
+    "PY-WL-007": "def process(data):\n    x = len(data)\n",
+    "PY-WL-008": 'def process(data):\n    result = validate(data)\n    if not result:\n        raise ValueError("invalid")\n',
+    "PY-WL-009": 'def process(data):\n    if isinstance(data, dict):\n        pass\n    if data["status"] == "active":\n        pass\n',
+}
+
+# PY-WL-003 only fires at these taint states (taint-gated in rule implementation)
+PY_WL_003_ACTIVE_TAINTS = {"EXTERNAL_RAW", "UNKNOWN_RAW", "MIXED_RAW"}
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def _write_specimen(path: str, data: dict) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write("---\n")
+        yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+
+
+def generate_matrix_specimens() -> dict[str, dict]:
+    """Generate TP+TN for every non-SUPPRESS cell."""
+    manifest: dict[str, dict] = {}
+    tp_count = 0
+    tn_count = 0
+    kfn_count = 0
+
+    for rule in RULES:
+        rule_str = str(rule)
+        for taint in TAINT_ORDER:
+            cell = SEVERITY_MATRIX[(rule, taint)]
+            taint_name = taint.name
+
+            # Skip SUPPRESS cells
+            if cell.severity == Severity.SUPPRESS:
+                continue
+
+            # PY-WL-003 is taint-gated: only fires at 3 taint states
+            tp_will_fire = True
+            if rule_str == "PY-WL-003" and taint_name not in PY_WL_003_ACTIVE_TAINTS:
+                tp_will_fire = False
+
+            # --- TP specimen ---
+            tp_id = f"{rule_str}-TP-{taint_name}"
+            tp_frag = TP_FRAGMENTS[rule_str]
+            tp_hash = _sha256(tp_frag)
+
+            if tp_will_fire:
+                verdict = "true_positive"
+                exp_sev = cell.severity.name
+                exp_exc = cell.exceptionability.name
+                exp_rules = [rule_str]
+                tp_count += 1
+            else:
+                verdict = "known_false_negative"
+                exp_sev = None
+                exp_exc = None
+                exp_rules = []
+                kfn_count += 1
+
+            tp_data = {
+                "specimen_id": tp_id,
+                "description": f"{rule_str} {verdict} at {taint_name}",
+                "rule": rule_str,
+                "fragment": tp_frag,
+                "taint_state": taint_name,
+                "expected_rules": exp_rules,
+                "expected_severity": exp_sev,
+                "expected_exceptionability": exp_exc,
+                "expected_match": tp_will_fire,
+                "sha256": tp_hash,
+                "verdict": verdict,
+            }
+            tp_path = os.path.join(
+                BASE, rule_str, taint_name, "positive", f"{tp_id}.yaml"
+            )
+            _write_specimen(tp_path, tp_data)
+            manifest[tp_id] = {
+                "path": os.path.relpath(tp_path, "corpus"),
+                "sha256": tp_hash,
+            }
+
+            # --- TN specimen ---
+            tn_id = f"{rule_str}-TN-{taint_name}"
+            tn_frag = TN_FRAGMENTS[rule_str]
+            tn_hash = _sha256(tn_frag)
+
+            tn_data = {
+                "specimen_id": tn_id,
+                "description": f"{rule_str} true negative at {taint_name}",
+                "rule": rule_str,
+                "fragment": tn_frag,
+                "taint_state": taint_name,
+                "expected_rules": [],
+                "expected_severity": None,
+                "expected_exceptionability": None,
+                "expected_match": False,
+                "sha256": tn_hash,
+                "verdict": "true_negative",
+            }
+            tn_path = os.path.join(
+                BASE, rule_str, taint_name, "negative", f"{tn_id}.yaml"
+            )
+            _write_specimen(tn_path, tn_data)
+            manifest[tn_id] = {
+                "path": os.path.relpath(tn_path, "corpus"),
+                "sha256": tn_hash,
+            }
+            tn_count += 1
+
+    print(f"Matrix specimens: {tp_count} TP, {kfn_count} KFN, {tn_count} TN")
+    return manifest
+
+
+def generate_adversarial_specimens() -> dict[str, dict]:
+    """Generate adversarial / evasion specimens."""
+    manifest: dict[str, dict] = {}
+    ADV_DIR = os.path.join(BASE, "adversarial")
+
+    long_body = "".join(f"    x{i} = {i}\n" for i in range(50))
+
+    specimens = [
+        {
+            "specimen_id": "ADV-001-alias",
+            "description": "Aliased dict.get via local variable",
+            "rule": "PY-WL-001",
+            "fragment": 'def process(data):\n    getter = data.get\n    x = getter("key", "default")\n',
+            "taint_state": "EXTERNAL_RAW",
+            "expected_rules": [],
+            "expected_match": False,
+            "verdict": "known_false_negative",
+            "tags": ["adversarial", "alias"],
+        },
+        {
+            "specimen_id": "ADV-002-dynamic-dispatch",
+            "description": "Dynamic dispatch via getattr to call .get",
+            "rule": "PY-WL-001",
+            "fragment": 'def process(data):\n    method = getattr(data, "get")\n    x = method("key", "default")\n',
+            "taint_state": "EXTERNAL_RAW",
+            "expected_rules": [],
+            "expected_match": False,
+            "verdict": "known_false_negative",
+            "tags": ["adversarial", "dynamic-dispatch"],
+        },
+        {
+            "specimen_id": "ADV-003-nested-scope",
+            "description": "Pattern inside nested function (visited separately)",
+            "rule": "PY-WL-001",
+            "fragment": 'def outer():\n    def inner(data):\n        x = data.get("key", "default")\n    return inner\n',
+            "taint_state": "EXTERNAL_RAW",
+            "expected_rules": ["PY-WL-001"],
+            "expected_match": True,
+            "verdict": "true_positive",
+            "tags": ["adversarial", "nested-scope"],
+        },
+        {
+            "specimen_id": "ADV-004-unicode-ident",
+            "description": "Unicode identifiers in function name",
+            "rule": "PY-WL-004",
+            "fragment": "def pr\u00f6cess():\n    try:\n        pass\n    except Exception:\n        handle()\n",
+            "taint_state": "EXTERNAL_RAW",
+            "expected_rules": ["PY-WL-004"],
+            "expected_match": True,
+            "verdict": "true_positive",
+            "tags": ["adversarial", "unicode"],
+        },
+        {
+            "specimen_id": "ADV-005-long-function",
+            "description": "Very long function body with pattern buried deep",
+            "rule": "PY-WL-005",
+            "fragment": f"def process():\n{long_body}    try:\n        pass\n    except Exception:\n        pass\n",
+            "taint_state": "EXTERNAL_RAW",
+            "expected_rules": ["PY-WL-005"],
+            "expected_match": True,
+            "verdict": "true_positive",
+            "tags": ["adversarial", "long-function"],
+        },
+        {
+            "specimen_id": "ADV-006-decorator-stack",
+            "description": "Multiple decorators on function with pattern",
+            "rule": "PY-WL-001",
+            "fragment": 'def deco1(f): return f\ndef deco2(f): return f\ndef deco3(f): return f\n\n@deco1\n@deco2\n@deco3\ndef process(data):\n    x = data.get("key", "default")\n',
+            "taint_state": "PIPELINE",
+            "expected_rules": ["PY-WL-001"],
+            "expected_match": True,
+            "verdict": "true_positive",
+            "tags": ["adversarial", "decorator-stack"],
+        },
+        {
+            "specimen_id": "ADV-007-async-get",
+            "description": "Async function with dict.get pattern",
+            "rule": "PY-WL-001",
+            "fragment": 'async def process(data):\n    x = data.get("key", "default")\n',
+            "taint_state": "EXTERNAL_RAW",
+            "expected_rules": ["PY-WL-001"],
+            "expected_match": True,
+            "verdict": "true_positive",
+            "tags": ["adversarial", "async"],
+        },
+        {
+            "specimen_id": "ADV-008-async-except",
+            "description": "Async function with broad exception handler",
+            "rule": "PY-WL-004",
+            "fragment": "async def process():\n    try:\n        pass\n    except BaseException:\n        handle()\n",
+            "taint_state": "UNKNOWN_RAW",
+            "expected_rules": ["PY-WL-004"],
+            "expected_match": True,
+            "verdict": "true_positive",
+            "tags": ["adversarial", "async"],
+        },
+        {
+            "specimen_id": "ADV-009-async-silent",
+            "description": "Async function with silent exception handler (ellipsis)",
+            "rule": "PY-WL-005",
+            "fragment": "async def process():\n    try:\n        await something()\n    except Exception:\n        ...\n",
+            "taint_state": "MIXED_RAW",
+            "expected_rules": ["PY-WL-005"],
+            "expected_match": True,
+            "verdict": "true_positive",
+            "tags": ["adversarial", "async", "ellipsis"],
+        },
+        {
+            "specimen_id": "ADV-010-async-getattr",
+            "description": "Async function with 3-arg getattr pattern",
+            "rule": "PY-WL-002",
+            "fragment": 'async def process(obj):\n    x = getattr(obj, "name", None)\n',
+            "taint_state": "PIPELINE",
+            "expected_rules": ["PY-WL-002"],
+            "expected_match": True,
+            "verdict": "true_positive",
+            "tags": ["adversarial", "async"],
+        },
+        {
+            "specimen_id": "ADV-011-class-method",
+            "description": "Pattern inside a class method",
+            "rule": "PY-WL-001",
+            "fragment": 'class Handler:\n    def process(self, data):\n        x = data.get("key", "default")\n',
+            "taint_state": "SHAPE_VALIDATED",
+            "expected_rules": ["PY-WL-001"],
+            "expected_match": True,
+            "verdict": "true_positive",
+            "tags": ["adversarial", "class-method"],
+        },
+        {
+            "specimen_id": "ADV-012-setdefault",
+            "description": "dict.setdefault triggers PY-WL-001",
+            "rule": "PY-WL-001",
+            "fragment": 'def process(data):\n    x = data.setdefault("key", [])\n',
+            "taint_state": "EXTERNAL_RAW",
+            "expected_rules": ["PY-WL-001"],
+            "expected_match": True,
+            "verdict": "true_positive",
+            "tags": ["adversarial", "setdefault"],
+        },
+        {
+            "specimen_id": "ADV-013-defaultdict",
+            "description": "defaultdict with factory triggers PY-WL-001",
+            "rule": "PY-WL-001",
+            "fragment": "from collections import defaultdict\ndef process():\n    d = defaultdict(list)\n",
+            "taint_state": "UNKNOWN_RAW",
+            "expected_rules": ["PY-WL-001"],
+            "expected_match": True,
+            "verdict": "true_positive",
+            "tags": ["adversarial", "defaultdict"],
+        },
+        {
+            "specimen_id": "ADV-014-hasattr-taint-gate",
+            "description": "hasattr in non-active taint state should not fire PY-WL-003",
+            "rule": "PY-WL-003",
+            "fragment": 'def process(obj):\n    if hasattr(obj, "name"):\n        pass\n',
+            "taint_state": "AUDIT_TRAIL",
+            "expected_rules": [],
+            "expected_match": False,
+            "verdict": "true_negative",
+            "tags": ["adversarial", "taint-gate"],
+        },
+        {
+            "specimen_id": "ADV-015-tuple-except",
+            "description": "Tuple except with Exception triggers PY-WL-004",
+            "rule": "PY-WL-004",
+            "fragment": "def process():\n    try:\n        pass\n    except (ValueError, Exception):\n        handle()\n",
+            "taint_state": "PIPELINE",
+            "expected_rules": ["PY-WL-004"],
+            "expected_match": True,
+            "verdict": "true_positive",
+            "tags": ["adversarial", "tuple-except"],
+        },
+    ]
+
+    for spec in specimens:
+        frag = spec["fragment"]
+        sha = _sha256(frag)
+        spec["sha256"] = sha
+        spec.setdefault("expected_severity", None)
+        spec.setdefault("expected_exceptionability", None)
+
+        path = os.path.join(ADV_DIR, f"{spec['specimen_id']}.yaml")
+        _write_specimen(path, spec)
+        manifest[spec["specimen_id"]] = {
+            "path": os.path.relpath(path, "corpus"),
+            "sha256": sha,
+        }
+
+    print(f"Adversarial specimens: {len(specimens)}")
+    return manifest
+
+
+def write_manifest(manifest: dict[str, dict]) -> None:
+    """Write the corpus manifest JSON."""
+    out = {"schema_version": "0.1", "specimens": manifest}
+    path = "corpus/corpus_manifest.json"
+    with open(path, "w") as f:
+        json.dump(out, f, indent=2, sort_keys=True)
+        f.write("\n")
+    print(f"Manifest written: {len(manifest)} entries -> {path}")
+
+
+def main() -> None:
+    manifest = generate_matrix_specimens()
+    adv_manifest = generate_adversarial_specimens()
+    manifest.update(adv_manifest)
+    write_manifest(manifest)
+    print(f"\nTotal specimens: {len(manifest)}")
+
+
+if __name__ == "__main__":
+    main()

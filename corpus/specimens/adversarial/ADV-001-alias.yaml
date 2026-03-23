@@ -1,0 +1,16 @@
+---
+specimen_id: ADV-001-alias
+description: Aliased dict.get via local variable
+rule: PY-WL-001
+fragment: "def process(data):\n    getter = data.get\n    x = getter(\"key\", \"default\"\
+  )\n"
+taint_state: EXTERNAL_RAW
+expected_rules: []
+expected_match: false
+verdict: known_false_negative
+tags:
+- adversarial
+- alias
+sha256: 568abd396aee9e5d33f20af0a28dc825f32a2073fead445c6f3cce26597758d4
+expected_severity: null
+expected_exceptionability: null

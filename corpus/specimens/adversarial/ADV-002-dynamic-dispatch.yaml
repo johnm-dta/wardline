@@ -1,0 +1,16 @@
+---
+specimen_id: ADV-002-dynamic-dispatch
+description: Dynamic dispatch via getattr to call .get
+rule: PY-WL-001
+fragment: "def process(data):\n    method = getattr(data, \"get\")\n    x = method(\"\
+  key\", \"default\")\n"
+taint_state: EXTERNAL_RAW
+expected_rules: []
+expected_match: false
+verdict: known_false_negative
+tags:
+- adversarial
+- dynamic-dispatch
+sha256: 5beb5881152a0f59caba23871f3a825e858c45e1de2e083033581516023a921b
+expected_severity: null
+expected_exceptionability: null
