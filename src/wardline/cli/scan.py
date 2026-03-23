@@ -23,7 +23,7 @@ from wardline.scanner.context import Finding
 from wardline.scanner.sarif import _PSEUDO_RULE_IDS, SarifReport
 
 if TYPE_CHECKING:
-    from wardline.manifest.models import ScannerConfig
+    from wardline.manifest.models import ScannerConfig, WardlineManifest
     from wardline.scanner.rules.base import RuleBase
 
 logger = logging.getLogger("wardline")
@@ -279,6 +279,7 @@ def scan(
         target_paths=target_paths,
         exclude_paths=exclude_paths,
         rules=active_rules,
+        manifest=manifest_model,
     )
 
     logger.info("Scanning %d target path(s)...", len(target_paths))
@@ -378,7 +379,7 @@ def _setup_logging(*, verbose: bool, debug: bool) -> None:
     logger.setLevel(level)
 
 
-def _load_manifest(manifest_arg: str | None) -> object | None:
+def _load_manifest(manifest_arg: str | None) -> WardlineManifest | None:
     """Load and validate the wardline.yaml manifest.
 
     Returns the loaded manifest object, or None on error (after printing
