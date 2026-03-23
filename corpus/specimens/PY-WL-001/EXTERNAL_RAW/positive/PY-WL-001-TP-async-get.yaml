@@ -10,5 +10,5 @@ verdict: true_positive
 tags:
 - async
 sha256: 26d9f988e68efc350bbe1d8e16af1a75a6cceb1aeed6ae528bcff2d8770ef3ca
-expected_severity: null
-expected_exceptionability: null
+expected_severity: ERROR
+expected_exceptionability: STANDARD
