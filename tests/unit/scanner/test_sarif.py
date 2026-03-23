@@ -222,7 +222,7 @@ class TestSarifPropertyBags:
     def test_property_bag_version(self) -> None:
         report = SarifReport(findings=[])
         props = report.to_dict()["runs"][0]["properties"]
-        assert props["wardline.propertyBagVersion"] == "1"
+        assert props["wardline.propertyBagVersion"] == "0.2"
 
 
 # ---------------------------------------------------------------------------

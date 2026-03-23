@@ -199,7 +199,7 @@ class SarifReport:
             "properties": {
                 "wardline.conformanceGaps": [],
                 "wardline.implementedRules": self._implemented_rules(),
-                "wardline.propertyBagVersion": "1",
+                "wardline.propertyBagVersion": "0.2",
                 "wardline.suppressedFindingCount": sum(
                     1 for f in self.findings if f.exception_id is not None
                 ),
