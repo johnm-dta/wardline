@@ -38,7 +38,12 @@ def load_exceptions(manifest_dir: Path) -> tuple[ExceptionEntry, ...]:
 
     # Schema validation
     schema_path = _SCHEMA_DIR / "exceptions.schema.json"
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    try:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise ManifestLoadError(
+            f"Cannot read exception schema {schema_path}: {exc}"
+        ) from exc
     try:
         jsonschema.validate(data, schema)
     except jsonschema.ValidationError as exc:

@@ -303,9 +303,14 @@ def scan(
 
     # --- Apply exception register ---
     from wardline.manifest.exceptions import load_exceptions
+    from wardline.manifest.loader import ManifestLoadError
     from wardline.scanner.exceptions import apply_exceptions
 
-    exceptions = load_exceptions(manifest_path.parent)
+    try:
+        exceptions = load_exceptions(manifest_path.parent)
+    except ManifestLoadError as exc:
+        _error(f"exception register failed: {exc}")
+        sys.exit(EXIT_CONFIG_ERROR)
     if exceptions:
         processed, governance_ex = apply_exceptions(
             result.findings, exceptions, project_root=manifest_path.parent

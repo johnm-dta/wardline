@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -183,7 +184,14 @@ def check_tier_downgrades(
     if not baseline_path.exists():
         return []
 
-    baseline_data = json.loads(baseline_path.read_text())
+    try:
+        baseline_data = json.loads(baseline_path.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        logging.getLogger("wardline").warning(
+            "Cannot read baseline %s: %s — skipping tier downgrade check",
+            baseline_path, exc,
+        )
+        return []
     baseline_modules: dict[str, str] = {
         entry["path"]: entry["default_taint"]
         for entry in baseline_data.get("module_tiers", [])
@@ -239,7 +247,14 @@ def check_tier_upgrade_without_evidence(
     if not baseline_path.exists():
         return []
 
-    baseline_data = json.loads(baseline_path.read_text())
+    try:
+        baseline_data = json.loads(baseline_path.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        logging.getLogger("wardline").warning(
+            "Cannot read baseline %s: %s — skipping tier upgrade check",
+            baseline_path, exc,
+        )
+        return []
     baseline_modules: dict[str, str] = {
         entry["path"]: entry["default_taint"]
         for entry in baseline_data.get("module_tiers", [])
