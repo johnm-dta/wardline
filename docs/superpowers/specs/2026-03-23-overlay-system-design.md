@@ -10,37 +10,51 @@
 Wire the overlay merge system to enforce boundary-level narrow-only invariants,
 inject resolved boundaries into the scanner's rule context, and upgrade
 `schema_default()` handling from unconditional WARNING to evidence-based
-severity (INFO when governed by a boundary declaration, ERROR when not).
+severity (SUPPRESS/note when governed by a boundary declaration, ERROR when not).
 
 ## Change 1: Boundary-Level Narrow-Only Enforcement in `merge()`
 
 **File:** `src/wardline/manifest/merge.py`
 
-`_check_boundary_tier()` and `_assert_tier_not_widened()` are already
-implemented but never called from `merge()`. Activate them.
+The existing `_check_boundary_tier()` helper uses `boundary.function` as a
+lookup key into a tier map keyed by `TierEntry.id` — these are different
+namespaces (function qualnames vs tier identifiers like `"trusted"`), so the
+check as written would never fire. **Rewrite the check** to enforce the actual
+invariant:
 
-After resolving boundaries from the overlay (line 124), build a tier map from
-`base.tiers` as `{tier.id: tier.tier}` and iterate each boundary entry through
-`_check_boundary_tier()`. If a boundary's `from_tier` or `to_tier` would relax
-(higher number) the corresponding base tier, `ManifestWidenError` is raised.
+**Invariant:** A boundary's `from_tier` or `to_tier` value must not exceed the
+module-level tier for the module containing that function. This requires
+resolving the boundary's function to its module tier.
 
-Boundaries referencing functions with no base tier entry pass without error
-(new boundaries are legitimate).
+**Implementation:** `merge()` now accepts two additional parameters:
+`module_tiers: tuple[ModuleTierEntry, ...] = ()` and
+`tiers: tuple[TierEntry, ...] = ()` (both from the base manifest). Resolution
+requires a two-step join: first build `{tier_id: tier_number}` from `tiers`,
+then build `{module_path: tier_number}` by resolving each `ModuleTierEntry`'s
+`default_taint` (which is a tier ID string like `"EXTERNAL_RAW"`) through the
+tier map. For each boundary, find the most-specific module path prefix matching
+`boundary.function`. If the boundary's `from_tier` or `to_tier` exceeds the
+module's resolved tier number, raise `ManifestWidenError`.
+
+Boundaries in modules with no `module_tiers` entry pass without error (no
+baseline to enforce against).
 
 **Tests (unit):**
-- Overlay relaxes `from_tier` beyond base → `ManifestWidenError` with correct
+- Boundary `from_tier` exceeds module tier → `ManifestWidenError` with correct
   `overlay_name`, `field_name`, `base_value`, `attempted_value`
-- Overlay relaxes `to_tier` beyond base → `ManifestWidenError`
-- Overlay tightens tier → passes, boundary in result
-- Overlay same tier → passes
-- Boundary function not in base tiers → passes
+- Boundary `to_tier` exceeds module tier → `ManifestWidenError`
+- Boundary tightens (lower than module tier) → passes, boundary in result
+- Boundary same as module tier → passes
+- Boundary function has no matching module tier → passes
 
 ## Change 2: `ScanContext` Boundary Injection
 
 **Files:** `src/wardline/scanner/context.py`, `src/wardline/scanner/engine.py`
 
 Add `boundaries: tuple[BoundaryEntry, ...] = ()` to `ScanContext`. This is
-a frozen dataclass field, matching the existing pattern.
+a frozen dataclass field, matching the existing pattern. Import
+`BoundaryEntry` under `TYPE_CHECKING` guard (same pattern as existing
+type-only imports in the scanner package).
 
 In `ScanEngine`:
 - At `scan()` time (once per scan run), discover overlays via
@@ -68,25 +82,42 @@ and merge happen in `scan()`. When either is None, boundaries default to `()`.
 
 Change `_emit_unverified_default()` to consult `self._context.boundaries`:
 
-1. Look up the enclosing function's qualname (`self._current_qualname`) in the
+1. Guard: if `self._context is None`, treat as ungoverned (no boundaries
+   available — emit ERROR).
+2. Look up the enclosing function's qualname (`self._current_qualname`) in the
    boundaries tuple — match on `boundary.function == qualname`.
-2. **Match found (governed):** Emit finding at `Severity.INFO` with rule ID
-   `PY_WL_001_UNVERIFIED_DEFAULT`. Message updated to indicate overlay
-   verification succeeded.
-3. **No match (ungoverned):** Emit finding at `Severity.ERROR` with rule ID
+3. **Match found (governed):** Emit finding at `Severity.SUPPRESS` with rule ID
+   `PY_WL_001_GOVERNED_DEFAULT` (new enum member). Message indicates overlay
+   verification succeeded. `Severity.INFO` does not exist in the enum — use
+   `SUPPRESS` which is the lowest non-silent severity. The finding still
+   appears in SARIF output (SUPPRESS findings are included with
+   `exceptionability: TRANSPARENT`) providing the audit trail.
+4. **No match (ungoverned):** Emit finding at `Severity.ERROR` with rule ID
    `PY_WL_001`. This is now a standard PY-WL-001 violation — the
    `schema_default()` wrapper provides no governance without a boundary
    declaration.
+
+**New rule ID:** Add `PY_WL_001_GOVERNED_DEFAULT = "PY-WL-001-GOVERNED-DEFAULT"`
+to `RuleId` enum. The old `PY_WL_001_UNVERIFIED_DEFAULT` is no longer emitted
+by any rule — it can be removed or kept as dead code (prefer removal to avoid
+confusion).
 
 **Boundary matching semantics:** Exact match on the function's dotted qualname
 (e.g., `"MyClass.handle"` matches boundary `function: "MyClass.handle"`).
 This is consistent with how `check_orphaned_annotations` and
 `check_undeclared_boundaries` in coherence.py match function names.
 
+**Known limitation:** Qualname matching is file-local (no file path component).
+If two files declare functions with identical qualnames, a boundary for one
+could match the other. This matches the existing coherence check behavior
+and is acceptable for v0.2.0 — cross-file qualname collisions are vanishingly
+rare in practice.
+
 **Tests (unit):**
-- `schema_default()` with matching boundary → INFO finding
-- `schema_default()` without matching boundary → ERROR finding (rule ID PY_WL_001)
+- `schema_default()` with matching boundary → SUPPRESS finding (SARIF "note"), rule ID `PY_WL_001_GOVERNED_DEFAULT`
+- `schema_default()` without matching boundary → ERROR finding, rule ID `PY_WL_001`
 - `schema_default()` with boundary for different function → ERROR
+- `schema_default()` with `self._context is None` → ERROR
 - Non-`schema_default()` default → ERROR (unchanged behavior)
 
 ## Change 4: Conformance Gap Cleanup
@@ -101,19 +132,19 @@ documents `PY-WL-001-SCHEMA-DEFAULT-UNVERIFIED` as a transitional artefact
 that disappears when overlay verification lands. This spec fulfills that
 commitment.
 
-**Validation:** The `PY_WL_001_UNVERIFIED_DEFAULT` rule ID continues to
-exist in `RuleId` enum for the INFO-level governed finding. It does NOT
-appear in `wardline.implementedRules` (per existing convention — it's not
-a spec rule).
+**Validation:** `PY_WL_001_GOVERNED_DEFAULT` does NOT appear in
+`wardline.implementedRules` (it's not a spec rule, same convention as the
+old `UNVERIFIED_DEFAULT`).
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/wardline/manifest/merge.py` | Activate `_check_boundary_tier` in `merge()` |
+| `src/wardline/manifest/merge.py` | Rewrite `_check_boundary_tier` for module-tier lookup, activate in `merge()`, add `ModuleTierEntry` import |
 | `src/wardline/scanner/context.py` | Add `boundaries` field to `ScanContext` |
 | `src/wardline/scanner/engine.py` | Overlay discovery + merge in `scan()`, pass boundaries to context |
 | `src/wardline/scanner/rules/py_wl_001.py` | Boundary-aware `schema_default()` handling |
+| `src/wardline/core/severity.py` | Add `PY_WL_001_GOVERNED_DEFAULT` to `RuleId`, remove `PY_WL_001_UNVERIFIED_DEFAULT` |
 | `tests/unit/manifest/test_merge.py` | Boundary-level narrow-only tests |
 | `tests/unit/scanner/test_py_wl_001.py` | Governed vs ungoverned `schema_default()` tests |
 | `tests/unit/scanner/test_engine.py` | Engine overlay integration tests |
@@ -123,5 +154,5 @@ a spec rule).
 - Multi-overlay merge ordering (only relevant when multiple overlays cover
   the same directory — deferred to WP 1.4)
 - Coherence check updates (existing checks already work with boundaries)
-- `RuleId` enum changes (existing `PY_WL_001_UNVERIFIED_DEFAULT` is reused)
 - SARIF output changes (conformance gap already cleared)
+- File-path-scoped qualname matching (matches existing coherence check behavior)
