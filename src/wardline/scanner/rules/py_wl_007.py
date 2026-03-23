@@ -15,16 +15,9 @@ from __future__ import annotations
 import ast
 
 from wardline.core import matrix
-from wardline.core.severity import RuleId, Severity
-from wardline.core.taints import TaintState
+from wardline.core.severity import RuleId
 from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
-
-# PY-WL-007 suppresses at these taint states (matrix shows SUPPRESS/TRANSPARENT).
-_SUPPRESS_TAINTS = frozenset({
-    TaintState.EXTERNAL_RAW,
-    TaintState.UNKNOWN_RAW,
-})
 
 
 class RulePyWl007(RuleBase):

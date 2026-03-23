@@ -22,12 +22,7 @@ from __future__ import annotations
 
 import ast
 import logging
-from typing import TYPE_CHECKING
-
 from wardline.core.taints import TaintState, taint_join
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -453,22 +448,41 @@ def _handle_try(
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
 ) -> None:
-    """Handle try/except/else/finally."""
-    # Walk try body.
-    _walk_body(stmt.body, function_taint, taint_map, var_taints)
+    """Handle try/except/else/finally — snapshot-branch-join pattern."""
+    pre_try = dict(var_taints)
 
-    # Walk exception handlers.
+    # Walk try body on a copy.
+    try_taints = dict(pre_try)
+    _walk_body(stmt.body, function_taint, taint_map, try_taints)
+
+    # Walk each handler on separate copies (mutually exclusive with try body).
+    handler_branches: list[dict[str, TaintState]] = [try_taints]  # try-success is one branch
     for handler in stmt.handlers:
+        handler_taints = dict(pre_try)
         if handler.name:
-            # Exception objects are runtime-constructed → AUDIT_TRAIL.
-            var_taints[handler.name] = TaintState.AUDIT_TRAIL
-        _walk_body(handler.body, function_taint, taint_map, var_taints)
+            handler_taints[handler.name] = TaintState.AUDIT_TRAIL
+        _walk_body(handler.body, function_taint, taint_map, handler_taints)
+        handler_branches.append(handler_taints)
 
-    # Walk else (no exception path).
+    # Walk orelse on try-success branch (runs only if no exception).
     if stmt.orelse:
-        _walk_body(stmt.orelse, function_taint, taint_map, var_taints)
+        _walk_body(stmt.orelse, function_taint, taint_map, try_taints)
 
-    # Walk finally.
+    # Merge all branches.
+    all_vars: set[str] = set()
+    for branch in handler_branches:
+        all_vars.update(branch.keys())
+
+    for var in all_vars:
+        taints_to_join = [b[var] for b in handler_branches if var in b]
+        if taints_to_join:
+            var_taints[var] = taints_to_join[0]
+            for t in taints_to_join[1:]:
+                var_taints[var] = taint_join(var_taints[var], t)
+        elif var in pre_try:
+            var_taints[var] = pre_try[var]
+
+    # finalbody runs unconditionally after merge.
     if stmt.finalbody:
         _walk_body(stmt.finalbody, function_taint, taint_map, var_taints)
 

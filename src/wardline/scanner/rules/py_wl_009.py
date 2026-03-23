@@ -90,7 +90,7 @@ def _is_membership_test(compare: ast.Compare) -> bool:
 def _has_subscript_or_attr_access(node: ast.AST) -> bool:
     """Check if node contains a subscript or attribute access on data."""
     for child in ast.walk(node):
-        if isinstance(child, ast.Subscript):
+        if isinstance(child, (ast.Subscript, ast.Attribute)):
             return True
     return False
 

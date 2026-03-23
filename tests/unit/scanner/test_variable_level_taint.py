@@ -344,3 +344,48 @@ class TestNested:
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
         # AUDIT_TRAIL join UNKNOWN_RAW = MIXED_RAW (while body merges with pre-loop)
         assert result["x"] == TaintState.MIXED_RAW
+
+
+# ── Try/except branch merge ──────────────────────────────────────
+
+
+class TestTryExceptBranchMerge:
+    def test_try_except_branch_merge(self) -> None:
+        """try/except should join branches, not sequential overwrite."""
+        func = _parse_func("""
+            def f():
+                x = unknown_thing
+                try:
+                    x = 42
+                except:
+                    x = "fallback"
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        # Both branches assign AUDIT_TRAIL; join should still be AUDIT_TRAIL
+        assert result["x"] == TaintState.AUDIT_TRAIL
+
+    def test_try_except_divergent_branches(self) -> None:
+        """try body and handler with different taints should join."""
+        func = _parse_func("""
+            def f():
+                x = "safe"
+                try:
+                    x = unknown_thing
+                except:
+                    x = "fallback"
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        # try branch: EXTERNAL_RAW, except branch: AUDIT_TRAIL → MIXED_RAW
+        assert result["x"] == TaintState.MIXED_RAW
+
+    def test_try_except_handler_name_audit_trail(self) -> None:
+        """Exception variable in handler should be AUDIT_TRAIL."""
+        func = _parse_func("""
+            def f():
+                try:
+                    pass
+                except ValueError as e:
+                    x = e
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        assert result["e"] == TaintState.AUDIT_TRAIL

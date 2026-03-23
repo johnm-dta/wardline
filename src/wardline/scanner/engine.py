@@ -170,7 +170,7 @@ class ScanEngine:
             taint_map = {}
 
         # Pass 1.5: Level 2 variable-level taint (when analysis_level >= 2)
-        variable_taint_map: dict[str, dict[str, object]] | None = None
+        variable_taint_map: dict[str, dict[str, TaintState]] | None = None
         if self._analysis_level >= 2 and taint_map:
             variable_taint_map = self._run_variable_taint(
                 tree, taint_map, file_path, result
@@ -203,14 +203,12 @@ class ScanEngine:
         from wardline.core.taints import TaintState as _TS
 
         var_map: dict[str, dict[str, _TS]] = {}
+        qualname_map = self._build_qualname_map(tree)
         try:
             for node in ast.walk(tree):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    # Find the qualname for this function in the taint_map.
-                    # Match by function name — works for top-level functions.
-                    # For nested, we match any key ending with the name.
-                    qualname = self._find_qualname(node.name, taint_map)
-                    if qualname is not None:
+                    qualname = qualname_map.get(id(node))
+                    if qualname is not None and qualname in taint_map:
                         func_taint = taint_map[qualname]
                         var_taints = compute_variable_taints(
                             node, func_taint, taint_map
@@ -228,20 +226,26 @@ class ScanEngine:
         return var_map if var_map else None
 
     @staticmethod
-    def _find_qualname(
-        name: str, taint_map: dict[str, TaintState]
-    ) -> str | None:
-        """Find the qualname key in taint_map for a function by name.
+    def _build_qualname_map(tree: ast.Module) -> dict[int, str]:
+        """Build {id(node): qualname} for all functions in the module."""
+        result: dict[int, str] = {}
+        ScanEngine._walk_with_scope(tree, [], result)
+        return result
 
-        Prefers exact match, then falls back to suffix match.
-        """
-        if name in taint_map:
-            return name
-        # Suffix match for nested functions (e.g., "Class.method")
-        for key in taint_map:
-            if key.endswith(f".{name}"):
-                return key
-        return None
+    @staticmethod
+    def _walk_with_scope(
+        node: ast.AST,
+        scope: list[str],
+        result: dict[int, str],
+    ) -> None:
+        """Recursively walk AST building qualnames with scope tracking."""
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.ClassDef):
+                ScanEngine._walk_with_scope(child, scope + [child.name], result)
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                qualname = ".".join(scope + [child.name])
+                result[id(child)] = qualname
+                ScanEngine._walk_with_scope(child, scope + [child.name], result)
 
     def _run_rule(
         self,
