@@ -139,7 +139,8 @@ class TestSarifRegressionBaseline:
 
         increase = len(current_scan) - len(baseline_scan)
         # This is informational — a moderate increase is fine
-        assert increase <= 50, (
+        # Raised to 200 to accommodate WP 1.5 (4 new rules PY-WL-006..009)
+        assert increase <= 200, (
             f"Finding count increased by {increase}: "
             f"baseline={len(baseline_scan)}, current={len(current_scan)}. "
             f"Review new findings."
