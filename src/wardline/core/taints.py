@@ -32,7 +32,9 @@ _USH = TaintState.UNKNOWN_SHAPE_VALIDATED
 _USE = TaintState.UNKNOWN_SEM_VALIDATED
 
 _JOIN_TABLE: dict[tuple[TaintState, TaintState], TaintState] = {
-    # Within UNKNOWN family: demote to weaker validation
+    # Within UNKNOWN family: demote to weaker validation.
+    # Keys MUST be in normalized order (sorted by .value string) to match
+    # the lookup normalization in taint_join().
     (_UR, _USE): _UR,
     (_UR, _USH): _UR,
     (_USE, _USH): _USH,
