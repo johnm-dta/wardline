@@ -1,0 +1,15 @@
+---
+specimen_id: ADV-014-hasattr-taint-gate
+description: hasattr in non-active taint state should not fire PY-WL-003
+rule: PY-WL-003
+fragment: "def process(obj):\n    if hasattr(obj, \"name\"):\n        pass\n"
+taint_state: AUDIT_TRAIL
+expected_rules: []
+expected_match: false
+verdict: true_negative
+tags:
+- adversarial
+- taint-gate
+sha256: 31648f94712fce43847df3533d076ab3de36907bd36fb90d05cdfe33e4f49d05
+expected_severity: null
+expected_exceptionability: null

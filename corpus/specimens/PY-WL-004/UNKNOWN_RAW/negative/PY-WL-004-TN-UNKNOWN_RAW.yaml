@@ -1,0 +1,13 @@
+---
+specimen_id: PY-WL-004-TN-UNKNOWN_RAW
+description: PY-WL-004 true negative at UNKNOWN_RAW
+rule: PY-WL-004
+fragment: "def process():\n    try:\n        pass\n    except ValueError:\n      \
+  \  handle()\n"
+taint_state: UNKNOWN_RAW
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+sha256: 0e7f54f9f27c7a9a70b0d68bb0077043edbf1d86be9094ebfe3dceda5764f267
+verdict: true_negative
