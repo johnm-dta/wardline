@@ -83,4 +83,12 @@ def lookup(rule: RuleId, taint: TaintState) -> SeverityCell:
     Raises KeyError if the combination is not in the matrix
     (e.g., pseudo-rule-IDs are not analysis rules).
     """
-    return SEVERITY_MATRIX[(rule, taint)]
+    try:
+        return SEVERITY_MATRIX[(rule, taint)]
+    except KeyError:
+        raise KeyError(
+            f"No severity-matrix entry for ({rule!r}, {taint!r}). "
+            f"Only canonical analysis rules (PY-WL-001..009) have matrix "
+            f"entries — pseudo-rule-IDs and unmapped taint states are not "
+            f"in the matrix."
+        ) from None
