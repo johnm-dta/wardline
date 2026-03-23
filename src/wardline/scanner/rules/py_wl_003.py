@@ -22,8 +22,10 @@ from wardline.scanner.rules.base import RuleBase
 
 # PY-WL-003 only fires at these taint states.
 # MIXED_RAW included: matrix shows (E,St) same as EXTERNAL_RAW/UNKNOWN_RAW.
-# Temporary divergence from matrix for suppressed states — matrix will be
-# updated in a future WP.
+# Temporary divergence from matrix for suppressed states — the matrix shows
+# (E,U) at AUDIT_TRAIL/PIPELINE/SHAPE_VALIDATED but we suppress here because
+# "key in config" is a normal pattern in safe contexts, not a structural gate.
+# Tracked: wardline-a87ea844eb (reconcile _ACTIVE_TAINTS with matrix)
 _ACTIVE_TAINTS = frozenset({
     TaintState.EXTERNAL_RAW,
     TaintState.UNKNOWN_RAW,

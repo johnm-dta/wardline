@@ -112,3 +112,38 @@ class MyClass:
         tree = ast.parse(source)
         rule.visit(tree)
         assert rule.visited_qualnames == ["MyClass.bar"]
+
+    def test_nested_function_qualname(self) -> None:
+        """Nested functions get dotted qualname: outer.inner."""
+        rule = _StubRule()
+        source = """\
+def outer():
+    def inner():
+        pass
+"""
+        tree = ast.parse(source)
+        rule.visit(tree)
+        assert rule.visited_qualnames == ["outer", "outer.inner"]
+
+    def test_deeply_nested_qualname(self) -> None:
+        """Deep nesting: Cls.method.inner."""
+        rule = _StubRule()
+        source = """\
+class Cls:
+    def method(self):
+        def inner():
+            pass
+"""
+        tree = ast.parse(source)
+        rule.visit(tree)
+        assert rule.visited_qualnames == ["Cls.method", "Cls.method.inner"]
+
+    def test_scope_stack_clean_after_crash(self) -> None:
+        """set_context resets scope stack — crash recovery is clean."""
+        rule = _StubRule()
+        # Simulate a dirty scope stack from a previous file
+        rule._scope_stack.append("StaleClass")
+        ctx = ScanContext(file_path="new.py", function_level_taint_map={})
+        rule.set_context(ctx)
+        assert rule._scope_stack == []
+        assert rule._current_qualname == ""
