@@ -301,6 +301,17 @@ def scan(
         len(result.findings),
     )
 
+    # --- Apply exception register ---
+    from wardline.manifest.exceptions import load_exceptions
+    from wardline.scanner.exceptions import apply_exceptions
+
+    exceptions = load_exceptions(manifest_path.parent)
+    if exceptions:
+        processed, governance_ex = apply_exceptions(
+            result.findings, exceptions, project_root=manifest_path.parent
+        )
+        result.findings = processed + governance_ex
+
     # --- Merge governance findings ---
     all_findings = governance_findings + result.findings
 
