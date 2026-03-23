@@ -73,6 +73,23 @@
             "type": "string",
             "enum": ["standard", "expedited"],
             "description": "Governance path used to grant this exception."
+          },
+          "ast_fingerprint": {
+            "type": "string",
+            "description": "16-char hex SHA-256 fingerprint of the function AST. Empty means always stale."
+          },
+          "last_refreshed_by": {
+            "type": ["string", "null"],
+            "description": "Who last refreshed this exception's fingerprint."
+          },
+          "last_refresh_rationale": {
+            "type": ["string", "null"],
+            "description": "Rationale for the last fingerprint refresh."
+          },
+          "last_refreshed_at": {
+            "type": ["string", "null"],
+            "format": "date",
+            "description": "When the fingerprint was last refreshed (ISO 8601)."
           }
         },
         "required": [

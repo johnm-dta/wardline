@@ -48,6 +48,11 @@ _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
     RuleId.GOVERNANCE_PERMISSIVE_DISTRIBUTION: (
         "Permissive distribution allowed (governance)"
     ),
+    RuleId.GOVERNANCE_STALE_EXCEPTION: "Stale exception — AST fingerprint mismatch (governance)",
+    RuleId.GOVERNANCE_UNKNOWN_PROVENANCE: "Unknown agent provenance on exception (governance)",
+    RuleId.GOVERNANCE_RECURRING_EXCEPTION: "Recurring exception — multiple renewals (governance)",
+    RuleId.GOVERNANCE_BATCH_REFRESH: "Batch exception refresh performed (governance)",
+    RuleId.GOVERNANCE_NO_EXPIRY_EXCEPTION: "Exception has no expiry date (governance)",
 }
 
 # Pseudo-rule-IDs that should NOT appear in implementedRules.
@@ -59,6 +64,11 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
         RuleId.GOVERNANCE_REGISTRY_MISMATCH_ALLOWED,
         RuleId.GOVERNANCE_RULE_DISABLED,
         RuleId.GOVERNANCE_PERMISSIVE_DISTRIBUTION,
+        RuleId.GOVERNANCE_STALE_EXCEPTION,
+        RuleId.GOVERNANCE_UNKNOWN_PROVENANCE,
+        RuleId.GOVERNANCE_RECURRING_EXCEPTION,
+        RuleId.GOVERNANCE_BATCH_REFRESH,
+        RuleId.GOVERNANCE_NO_EXPIRY_EXCEPTION,
     }
 )
 
@@ -94,6 +104,10 @@ def _make_result(finding: Finding) -> dict[str, Any]:
             "wardline.analysisLevel": finding.analysis_level,
         }
     )
+    if finding.exception_id is not None:
+        properties["wardline.exceptionId"] = finding.exception_id
+    if finding.exception_expires is not None:
+        properties["wardline.exceptionExpires"] = finding.exception_expires
     return {
         "level": _SEVERITY_TO_SARIF_LEVEL.get(finding.severity, "note"),
         "locations": [
@@ -181,6 +195,9 @@ class SarifReport:
                 "wardline.conformanceGaps": [],
                 "wardline.implementedRules": self._implemented_rules(),
                 "wardline.propertyBagVersion": "1",
+                "wardline.suppressedFindingCount": sum(
+                    1 for f in self.findings if f.exception_id is not None
+                ),
                 "wardline.unknownRawFunctionCount": self.unknown_raw_count,
                 "wardline.unresolvedDecoratorCount": self.unresolved_decorator_count,
             },

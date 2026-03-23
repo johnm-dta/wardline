@@ -123,5 +123,6 @@ class RulePyWl005(RuleBase):
                 taint_state=taint,
                 analysis_level=1,
                 source_snippet=None,
+                qualname=self._current_qualname,
             )
         )

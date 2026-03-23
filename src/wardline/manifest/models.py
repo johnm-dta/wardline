@@ -32,6 +32,12 @@ class ExceptionEntry:
     expires: str | None = None
     provenance: str | None = None
     agent_originated: bool | None = None
+    ast_fingerprint: str = ""
+    recurrence_count: int = 0
+    governance_path: str = "standard"
+    last_refreshed_by: str | None = None
+    last_refresh_rationale: str | None = None
+    last_refreshed_at: str | None = None
 
 
 @dataclass(frozen=True)
