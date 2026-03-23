@@ -102,12 +102,12 @@ def _write_source(tmp_path: Path, relpath: str, source: str) -> str:
 def test_matching_active_exception_suppresses(tmp_path: Path) -> None:
     source = "def my_func():\n    pass\n"
     fpath = _write_source(tmp_path, "src/app.py", source)
-    fp = compute_ast_fingerprint(Path(fpath), "my_func")
+    fp = compute_ast_fingerprint(Path(fpath), "my_func", project_root=tmp_path)
     assert fp is not None
 
     finding = _make_finding(file_path=fpath)
     exc = _make_exception(
-        location=f"{fpath}::my_func",
+        location="src/app.py::my_func",
         ast_fingerprint=fp,
     )
 
@@ -127,11 +127,11 @@ def test_matching_active_exception_suppresses(tmp_path: Path) -> None:
 def test_expired_exception_not_suppressed(tmp_path: Path) -> None:
     source = "def my_func():\n    pass\n"
     fpath = _write_source(tmp_path, "src/app.py", source)
-    fp = compute_ast_fingerprint(Path(fpath), "my_func")
+    fp = compute_ast_fingerprint(Path(fpath), "my_func", project_root=tmp_path)
 
     finding = _make_finding(file_path=fpath)
     exc = _make_exception(
-        location=f"{fpath}::my_func",
+        location="src/app.py::my_func",
         ast_fingerprint=fp,
         expires="2026-01-01",  # before NOW
     )
@@ -152,7 +152,7 @@ def test_fingerprint_mismatch_emits_stale_governance(tmp_path: Path) -> None:
 
     finding = _make_finding(file_path=fpath)
     exc = _make_exception(
-        location=f"{fpath}::my_func",
+        location="src/app.py::my_func",
         ast_fingerprint="deadbeef12345678",  # wrong fingerprint
     )
 
@@ -173,14 +173,14 @@ def test_fingerprint_mismatch_emits_stale_governance(tmp_path: Path) -> None:
 def test_unconditional_finding_not_suppressed(tmp_path: Path) -> None:
     source = "def my_func():\n    pass\n"
     fpath = _write_source(tmp_path, "src/app.py", source)
-    fp = compute_ast_fingerprint(Path(fpath), "my_func")
+    fp = compute_ast_fingerprint(Path(fpath), "my_func", project_root=tmp_path)
 
     finding = _make_finding(
         file_path=fpath,
         exceptionability=Exceptionability.UNCONDITIONAL,
     )
     exc = _make_exception(
-        location=f"{fpath}::my_func",
+        location="src/app.py::my_func",
         ast_fingerprint=fp,
     )
 
@@ -281,7 +281,7 @@ def test_empty_fingerprint_emits_stale_governance(tmp_path: Path) -> None:
 
     finding = _make_finding(file_path=fpath)
     exc = _make_exception(
-        location=f"{fpath}::my_func",
+        location="src/app.py::my_func",
         ast_fingerprint="",  # empty
     )
 
@@ -302,11 +302,11 @@ def test_empty_fingerprint_emits_stale_governance(tmp_path: Path) -> None:
 def test_qualname_none_not_matchable(tmp_path: Path) -> None:
     source = "def my_func():\n    pass\n"
     fpath = _write_source(tmp_path, "src/app.py", source)
-    fp = compute_ast_fingerprint(Path(fpath), "my_func")
+    fp = compute_ast_fingerprint(Path(fpath), "my_func", project_root=tmp_path)
 
     finding = _make_finding(file_path=fpath, qualname=None)
     exc = _make_exception(
-        location=f"{fpath}::my_func",
+        location="src/app.py::my_func",
         ast_fingerprint=fp,
     )
 

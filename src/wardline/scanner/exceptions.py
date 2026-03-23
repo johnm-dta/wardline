@@ -62,7 +62,13 @@ def apply_exceptions(
             processed.append(finding)
             continue
 
-        location = f"{finding.file_path}::{finding.qualname}"
+        # Relativize file_path so location keys match CLI-added exceptions
+        try:
+            rel_path = str(Path(finding.file_path).relative_to(project_root))
+        except ValueError:
+            rel_path = finding.file_path
+
+        location = f"{rel_path}::{finding.qualname}"
         key = (str(finding.rule_id), str(finding.taint_state), location)
         candidates = index.get(key)
 
@@ -72,6 +78,21 @@ def apply_exceptions(
 
         # Check if finding's exceptionability allows suppression
         if finding.exceptionability == Exceptionability.UNCONDITIONAL:
+            processed.append(finding)
+            continue
+
+        # Compute fingerprint once per (file, qualname) — use absolute path
+        # for file reading, project_root for consistent hash with CLI
+        fp_key = (rel_path, finding.qualname)
+        if fp_key not in _fp_cache:
+            _fp_cache[fp_key] = compute_ast_fingerprint(
+                Path(finding.file_path), finding.qualname,
+                project_root=project_root,
+            )
+        current_fp = _fp_cache[fp_key]
+
+        # Guard: if fingerprint computation failed, leave unsuppressed
+        if current_fp is None:
             processed.append(finding)
             continue
 
@@ -85,14 +106,6 @@ def apply_exceptions(
                     continue
                 if expiry < now:
                     continue  # Expired
-
-            # Check fingerprint
-            fp_key = (finding.file_path, finding.qualname)
-            if fp_key not in _fp_cache:
-                _fp_cache[fp_key] = compute_ast_fingerprint(
-                    Path(finding.file_path), finding.qualname
-                )
-            current_fp = _fp_cache[fp_key]
 
             if exc.ast_fingerprint and current_fp != exc.ast_fingerprint:
                 # Stale — fingerprint mismatch

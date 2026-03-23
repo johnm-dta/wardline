@@ -310,7 +310,8 @@ def scan(
         processed, governance_ex = apply_exceptions(
             result.findings, exceptions, project_root=manifest_path.parent
         )
-        result.findings = processed + governance_ex
+        result.findings = processed
+        governance_findings.extend(governance_ex)
 
     # --- Merge governance findings ---
     all_findings = governance_findings + result.findings

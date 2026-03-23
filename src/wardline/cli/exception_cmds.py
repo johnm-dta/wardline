@@ -132,7 +132,7 @@ def add(
         "reviewer": reviewer,
         "expires": expires,
         "provenance": "cli",
-        "agent_originated": agent_originated or None,
+        "agent_originated": agent_originated,  # True if --agent-originated, False otherwise
         "ast_fingerprint": fp,
         "recurrence_count": 0,
         "governance_path": governance_path,
@@ -206,6 +206,10 @@ def refresh(
             click.echo(f"  Code at: {location}")
             click.echo(f"  Current fingerprint: {entry.get('ast_fingerprint', '<none>')}")
             continue
+
+        # Display rule governance context (cognitive forcing function)
+        desc = _RULE_GOVERNANCE_CONTEXT.get(rule, f"Rule {rule}")
+        click.echo(f"\n  Refreshing {entry['id']} for {rule}: {desc}", err=True)
 
         if "::" not in location:
             results.append({"id": entry["id"], "status": "skipped", "reason": "invalid location"})
