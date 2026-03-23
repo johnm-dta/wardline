@@ -67,7 +67,13 @@ def _run_rules_on_fragment(
     for rule in rules:
         rule._file_path = "<specimen>"
         rule.findings.clear()
-        rule.visit(tree)
+        try:
+            rule.visit(tree)
+        except Exception as exc:
+            logger.warning(
+                "Rule %s crashed on specimen: %s", rule.RULE_ID, exc,
+            )
+            continue
         if rule.findings:
             fired.add(str(rule.RULE_ID))
     return fired
