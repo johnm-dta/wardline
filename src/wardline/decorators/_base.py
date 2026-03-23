@@ -32,6 +32,13 @@ def wardline_decorator(
         )
 
     entry = REGISTRY[name]
+
+    # Validate group matches registry entry
+    if group != entry.group:
+        raise ValueError(
+            f"Group mismatch for decorator '{name}': "
+            f"passed group={group}, registry expects group={entry.group}"
+        )
     for key in semantic_attrs:
         attr_key = f"_wardline_{key}" if not key.startswith("_wardline_") else key
         # Check against entry.attrs contract

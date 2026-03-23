@@ -69,7 +69,9 @@ def _find_validation_assignments(
             ):
                 results.append((child.target.id, child))
         elif isinstance(child, ast.Expr) and isinstance(child.value, ast.Call):
-            if _is_validation_call(child.value):
+            if _is_validation_call(child.value) and not _is_rejection_call(
+                child.value
+            ):
                 results.append((None, child))
     return results
 

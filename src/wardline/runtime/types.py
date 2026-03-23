@@ -77,6 +77,14 @@ class _FailFastMarker:
 
 
 # ── Public Annotated aliases ──────────────────────────────────
+#
+# Known limitation: PEP 695 ``type`` aliases produce ``TypeAliasType``
+# objects that do NOT support subscripting at runtime.  ``Tier1[str]``
+# raises ``TypeError``.  These aliases work correctly in static type
+# checkers (mypy, pyright) but cannot be parameterised at runtime.
+# The v0.3.0 mypy spike recommends switching to ``NewType`` which
+# supports runtime subscripting.  Until then, use ``Annotated[str,
+# TierMarker(1)]`` directly when a parameterised form is needed.
 
 type Tier1 = Annotated[Any, TierMarker(1)]
 type Tier2 = Annotated[Any, TierMarker(2)]

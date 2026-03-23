@@ -83,6 +83,12 @@ def merge(
     # -- Merge rule overrides ------------------------------------------------
     governance_signals: list[GovernanceSignal] = []
 
+    # NOTE: If the base overrides contain duplicate rule IDs, last-wins
+    # semantics apply — earlier entries with the same ID are silently
+    # superseded.  This is intentional: the dict-keyed merge pattern
+    # inherently deduplicates, and the last entry in document order is
+    # considered authoritative.  Callers that need to detect duplicates
+    # should validate before calling merge().
     base_overrides_by_rule: dict[str, dict[str, object]] = {}
     for ovr in base.rules.overrides:
         rule_id = ovr.get("id")
