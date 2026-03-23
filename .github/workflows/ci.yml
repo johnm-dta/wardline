@@ -18,7 +18,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv pip install -e ".[dev]"
       - name: Ruff check
         run: uv run ruff check src/ tests/
       - name: Mypy
@@ -35,7 +35,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv pip install -e ".[dev]"
       - name: Integration tests
         run: uv run pytest -m integration --tb=short
 
@@ -48,6 +48,6 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv pip install -e ".[dev]"
       - name: Network tests
         run: uv run pytest -m network --tb=short -v
