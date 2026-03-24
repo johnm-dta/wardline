@@ -9,6 +9,53 @@
       "type": "string",
       "description": "Schema version identifier."
     },
+    "python_version": {
+      "type": "string",
+      "description": "Python major.minor version used for fingerprint computation."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the baseline was generated."
+    },
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "annotated": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of annotated functions."
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of functions."
+        },
+        "ratio": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Ratio of annotated to total functions."
+        },
+        "tier1_annotated": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of annotated functions in tier 1."
+        },
+        "tier1_total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of functions in tier 1."
+        },
+        "tier1_unannotated": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Qualnames of unannotated tier 1 functions."
+        }
+      },
+      "required": ["annotated", "total", "ratio", "tier1_annotated", "tier1_total"],
+      "additionalProperties": false
+    },
     "fingerprints": {
       "type": "array",
       "items": {
@@ -45,6 +92,11 @@
             "type": ["string", "null"],
             "format": "date",
             "description": "Date of last annotation change."
+          },
+          "artefact_class": {
+            "type": "string",
+            "enum": ["policy", "enforcement", ""],
+            "description": "Artefact classification: policy (tier/boundary) or enforcement (supplementary)."
           }
         },
         "required": [

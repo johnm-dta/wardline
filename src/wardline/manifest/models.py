@@ -54,6 +54,19 @@ class FingerprintEntry:
     tier_context: int
     boundary_transition: str | None = None
     last_changed: str | None = None
+    artefact_class: str = ""
+
+
+@dataclass(frozen=True)
+class CoverageReport:
+    """Annotation coverage statistics."""
+
+    annotated: int
+    total: int
+    ratio: float
+    tier1_annotated: int
+    tier1_total: int
+    tier1_unannotated: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
