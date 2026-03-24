@@ -157,3 +157,51 @@ class TestDecoratedMethodDetection:
         # Should not raise
         svc = MyService()
         assert hasattr(svc, "_internal")
+
+
+# ── Cooperative MRO ──────────────────────────────────────────────
+
+
+class TestCooperativeMRO:
+    """WardlineBase.__init__ cooperates with the MRO via *args/**kwargs."""
+
+    def test_init_cooperative_mro(self) -> None:
+        """WardlineBase works with a mixin that takes positional args."""
+
+        class SomeMixin:
+            def __init__(self, x: int, **kwargs: object) -> None:
+                super().__init__(**kwargs)
+                self.x = x
+
+        class C(WardlineBase, SomeMixin):
+            pass
+
+        obj = C(42)
+        assert isinstance(obj, WardlineBase)
+        assert isinstance(obj, SomeMixin)
+        assert obj.x == 42
+
+    def test_init_with_abc(self) -> None:
+        """WardlineBase works with ABC in the MRO."""
+
+        class SomeABC(ABC):
+            @abstractmethod
+            def do_thing(self) -> str: ...
+
+        class C(WardlineBase, SomeABC):
+            def do_thing(self) -> str:
+                return "done"
+
+        obj = C()
+        assert isinstance(obj, WardlineBase)
+        assert isinstance(obj, SomeABC)
+        assert obj.do_thing() == "done"
+
+    def test_init_no_args(self) -> None:
+        """Bare subclass with no-arg init still works (regression)."""
+
+        class C(WardlineBase):
+            pass
+
+        obj = C()
+        assert isinstance(obj, WardlineBase)

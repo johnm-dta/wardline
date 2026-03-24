@@ -34,8 +34,8 @@ class WardlineBase:
         # Check subclass methods for wardline decorators
         _check_decorated_methods(cls)
 
-    def __init__(self) -> None:
-        # Runtime enforcement check at construction (no-op when disabled)
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
         from wardline.runtime.enforcement import enforce_construction
 
         enforce_construction(self)
