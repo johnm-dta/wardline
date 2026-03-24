@@ -1,0 +1,19 @@
+---
+# schema_version: 0.1
+specimen_id: "L3-direct-recursion"
+description: "L3: self-recursive function — taint stable, no infinite loop"
+rule: "PY-WL-001"
+fragment: |
+  def recurse(data, depth=0):
+      if depth > 10:
+          return data.get("key", "default")
+      return recurse(data, depth + 1)
+  
+taint_state: "UNKNOWN_RAW"
+analysis_level_required: 3
+expected_rules: ["PY-WL-001"]
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"
+sha256: "24e53c051001d0a3b292d32c24af6f455ebbdfaa9676ec112de6ea5bfa6f65f7"

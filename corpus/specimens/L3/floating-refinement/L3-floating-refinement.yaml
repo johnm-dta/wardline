@@ -1,0 +1,24 @@
+---
+# schema_version: 0.1
+specimen_id: "L3-floating-refinement"
+description: "L3: undecorated A calls only @tier1_read — refined from UNKNOWN_RAW to AUDIT_TRAIL"
+rule: "PY-WL-001"
+fragment: |
+  from wardline.decorators import tier1_read
+  
+  @tier1_read
+  def load_config():
+      return {"key": "value"}
+  
+  def get_setting(name):
+      cfg = load_config()
+      return cfg.get(name, "default")
+  
+taint_state: "AUDIT_TRAIL"
+analysis_level_required: 3
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "true_negative"
+sha256: "05f86ac68b79ff6b95ad5d80062dbde04d1b75b062d158ff060233fc2c97914a"

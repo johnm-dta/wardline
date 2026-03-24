@@ -1,0 +1,25 @@
+---
+# schema_version: 0.1
+specimen_id: "L3-mixed-resolved-unresolved"
+description: "L3: A calls B (resolved) + json.loads (unresolved) — refined by B only"
+rule: "PY-WL-001"
+fragment: |
+  import json
+  from wardline.decorators import external_boundary
+  
+  @external_boundary
+  def parse_input(raw):
+      return json.loads(raw)
+  
+  def process(raw):
+      data = parse_input(raw)
+      x = data.get("key", "default")
+  
+taint_state: "EXTERNAL_RAW"
+analysis_level_required: 3
+expected_rules: ["PY-WL-001"]
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"
+sha256: "a554532ad3979a6f29183460e6939481579525dd869ec6232eda28259036a779"

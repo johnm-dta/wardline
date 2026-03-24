@@ -1,0 +1,28 @@
+---
+# schema_version: 0.1
+specimen_id: "L3-anchored-immutable"
+description: "L3: adversarial — decorated function in crafted call chain stays unchanged"
+rule: "PY-WL-001"
+fragment: |
+  from wardline.decorators import external_boundary, tier1_read
+  
+  @tier1_read
+  def trusted_source():
+      return {"key": "safe"}
+  
+  @external_boundary
+  def boundary_func():
+      data = trusted_source()
+      return data.get("key", "default")
+  
+  def caller():
+      return boundary_func()
+  
+taint_state: "EXTERNAL_RAW"
+analysis_level_required: 3
+expected_rules: ["PY-WL-001"]
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"
+sha256: "6eee2dc33bbc3f6a0028b2d0bc6b35b8d11e3c6081bfa51cfc473607fb5f6012"

@@ -1,0 +1,27 @@
+---
+# schema_version: 0.1
+specimen_id: "L3-multi-hop-chain"
+description: "L3: A→B→C(@external_boundary) — A and B refined to EXTERNAL_RAW"
+rule: "PY-WL-001"
+fragment: |
+  from wardline.decorators import external_boundary
+  
+  @external_boundary
+  def fetch_raw(url):
+      return {"key": url}
+  
+  def transform(url):
+      return fetch_raw(url)
+  
+  def process(url):
+      data = transform(url)
+      x = data.get("key", "default")
+  
+taint_state: "EXTERNAL_RAW"
+analysis_level_required: 3
+expected_rules: ["PY-WL-001"]
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"
+sha256: "db098bd242212bbc8414b1e17f9dc605f0e006fa2ce818b1588ea3f2a0222253"

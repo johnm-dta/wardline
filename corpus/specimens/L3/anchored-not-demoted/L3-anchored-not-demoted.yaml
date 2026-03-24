@@ -1,0 +1,25 @@
+---
+# schema_version: 0.1
+specimen_id: "L3-anchored-not-demoted"
+description: "L3: @external_boundary A calls @tier1_read B — A stays EXTERNAL_RAW (anchored)"
+rule: "PY-WL-001"
+fragment: |
+  from wardline.decorators import external_boundary, tier1_read
+  
+  @tier1_read
+  def get_config():
+      return {"safe": True}
+  
+  @external_boundary
+  def handle_request(data):
+      cfg = get_config()
+      x = data.get("key", cfg.get("safe", "default"))
+  
+taint_state: "EXTERNAL_RAW"
+analysis_level_required: 3
+expected_rules: ["PY-WL-001"]
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"
+sha256: "b935689907e5ccd50800959d173aaf3489b8fbb4cd65cf090a83f7de18284142"

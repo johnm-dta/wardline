@@ -1,0 +1,24 @@
+---
+# schema_version: 0.1
+specimen_id: "L3-module-default-demoted"
+description: "L3: module_tiers PIPELINE function calls @external_boundary — refined to EXTERNAL_RAW"
+rule: "PY-WL-001"
+fragment: |
+  from wardline.decorators import external_boundary
+  
+  @external_boundary
+  def fetch_external():
+      return {"key": "raw"}
+  
+  def pipeline_with_external():
+      data = fetch_external()
+      return data.get("key", "default")
+  
+taint_state: "EXTERNAL_RAW"
+analysis_level_required: 3
+expected_rules: ["PY-WL-001"]
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"
+sha256: "67d5316ea1c0f21439fc444d9b33ef31a65d1017205f14d0352c2d040ecf6811"
