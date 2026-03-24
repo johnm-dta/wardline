@@ -96,10 +96,10 @@ class TestScanProducesSarif:
         ])
         sarif = json.loads(result.stdout)
         implemented = sarif["runs"][0]["properties"]["wardline.implementedRules"]
-        # MVP has 5 rules loaded
+        # 9 rules loaded (PY-WL-001 through PY-WL-009)
         assert "PY-WL-001" in implemented
-        assert "PY-WL-005" in implemented
-        assert len(implemented) == 5
+        assert "PY-WL-009" in implemented
+        assert len(implemented) == 9
 
     def test_sarif_findings_present_for_fixture(self) -> None:
         """Scanning fixture project produces SARIF results."""
@@ -193,13 +193,20 @@ class TestRegistrySync:
         self, tmp_path: Path
     ) -> None:
         """Registry mismatch without --allow-registry-mismatch → exit 2."""
+        from unittest.mock import patch
+
         manifest = _minimal_manifest(tmp_path)
         runner = CliRunner()
-        # Don't pass --allow-registry-mismatch → sync fails for PY-WL-006..009
-        result = runner.invoke(cli, [
-            "scan", str(tmp_path),
-            "--manifest", str(manifest),
-        ])
+        # Patch _make_rules to return only a subset, creating a mismatch
+        # with the canonical registry (which has all 9 rules).
+        with patch(
+            "wardline.cli.scan._make_rules",
+            return_value=(),
+        ):
+            result = runner.invoke(cli, [
+                "scan", str(tmp_path),
+                "--manifest", str(manifest),
+            ])
         assert result.exit_code == 2
         assert "registry sync failed" in result.stderr
 
@@ -207,13 +214,20 @@ class TestRegistrySync:
         self, tmp_path: Path
     ) -> None:
         """Registry mismatch with flag → GOVERNANCE finding."""
+        from unittest.mock import patch
+
         manifest = _minimal_manifest(tmp_path)
         runner = CliRunner()
-        result = runner.invoke(cli, [
-            "scan", str(tmp_path),
-            "--manifest", str(manifest),
-            "--allow-registry-mismatch",
-        ])
+        # Patch _make_rules to return only a subset, creating a mismatch
+        with patch(
+            "wardline.cli.scan._make_rules",
+            return_value=(),
+        ):
+            result = runner.invoke(cli, [
+                "scan", str(tmp_path),
+                "--manifest", str(manifest),
+                "--allow-registry-mismatch",
+            ])
         # Should succeed (no scan findings on clean code)
         assert result.exit_code == 0
         sarif = json.loads(result.stdout)

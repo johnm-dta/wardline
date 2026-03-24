@@ -79,7 +79,7 @@ class TestExplainUndeclaredModule:
         manifest_file = tmp_path / "wardline.yaml"
         manifest_file.write_text(
             textwrap.dedent("""\
-                $id: "https://wardline.dev/schemas/wardline/0.1"
+                $id: "https://wardline.dev/schemas/0.1/wardline"
                 tiers:
                   - id: core
                     tier: 1

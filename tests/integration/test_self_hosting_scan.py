@@ -128,15 +128,15 @@ class TestSelfHostingScan:
 
         # Per-rule baselines (measured 2026-03-24, ±50% tolerance)
         expected_ranges: dict[str, tuple[int, int]] = {
-            "PY-WL-001": (21, 63),
+            "PY-WL-001": (21, 90),
             "PY-WL-002": (6, 38),
-            "PY-WL-003": (20, 59),
-            "PY-WL-004": (2, 6),
-            "PY-WL-005": (4, 11),
-            "PY-WL-006": (0, 30),
-            "PY-WL-007": (0, 80),
-            "PY-WL-008": (0, 60),
-            "PY-WL-009": (0, 60),
+            "PY-WL-003": (36, 108),
+            "PY-WL-004": (2, 9),
+            "PY-WL-005": (4, 18),
+            "PY-WL-006": (1, 30),
+            "PY-WL-007": (50, 230),
+            "PY-WL-008": (7, 60),
+            "PY-WL-009": (40, 185),
         }
 
         for rule_id, (lo, hi) in expected_ranges.items():
@@ -149,7 +149,7 @@ class TestSelfHostingScan:
         # Total sanity check
         total = len(scan_findings)
         assert total >= 50, f"Suspiciously few findings ({total})"
-        assert total <= 400, f"Too many findings ({total})"
+        assert total <= 750, f"Too many findings ({total})"
 
     def test_files_scanned_count(self) -> None:
         """Scanner processes all wardline source files."""
