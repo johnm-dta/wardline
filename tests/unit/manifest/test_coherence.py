@@ -247,7 +247,7 @@ class TestTierDistribution:
         )
         issues = check_tier_distribution(tiers, module_tiers)
         assert len(issues) == 1
-        assert issues[0].kind == "GOVERNANCE WARNING"
+        assert issues[0].kind == "tier_distribution"
 
     def test_threshold_boundary_does_not_fire_at_60_percent(self) -> None:
         """Exactly 60% permissive tiers does not exceed threshold."""
@@ -314,7 +314,7 @@ class TestTierDowngrades:
 
         issues = check_tier_downgrades(tiers, module_tiers, baseline_path)
         assert len(issues) == 1
-        assert issues[0].kind == "GOVERNANCE WARNING"
+        assert issues[0].kind == "tier_downgrade"
         assert "src/core" in issues[0].detail
         assert "tier 1" in issues[0].detail
         assert "tier 3" in issues[0].detail
@@ -396,7 +396,7 @@ class TestTierUpgradeWithoutEvidence:
             tiers, module_tiers, boundaries, baseline_path
         )
         assert len(issues) == 1
-        assert issues[0].kind == "GOVERNANCE WARNING"
+        assert issues[0].kind == "tier_upgrade_without_evidence"
         assert "without evidence" in issues[0].detail
 
     def test_upgrade_with_evidence_no_warning(self, tmp_path: Path) -> None:
@@ -448,7 +448,7 @@ class TestAgentOriginatedException:
         )
         issues = check_agent_originated_exceptions(exceptions)
         assert len(issues) == 1
-        assert issues[0].kind == "GOVERNANCE WARNING"
+        assert issues[0].kind == "agent_originated_exception"
         assert "EXC-NULL" in issues[0].detail
 
     def test_explicit_true_no_warning(self) -> None:
@@ -483,7 +483,7 @@ class TestExpiredExceptions:
         )
         issues = check_expired_exceptions(exceptions, now=now)
         assert len(issues) == 1
-        assert issues[0].kind == "GOVERNANCE WARNING"
+        assert issues[0].kind == "expired_exception"
         assert "expired" in issues[0].detail.lower()
 
     def test_far_future_expiry_rejected(self) -> None:
@@ -496,7 +496,7 @@ class TestExpiredExceptions:
             exceptions, max_exception_duration_days=365, now=now
         )
         assert len(issues) == 1
-        assert issues[0].kind == "GOVERNANCE WARNING"
+        assert issues[0].kind == "expired_exception"
         assert "far-future" in issues[0].detail.lower()
 
     def test_valid_exception_no_warning(self) -> None:
@@ -549,11 +549,11 @@ class TestFirstScanPerimeter:
     """Tests for check_first_scan_perimeter."""
 
     def test_no_baseline_fires_info(self, tmp_path: Path) -> None:
-        """Missing perimeter baseline fires GOVERNANCE INFO."""
+        """Missing perimeter baseline fires first_scan_perimeter."""
         perimeter_path = tmp_path / "wardline.perimeter.baseline.json"
         issues = check_first_scan_perimeter(perimeter_path)
         assert len(issues) == 1
-        assert issues[0].kind == "GOVERNANCE INFO"
+        assert issues[0].kind == "first_scan_perimeter"
         assert "first scan" in issues[0].detail.lower()
 
     def test_existing_baseline_no_issue(self, tmp_path: Path) -> None:

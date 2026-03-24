@@ -151,7 +151,7 @@ def check_tier_distribution(
     if pct > max_permissive_percent:
         return [
             CoherenceIssue(
-                kind="GOVERNANCE WARNING",
+                kind="tier_distribution",
                 function="",
                 file_path="",
                 detail=(
@@ -212,7 +212,7 @@ def check_tier_downgrades(
             if old_tier is not None and new_tier is not None and new_tier > old_tier:
                 issues.append(
                     CoherenceIssue(
-                        kind="GOVERNANCE WARNING",
+                        kind="tier_downgrade",
                         function="",
                         file_path=mt.path,
                         detail=(
@@ -293,7 +293,7 @@ def check_tier_upgrade_without_evidence(
                 if not has_evidence:
                     issues.append(
                         CoherenceIssue(
-                            kind="GOVERNANCE WARNING",
+                            kind="tier_upgrade_without_evidence",
                             function="",
                             file_path=mt.path,
                             detail=(
@@ -326,7 +326,7 @@ def check_agent_originated_exceptions(
         if exc.agent_originated is None:
             issues.append(
                 CoherenceIssue(
-                    kind="GOVERNANCE WARNING",
+                    kind="agent_originated_exception",
                     function="",
                     file_path=exc.location,
                     detail=(
@@ -374,7 +374,7 @@ def check_expired_exceptions(
         except ValueError:
             issues.append(
                 CoherenceIssue(
-                    kind="GOVERNANCE WARNING",
+                    kind="expired_exception",
                     function="",
                     file_path=exc.location,
                     detail=(
@@ -388,7 +388,7 @@ def check_expired_exceptions(
         if expiry_date < now:
             issues.append(
                 CoherenceIssue(
-                    kind="GOVERNANCE WARNING",
+                    kind="expired_exception",
                     function="",
                     file_path=exc.location,
                     detail=(
@@ -399,7 +399,7 @@ def check_expired_exceptions(
         elif expiry_date > max_expiry:
             issues.append(
                 CoherenceIssue(
-                    kind="GOVERNANCE WARNING",
+                    kind="expired_exception",
                     function="",
                     file_path=exc.location,
                     detail=(
@@ -427,7 +427,7 @@ def check_first_scan_perimeter(
     if not perimeter_baseline_path.exists():
         return [
             CoherenceIssue(
-                kind="GOVERNANCE INFO",
+                kind="first_scan_perimeter",
                 function="",
                 file_path=str(perimeter_baseline_path),
                 detail=(
