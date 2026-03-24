@@ -124,9 +124,15 @@ def _is_membership_test(compare: ast.Compare) -> bool:
     return any(isinstance(op, (ast.In, ast.NotIn)) for op in compare.ops)
 
 
-def _has_subscript_or_attr_access(node: ast.AST) -> bool:
-    """Check if node contains a subscript or attribute access on data."""
-    return any(isinstance(child, (ast.Subscript, ast.Attribute)) for child in ast.walk(node))
+def _has_subscript_access(node: ast.AST) -> bool:
+    """Check if node contains a subscript access (``data["key"]``).
+
+    Only matches ``ast.Subscript`` — NOT ``ast.Attribute``.  Attribute
+    access (``obj.attr``) is shape-guaranteed by the type system: the
+    class definition IS the shape declaration.  Subscript access on
+    dicts/lists has no such guarantee and needs explicit shape validation.
+    """
+    return any(isinstance(child, ast.Subscript) for child in ast.walk(node))
 
 
 def _test_contains_shape_check(test: ast.expr) -> bool:
@@ -150,18 +156,23 @@ def _get_semantic_check_nodes(
     """Find if/assert nodes that perform semantic checks on subscript data.
 
     A semantic check is an if-test or assert that accesses data via
-    subscript (data["key"]) and compares or tests a value — business
+    subscript (``data["key"]``) and compares or tests a value — business
     logic validation on the data's content rather than its shape.
+
+    Pure attribute access (``obj.attr``) is excluded — the type system
+    guarantees attributes declared by the class definition.  Only
+    subscript access (``data["key"]``) indicates potentially unvalidated
+    shape.
 
     Conditions that already contain an inline shape check (isinstance,
     hasattr, membership test) are excluded — the shape guard in the
-    condition itself covers the attribute/subscript access.
+    condition itself covers the subscript access.
     """
     results: list[ast.AST] = []
     for child in walk_skip_nested_defs(node):
         if not isinstance(child, (ast.If, ast.Assert)):
             continue
-        if not _has_subscript_or_attr_access(child.test):
+        if not _has_subscript_access(child.test):
             continue
         if _test_contains_shape_check(child.test):
             continue

@@ -321,12 +321,34 @@ if "key" in data and data["key"] > 0:
 
         assert len(rule.findings) == 0
 
-    def test_plain_attr_access_without_isinstance_still_fires(self) -> None:
-        """obj.attr access in condition without any shape guard must fire."""
+    def test_pure_attr_access_is_typed_silent(self) -> None:
+        """obj.attr access without subscript — shape declared by type system."""
         rule = _run_rule(
             """\
 if obj.value > threshold:
     reject(obj)
+"""
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_subscript_access_still_fires(self) -> None:
+        """data['key'] access in condition without guard still fires."""
+        rule = _run_rule(
+            """\
+if data["key"] > threshold:
+    reject(data)
+"""
+        )
+
+        assert len(rule.findings) == 1
+
+    def test_mixed_attr_and_subscript_fires(self) -> None:
+        """Condition with both attr and subscript — subscript is the risk."""
+        rule = _run_rule(
+            """\
+if obj.data["key"] > 0:
+    process()
 """
         )
 
