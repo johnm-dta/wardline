@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from wardline.manifest.exceptions import load_exceptions
 from wardline.manifest.loader import ManifestLoadError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _write_exceptions(path: Path, entries: list[dict]) -> None:

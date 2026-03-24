@@ -43,10 +43,9 @@ def _search(
                 result = _search(child, parts, depth + 1)
                 if result is not None:
                     return result
-        elif isinstance(child, ast.ClassDef):
-            if child.name == target:
-                result = _search(child, parts, depth + 1)
-                if result is not None:
-                    return result
+        elif isinstance(child, ast.ClassDef) and child.name == target:
+            result = _search(child, parts, depth + 1)
+            if result is not None:
+                return result
 
     return None

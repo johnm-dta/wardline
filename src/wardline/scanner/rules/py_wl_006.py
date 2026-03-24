@@ -74,10 +74,7 @@ def _is_audit_call(call: ast.Call) -> bool:
     # obj.method(...) — attribute call
     if isinstance(call.func, ast.Attribute):
         attr = call.func.attr
-        for prefix in _AUDIT_ATTR_PREFIXES:
-            if attr == prefix or attr.startswith(prefix + "_"):
-                return True
-        return False
+        return any(attr == prefix or attr.startswith(prefix + "_") for prefix in _AUDIT_ATTR_PREFIXES)
     # bare_func(...) — name call
     if isinstance(call.func, ast.Name):
         return call.func.id in _AUDIT_FUNC_NAMES

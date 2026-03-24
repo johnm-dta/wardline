@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import datetime
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 from types import MappingProxyType
 
 import pytest
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.core.taints import TaintState
-from wardline.scanner.context import Finding, ScanContext, WardlineAnnotation
+from wardline.manifest.models import ExceptionEntry
+from wardline.scanner.context import Finding, ScanContext, WardlineAnnotation, make_governance_finding
+from wardline.scanner.exceptions import apply_exceptions
 
 # ── Finding ───────────────────────────────────────────────────────
 
@@ -177,9 +181,6 @@ class TestWardlineAnnotation:
 
 # ── make_governance_finding ───────────────────────────────────────
 
-from wardline.core.severity import RuleId
-from wardline.scanner.context import make_governance_finding
-
 
 def test_make_governance_finding_with_exception_id():
     f = make_governance_finding(
@@ -199,12 +200,6 @@ def test_make_governance_finding_defaults_none():
     )
     assert f.exception_id is None
     assert f.original_rule is None
-
-
-import datetime
-from pathlib import Path
-from wardline.manifest.models import ExceptionEntry
-from wardline.scanner.exceptions import apply_exceptions
 
 
 def test_governance_findings_carry_exception_id_and_original_rule():

@@ -60,7 +60,7 @@ def build_preview_report(
         "scan_metadata": {
             "wardline_version": wardline_version,
             "scanned_path": scanned_path,
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         },
         "unverified_default_count": len(unverified),
         "exception_rereview_count": len(exc_map),

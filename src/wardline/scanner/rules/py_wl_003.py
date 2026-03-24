@@ -15,7 +15,7 @@ from __future__ import annotations
 import ast
 
 from wardline.core import matrix
-from wardline.core.severity import Exceptionability, RuleId, Severity
+from wardline.core.severity import RuleId
 from wardline.core.taints import TaintState
 from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs

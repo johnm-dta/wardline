@@ -23,6 +23,7 @@ from wardline.scanner.context import Finding, make_governance_finding
 from wardline.scanner.sarif import _PSEUDO_RULE_IDS, SarifReport
 
 if TYPE_CHECKING:
+    from wardline.manifest.models import BoundaryEntry as _BoundaryEntry
     from wardline.manifest.models import ScannerConfig, WardlineManifest
     from wardline.scanner.rules.base import RuleBase
 
@@ -272,7 +273,6 @@ def scan(
         exclude_paths = cfg.exclude_paths
 
     # --- Resolve overlay boundaries ---
-    from wardline.manifest.models import BoundaryEntry as _BoundaryEntry
     from wardline.manifest.resolve import resolve_boundaries
 
     boundaries: tuple[_BoundaryEntry, ...] = ()
@@ -380,9 +380,10 @@ def scan(
 
     # --- Preview Phase 2 report ---
     if preview_phase2:
-        from wardline.cli.preview import build_preview_report
-        import wardline
         import json
+
+        import wardline
+        from wardline.cli.preview import build_preview_report
 
         report = build_preview_report(
             result.findings,

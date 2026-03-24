@@ -13,12 +13,13 @@ from __future__ import annotations
 import ast
 from abc import ABC, abstractmethod
 from collections import deque
-from collections.abc import Iterator
 from typing import TYPE_CHECKING, ClassVar, final
 
 from wardline.core.taints import TaintState
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from wardline.core.severity import RuleId
     from wardline.scanner.context import Finding, ScanContext
 

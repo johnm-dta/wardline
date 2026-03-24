@@ -9,8 +9,8 @@ from wardline.core.taints import TaintState
 from wardline.scanner.context import ScanContext
 from wardline.scanner.rules.py_wl_001 import RulePyWl001
 from wardline.scanner.rules.py_wl_002 import RulePyWl002
-from wardline.scanner.rules.py_wl_004 import RulePyWl004
 from wardline.scanner.rules.py_wl_003 import RulePyWl003
+from wardline.scanner.rules.py_wl_004 import RulePyWl004
 from wardline.scanner.rules.py_wl_005 import RulePyWl005
 
 

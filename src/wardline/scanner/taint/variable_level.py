@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import ast
 import logging
+
 from wardline.core.taints import TaintState, taint_join
 
 logger = logging.getLogger(__name__)
@@ -217,7 +218,7 @@ def _process_stmt(
     elif isinstance(stmt, ast.If):
         _handle_if(stmt, function_taint, taint_map, var_taints)
 
-    elif isinstance(stmt, ast.With) or isinstance(stmt, ast.AsyncWith):
+    elif isinstance(stmt, (ast.With, ast.AsyncWith)):
         _handle_with(stmt, function_taint, taint_map, var_taints)
 
     elif isinstance(stmt, ast.Try):
@@ -295,7 +296,7 @@ def _handle_unpack(
     if isinstance(value, (ast.Tuple, ast.List)) and len(value.elts) == len(
         target.elts
     ):
-        for tgt, val in zip(target.elts, value.elts):
+        for tgt, val in zip(target.elts, value.elts, strict=False):
             if isinstance(tgt, ast.Name):
                 taint = _resolve_expr(
                     val, function_taint, taint_map, var_taints

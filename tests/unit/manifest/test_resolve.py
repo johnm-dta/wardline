@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from wardline.manifest.discovery import GovernanceError
 from wardline.manifest.merge import ManifestWidenError
 from wardline.manifest.models import (
-    BoundaryEntry,
     ModuleTierEntry,
     TierEntry,
     WardlineManifest,
 )
 from wardline.manifest.resolve import resolve_boundaries
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _write_overlay(path: Path, content: str) -> None:

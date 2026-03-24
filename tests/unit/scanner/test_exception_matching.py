@@ -5,8 +5,6 @@ from __future__ import annotations
 import datetime
 from pathlib import Path
 
-import pytest
-
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.core.taints import TaintState
 from wardline.manifest.models import ExceptionEntry

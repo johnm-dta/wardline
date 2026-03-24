@@ -16,7 +16,6 @@ from wardline.core.severity import Exceptionability, RuleId
 from wardline.core.taints import TaintState
 from wardline.scanner.fingerprint import compute_ast_fingerprint
 
-
 # Rule governance context — explains why each rule matters
 _RULE_GOVERNANCE_CONTEXT: dict[str, str] = {
     "PY-WL-001": (

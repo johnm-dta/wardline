@@ -12,7 +12,6 @@ Verifies that the decorator registry and library exports stay in sync:
 
 from __future__ import annotations
 
-import importlib
 import logging
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
@@ -25,11 +24,6 @@ from click.testing import CliRunner
 
 from wardline.core.registry import REGISTRY
 from wardline.core.taints import TaintState
-from wardline.decorators._base import get_wardline_attrs, wardline_decorator
-
-# Direct imports used in test bodies
-from wardline.decorators.audit import audit_critical
-from wardline.decorators.authority import external_boundary
 
 # Import all decorator modules
 from wardline.decorators import (
@@ -48,6 +42,11 @@ from wardline.decorators import (
     secrets,
     sensitivity,
 )
+from wardline.decorators._base import get_wardline_attrs, wardline_decorator
+
+# Direct imports used in test bodies
+from wardline.decorators.audit import audit_critical
+from wardline.decorators.authority import external_boundary
 
 # Build _LIBRARY_DECORATORS from all modules — every registered name
 # must map to its callable.

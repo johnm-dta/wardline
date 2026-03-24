@@ -8,14 +8,15 @@ Exercises the complete pipeline:
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from click.testing import CliRunner
 
 from wardline.cli.main import cli
-from wardline.scanner.fingerprint import compute_ast_fingerprint
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Fixture construction helpers
@@ -315,7 +316,7 @@ class TestPreviewPhase2FullPipeline:
         manifest, _app_py = _build_fixture(tmp_path)
         output_file = tmp_path / "preview.json"
         runner = CliRunner()
-        result = runner.invoke(cli, [
+        runner.invoke(cli, [
             "scan", str(tmp_path),
             "--manifest", str(manifest),
             "--allow-registry-mismatch",

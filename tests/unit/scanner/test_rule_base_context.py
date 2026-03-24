@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ast
-from types import MappingProxyType
 
 from wardline.core.severity import RuleId
 from wardline.core.taints import TaintState

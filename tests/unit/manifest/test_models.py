@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
-from pathlib import Path
+from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 import pytest
 
 from wardline.core.severity import RuleId
 from wardline.core.taints import TaintState
-from types import MappingProxyType
-
 from wardline.manifest.models import (
     BoundaryEntry,
     ContractBinding,
@@ -26,6 +25,9 @@ from wardline.manifest.models import (
     WardlineManifest,
     WardlineOverlay,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ── ExceptionEntry ────────────────────────────────────────────────
 

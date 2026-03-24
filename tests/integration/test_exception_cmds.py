@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from unittest.mock import patch
+from typing import TYPE_CHECKING
 
 import pytest
 from click.testing import CliRunner
 
 from wardline.cli.main import cli
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _make_project(tmp_path: Path) -> tuple[Path, Path]:

@@ -12,12 +12,10 @@ from pathlib import Path
 import jsonschema
 
 from wardline.core import matrix
-from wardline.core.severity import Exceptionability, RuleId
+from wardline.core.severity import Exceptionability, GovernancePath, RuleId
 from wardline.core.taints import TaintState
 from wardline.manifest.loader import ManifestLoadError
 from wardline.manifest.models import ExceptionEntry
-
-from wardline.core.severity import GovernancePath
 
 _SCHEMA_DIR = Path(__file__).parent / "schemas"
 _EXCEPTIONS_FILENAME = "wardline.exceptions.json"

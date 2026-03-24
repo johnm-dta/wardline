@@ -68,6 +68,13 @@
       "type": "string",
       "description": "SHA-256 hash of the fragment for integrity."
     },
+    "analysis_level_required": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3,
+      "default": 1,
+      "description": "Minimum analysis level required to evaluate this specimen correctly. Verifier skips specimens above the configured level."
+    },
     "tags": {
       "type": "array",
       "items": { "type": "string" },

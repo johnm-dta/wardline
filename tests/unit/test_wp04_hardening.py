@@ -24,7 +24,6 @@ from wardline.manifest.loader import (
 from wardline.manifest.models import BoundaryEntry
 from wardline.scanner.rules.base import walk_skip_nested_defs
 
-
 # ── Bug 2: ast.walk duplicate findings on nested defs ─────────────
 
 

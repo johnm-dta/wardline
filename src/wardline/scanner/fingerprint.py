@@ -9,9 +9,12 @@ from __future__ import annotations
 import ast
 import hashlib
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from wardline.scanner._scope import find_function_node
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def compute_ast_fingerprint(

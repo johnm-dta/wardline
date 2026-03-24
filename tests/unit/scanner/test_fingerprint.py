@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from wardline.scanner.fingerprint import compute_ast_fingerprint
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestComputeAstFingerprint:

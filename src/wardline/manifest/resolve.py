@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from wardline.manifest.discovery import GovernanceError, discover_overlays
@@ -16,6 +15,8 @@ from wardline.manifest.loader import ManifestLoadError, load_overlay
 from wardline.manifest.merge import merge
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from wardline.manifest.models import BoundaryEntry, WardlineManifest
 
 logger = logging.getLogger(__name__)

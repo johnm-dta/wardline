@@ -220,7 +220,13 @@ def corpus() -> None:
     default="corpus/",
     help="Directory containing specimen YAML files.",
 )
-def verify(corpus_dir: str) -> None:
+@click.option(
+    "--analysis-level",
+    type=click.IntRange(1, 3),
+    default=1,
+    help="Analysis level (1-3). Specimens requiring a higher level are skipped.",
+)
+def verify(corpus_dir: str, analysis_level: int) -> None:
     """Verify corpus specimens against scanner rules."""
     corpus_path = Path(corpus_dir)
     specimens = sorted(
@@ -237,6 +243,7 @@ def verify(corpus_dir: str) -> None:
     stats: dict[str, _RuleStats] = {}
     errors = 0
     total = 0
+    skipped = 0
 
     for specimen_path in specimens:
         total += 1
@@ -264,6 +271,12 @@ def verify(corpus_dir: str) -> None:
                 err=True,
             )
             errors += 1
+            continue
+
+        # Skip specimens that require a higher analysis level
+        required_level = int(data.get("analysis_level_required", 1))
+        if required_level > analysis_level:
+            total -= 1  # Don't count skipped specimens
             continue
 
         source = data.get("fragment", "") or data.get("source", "")

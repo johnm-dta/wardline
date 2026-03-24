@@ -92,11 +92,10 @@ def _variable_used_in_rejection_path(
     """
     for child in walk_skip_nested_defs(node):
         if isinstance(child, ast.If):
-            if _name_appears_in(child.test, var_name):
-                if _branch_has_rejection(child.body) or _branch_has_rejection(
-                    child.orelse
-                ):
-                    return True
+            if _name_appears_in(child.test, var_name) and (_branch_has_rejection(child.body) or _branch_has_rejection(
+                child.orelse
+            )):
+                return True
         elif isinstance(child, ast.Assert):
             if _name_appears_in(child.test, var_name):
                 return True
@@ -108,10 +107,9 @@ def _variable_used_in_rejection_path(
             # where the variable is passed to a function that rejects
             if _name_appears_in(child, var_name) and _is_rejection_call(child):
                 return True
-        elif isinstance(child, ast.Return):
+        elif isinstance(child, ast.Return) and child.value is not None and _name_appears_in(child.value, var_name):
             # return result — delegates rejection responsibility to caller
-            if child.value is not None and _name_appears_in(child.value, var_name):
-                return True
+            return True
     return False
 
 
@@ -140,10 +138,7 @@ def _is_rejection_call(call: ast.Call) -> bool:
 
 def _name_appears_in(node: ast.AST, name: str) -> bool:
     """Check if an ``ast.Name`` with id == *name* appears anywhere in *node*."""
-    for child in ast.walk(node):
-        if isinstance(child, ast.Name) and child.id == name:
-            return True
-    return False
+    return any(isinstance(child, ast.Name) and child.id == name for child in ast.walk(node))
 
 
 class RulePyWl008(RuleBase):

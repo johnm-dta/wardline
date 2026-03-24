@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from wardline.core.taints import TaintState
+    from wardline.core.taints import TaintState as _TS
     from wardline.manifest.models import BoundaryEntry, WardlineManifest
     from wardline.scanner.rules.base import RuleBase
 
@@ -200,7 +201,6 @@ class ScanEngine:
         Returns a dict mapping qualname -> {variable: TaintState}, or None
         on failure.
         """
-        from wardline.core.taints import TaintState as _TS
 
         var_map: dict[str, dict[str, _TS]] = {}
         qualname_map = self._build_qualname_map(tree)

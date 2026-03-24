@@ -55,9 +55,8 @@ def _has_shape_check_before(
         if isinstance(node, ast.Call):
             if _is_shape_validation_call(node):
                 return True
-        elif isinstance(node, ast.Compare):
-            if _is_membership_test(node):
-                return True
+        elif isinstance(node, ast.Compare) and _is_membership_test(node):
+            return True
     return False
 
 
@@ -89,10 +88,7 @@ def _is_membership_test(compare: ast.Compare) -> bool:
 
 def _has_subscript_or_attr_access(node: ast.AST) -> bool:
     """Check if node contains a subscript or attribute access on data."""
-    for child in ast.walk(node):
-        if isinstance(child, (ast.Subscript, ast.Attribute)):
-            return True
-    return False
+    return any(isinstance(child, (ast.Subscript, ast.Attribute)) for child in ast.walk(node))
 
 
 def _get_semantic_check_nodes(
@@ -106,12 +102,8 @@ def _get_semantic_check_nodes(
     """
     results: list[ast.AST] = []
     for child in walk_skip_nested_defs(node):
-        if isinstance(child, ast.If):
-            if _has_subscript_or_attr_access(child.test):
-                results.append(child)
-        elif isinstance(child, ast.Assert):
-            if _has_subscript_or_attr_access(child.test):
-                results.append(child)
+        if (isinstance(child, (ast.If, ast.Assert))) and _has_subscript_or_attr_access(child.test):
+            results.append(child)
     return results
 
 
