@@ -27,6 +27,7 @@ def _make_finding(
     taint_state: object = None,
     analysis_level: int = 1,
     source_snippet: str | None = None,
+    qualname: str | None = None,
 ) -> Finding:
     return Finding(
         rule_id=rule_id,
@@ -41,6 +42,7 @@ def _make_finding(
         taint_state=taint_state,
         analysis_level=analysis_level,
         source_snippet=source_snippet,
+        qualname=qualname,
     )
 
 
@@ -99,6 +101,23 @@ class TestSarifResults:
         assert "wardline.severity" in props
         assert "wardline.exceptionability" in props
         assert "wardline.analysisLevel" in props
+
+    def test_result_property_bag_qualname_and_snippet(self) -> None:
+        """wardline.qualname and wardline.sourceSnippet appear when set."""
+        finding = _make_finding(qualname="MyClass.handle", source_snippet="x = 1")
+        report = SarifReport(findings=[finding])
+        result = report.to_dict()["runs"][0]["results"][0]
+        props = result["properties"]
+        assert props["wardline.qualname"] == "MyClass.handle"
+        assert props["wardline.sourceSnippet"] == "x = 1"
+
+    def test_result_property_bag_omits_none_qualname(self) -> None:
+        """None-valued qualname and sourceSnippet are omitted (not serialized as null)."""
+        report = SarifReport(findings=[_make_finding()])
+        result = report.to_dict()["runs"][0]["results"][0]
+        props = result["properties"]
+        assert "wardline.qualname" not in props
+        assert "wardline.sourceSnippet" not in props
 
     def test_sarif_level_mapping(self) -> None:
         err = _make_finding(severity=Severity.ERROR)
