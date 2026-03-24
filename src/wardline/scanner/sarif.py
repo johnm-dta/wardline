@@ -119,6 +119,8 @@ def _make_result(finding: Finding) -> dict[str, Any]:
             "wardline.severity": str(finding.severity),
             "wardline.exceptionability": str(finding.exceptionability),
             "wardline.analysisLevel": finding.analysis_level,
+            "wardline.qualname": finding.qualname,
+            "wardline.sourceSnippet": finding.source_snippet,
         }
     )
     if finding.exception_id is not None:
