@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import datetime
 import json
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -295,6 +297,227 @@ def expire(exc_id: str, reason: str) -> None:
 
 
 @exception.command()
+@click.option("--rule", required=True, help="Rule ID (e.g., PY-WL-001)")
+@click.option("--location", required=True, help="file_path::qualname")
+@click.option("--taint-state", required=True, help="Taint state (e.g., EXTERNAL_RAW)")
+@click.option("--rationale", required=True, help="Why this exception is granted")
+@click.option("--reviewer", required=True, help="Who approved this exception")
+@click.option("--governance-path", default="standard", type=click.Choice(["standard", "expedited"]))
+@click.option("--expires", default=None, help="Expiry date (ISO 8601, e.g., 2027-03-23)")
+@click.option("--agent-originated", is_flag=True, default=False, help="Mark as agent-originated")
+@click.option("--analysis-level", default=1, type=int, help="Analysis level to stamp on the exception")
+def grant(
+    rule: str,
+    location: str,
+    taint_state: str,
+    rationale: str,
+    reviewer: str,
+    governance_path: str,
+    expires: str | None,
+    agent_originated: bool,
+    analysis_level: int,
+) -> None:
+    """Grant a new exception (like 'add', stamps analysis_level)."""
+    # Validate rule ID
+    try:
+        rule_id = RuleId(rule)
+    except ValueError:
+        click.echo(f"Error: invalid rule ID: {rule}", err=True)
+        sys.exit(1)
+
+    # Validate taint state
+    try:
+        taint = TaintState(taint_state)
+    except ValueError:
+        click.echo(f"Error: invalid taint state: {taint_state}", err=True)
+        sys.exit(1)
+
+    # Check not UNCONDITIONAL
+    cell = matrix.lookup(rule_id, taint)
+    if cell.exceptionability == Exceptionability.UNCONDITIONAL:
+        click.echo(
+            f"Error: ({rule}, {taint_state}) is UNCONDITIONAL — cannot be excepted",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Validate location format
+    if "::" not in location:
+        click.echo("Error: --location must be file_path::qualname", err=True)
+        sys.exit(1)
+
+    file_path, qualname = location.split("::", 1)
+
+    # Agent-originated without expires
+    if agent_originated and expires is None:
+        click.echo("Error: agent-originated exceptions require --expires", err=True)
+        sys.exit(1)
+
+    # Validate expires format
+    if expires is not None:
+        try:
+            datetime.date.fromisoformat(expires)
+        except ValueError:
+            click.echo(f"Error: invalid date format: {expires}", err=True)
+            sys.exit(1)
+
+    # Compute fingerprint
+    fp = compute_ast_fingerprint(Path(file_path), qualname)
+    if fp is None:
+        click.echo(f"Error: cannot compute fingerprint for {location}", err=True)
+        sys.exit(1)
+
+    # Build entry
+    exc_id = f"EXC-{uuid.uuid4().hex[:8].upper()}"
+    entry: dict[str, Any] = {
+        "id": exc_id,
+        "rule": rule,
+        "taint_state": taint_state,
+        "location": location,
+        "exceptionability": str(cell.exceptionability),
+        "severity_at_grant": str(cell.severity),
+        "rationale": rationale,
+        "reviewer": reviewer,
+        "expires": expires,
+        "provenance": "cli",
+        "agent_originated": agent_originated,
+        "ast_fingerprint": fp,
+        "recurrence_count": 0,
+        "governance_path": governance_path,
+        "analysis_level": analysis_level,
+    }
+
+    # Load or create exceptions file
+    exc_path = _find_exceptions_file()
+    data = _load_or_create(exc_path)
+    data["exceptions"].append(entry)
+    _write_exceptions(exc_path, data)
+
+    click.echo(f"Added exception {exc_id} for {rule} at {location} (analysis_level={analysis_level})")
+
+
+@exception.command("preview-drift")
+@click.option("--analysis-level", default=1, type=int, help="Analysis level for taint computation")
+@click.option("--manifest", "manifest_path", default=None, type=click.Path(exists=True), help="Path to wardline.yaml")
+@click.option("--path", "scan_path", required=True, type=click.Path(exists=True), help="Path to scan for taint computation")
+@click.option("--json", "json_output", is_flag=True, help="JSON output")
+def preview_drift(
+    analysis_level: int,
+    manifest_path: str | None,
+    scan_path: str,
+    json_output: bool,
+) -> None:
+    """Preview which exceptions would drift under L3 taint analysis."""
+    exc_path = _find_exceptions_file()
+    data = _load_or_create(exc_path)
+
+    if not data["exceptions"]:
+        click.echo("No exceptions to check.")
+        return
+
+    # Compute refined taints
+    taint_map = _compute_taints(scan_path, manifest_path, analysis_level)
+
+    # Compare each exception's taint_state against the refined taint
+    drifted: list[dict[str, Any]] = []
+    for entry in data["exceptions"]:
+        location = entry["location"]
+        if "::" not in location:
+            continue
+        _file_path, qualname = location.split("::", 1)
+        if qualname not in taint_map:
+            continue
+
+        old_taint = entry["taint_state"]
+        new_taint = taint_map[qualname].value
+        if old_taint != new_taint:
+            drifted.append({
+                "id": entry["id"],
+                "location": location,
+                "rule": entry["rule"],
+                "old_taint": old_taint,
+                "new_taint": new_taint,
+            })
+
+    if json_output:
+        click.echo(json.dumps({"drifted": drifted, "count": len(drifted)}, indent=2))
+    elif drifted:
+        click.echo(f"Found {len(drifted)} drifted exception(s):")
+        for d in drifted:
+            click.echo(f"  {d['id']} ({d['rule']}) at {d['location']}: {d['old_taint']} -> {d['new_taint']}")
+    else:
+        click.echo("No drift detected.")
+
+
+@exception.command()
+@click.option("--analysis-level", default=1, type=int, help="Analysis level for taint computation")
+@click.option("--manifest", "manifest_path", default=None, type=click.Path(exists=True), help="Path to wardline.yaml")
+@click.option("--path", "scan_path", required=True, type=click.Path(exists=True), help="Path to scan for taint computation")
+@click.option("--confirm", is_flag=True, help="Required to actually perform migration")
+@click.option("--json", "json_output", is_flag=True, help="JSON output")
+def migrate(
+    analysis_level: int,
+    manifest_path: str | None,
+    scan_path: str,
+    confirm: bool,
+    json_output: bool,
+) -> None:
+    """Migrate exception taint_state values to match current taint analysis."""
+    if not confirm:
+        click.echo("Error: --confirm is required to perform migration", err=True)
+        sys.exit(1)
+
+    exc_path = _find_exceptions_file()
+    data = _load_or_create(exc_path)
+
+    if not data["exceptions"]:
+        click.echo("No exceptions to migrate.")
+        return
+
+    # Compute refined taints
+    taint_map = _compute_taints(scan_path, manifest_path, analysis_level)
+
+    # Update drifted exceptions
+    migrated: list[dict[str, Any]] = []
+    for entry in data["exceptions"]:
+        location = entry["location"]
+        if "::" not in location:
+            continue
+        _file_path, qualname = location.split("::", 1)
+        if qualname not in taint_map:
+            continue
+
+        old_taint = entry["taint_state"]
+        new_taint = taint_map[qualname].value
+        if old_taint != new_taint:
+            old_level = entry.get("analysis_level", 1)
+            entry["migrated_from"] = f"taint_state was {old_taint} at level {old_level}"
+            entry["taint_state"] = new_taint
+            entry["analysis_level"] = analysis_level
+            migrated.append({
+                "id": entry["id"],
+                "location": location,
+                "old_taint": old_taint,
+                "new_taint": new_taint,
+            })
+        else:
+            # Even if taint didn't change, stamp the analysis_level if it differs
+            if entry.get("analysis_level", 1) != analysis_level:
+                entry["analysis_level"] = analysis_level
+
+    _write_exceptions(exc_path, data)
+
+    if json_output:
+        click.echo(json.dumps({"migrated": migrated, "count": len(migrated)}, indent=2))
+    elif migrated:
+        click.echo(f"Migrated {len(migrated)} exception(s):")
+        for m in migrated:
+            click.echo(f"  {m['id']} at {m['location']}: {m['old_taint']} -> {m['new_taint']}")
+    else:
+        click.echo("No exceptions needed migration.")
+
+
+@exception.command()
 @click.option("--json", "json_output", is_flag=True, help="JSON output")
 def review(json_output: bool) -> None:
     """Review exceptions needing attention."""
@@ -398,3 +621,82 @@ def _load_or_create(path: Path) -> dict[str, Any]:
 def _write_exceptions(path: Path, data: dict[str, Any]) -> None:
     """Write exceptions file with sorted, indented JSON."""
     path.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+
+
+def _compute_taints(
+    scan_path: str,
+    manifest_path: str | None,
+    analysis_level: int,
+) -> dict[str, TaintState]:
+    """Compute function-level taints for all .py files under scan_path.
+
+    Returns a merged dict mapping qualname -> TaintState across all files.
+    When analysis_level >= 3, runs L3 call-graph propagation.
+    """
+    from wardline.manifest.loader import load_manifest
+    from wardline.scanner._qualnames import build_qualname_map
+    from wardline.scanner.discovery import discover_annotations
+    from wardline.scanner.taint.callgraph import extract_call_edges
+    from wardline.scanner.taint.callgraph_propagation import propagate_callgraph_taints
+    from wardline.scanner.taint.function_level import assign_function_taints
+
+    manifest = None
+    if manifest_path is not None:
+        manifest = load_manifest(Path(manifest_path))
+
+    merged_taint: dict[str, TaintState] = {}
+    merged_sources: dict[str, str] = {}  # qualname -> TaintSource
+    merged_edges: dict[str, set[str]] = {}
+    merged_resolved: dict[str, int] = {}
+    merged_unresolved: dict[str, int] = {}
+
+    root = Path(scan_path).resolve()
+    py_files: list[Path] = []
+    if root.is_file():
+        py_files = [root]
+    else:
+        for dirpath, _dirs, filenames in os.walk(root, followlinks=False):
+            for fn in filenames:
+                if fn.endswith(".py"):
+                    py_files.append(Path(dirpath) / fn)
+
+    for file_path in py_files:
+        try:
+            source = file_path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(file_path))
+        except (OSError, SyntaxError):
+            continue
+
+        try:
+            annotations = discover_annotations(tree, file_path)
+            taint_map, taint_sources = assign_function_taints(
+                tree, file_path, annotations, manifest,
+            )
+        except Exception:
+            continue
+
+        merged_taint.update(taint_map)
+        merged_sources.update(taint_sources)
+
+        if analysis_level >= 3:
+            try:
+                qualname_map = build_qualname_map(tree)
+                edges, resolved, unresolved = extract_call_edges(tree, qualname_map)
+                merged_edges.update(edges)
+                merged_resolved.update(resolved)
+                merged_unresolved.update(unresolved)
+            except Exception:
+                pass
+
+    # If analysis_level >= 3, run L3 propagation on merged data
+    if analysis_level >= 3 and merged_taint:
+        try:
+            refined, _provenance = propagate_callgraph_taints(
+                merged_edges, merged_taint, merged_sources,
+                merged_resolved, merged_unresolved,
+            )
+            merged_taint = refined
+        except Exception:
+            pass  # Fall back to L1 taints
+
+    return merged_taint
