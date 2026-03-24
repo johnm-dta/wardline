@@ -18,6 +18,10 @@ class WardlineBase:
     annotations at class definition time. This enables early detection
     of missing or incorrect decorator usage without running a scan.
 
+    When runtime enforcement is enabled (``wardline.runtime.enforcement.enable()``
+    or ``WARDLINE_ENFORCE=1``), instances are also checked at construction
+    time for tier consistency across decorated methods.
+
     Cooperative ``__init_subclass__``: calls ``super()`` BEFORE
     wardline checks to ensure other ``__init_subclass__`` hooks in
     the MRO chain fire correctly.
@@ -29,6 +33,12 @@ class WardlineBase:
 
         # Check subclass methods for wardline decorators
         _check_decorated_methods(cls)
+
+    def __init__(self) -> None:
+        # Runtime enforcement check at construction (no-op when disabled)
+        from wardline.runtime.enforcement import enforce_construction
+
+        enforce_construction(self)
 
 
 def _check_decorated_methods(cls: type) -> None:
