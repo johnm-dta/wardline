@@ -568,3 +568,53 @@ class TestPreviewPhase2Flag:
         report = json.loads(result.stdout)
         assert "$schema" not in report
         assert "runs" not in report
+
+
+@pytest.mark.integration
+class TestScanResolved:
+    """Tests for --resolved flag loading pre-resolved manifest."""
+
+    def test_resolved_flag_loads_boundaries(self, tmp_path: Path) -> None:
+        """--resolved flag loads boundaries from JSON instead of discovering."""
+        manifest = _minimal_manifest(tmp_path)
+
+        # Write a resolved JSON with one boundary
+        resolved = tmp_path / "wardline.resolved.json"
+        resolved.write_text(json.dumps({
+            "format_version": "0.1",
+            "resolved_at": "2026-01-01T00:00:00Z",
+            "root": ".",
+            "manifest_source": "wardline.yaml",
+            "manifest_hash": "sha256:abc",
+            "tiers": [],
+            "module_tiers": [],
+            "merged_rule_overrides": [
+                {"id": "PY-WL-001", "severity": "ERROR", "source": "base"},
+            ],
+            "boundaries": [
+                {
+                    "function": "test_fn",
+                    "transition": "boundary_crossing",
+                    "from_tier": 4,
+                    "to_tier": 2,
+                    "overlay_scope": "/tmp/test",
+                    "overlay_path": "src/wardline.overlay.yaml",
+                },
+            ],
+            "governance_signals": [],
+            "overlays_discovered": [],
+            "scanner_config": None,
+            "metadata": {},
+        }), encoding="utf-8")
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--resolved", str(resolved),
+            "--allow-registry-mismatch",
+        ])
+        # Should produce valid SARIF — the resolved boundaries are loaded
+        sarif = json.loads(result.stdout)
+        assert isinstance(sarif, dict)
+        assert "runs" in sarif

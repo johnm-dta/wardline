@@ -93,7 +93,9 @@ def merge(
     for ovr in base.rules.overrides:
         rule_id = ovr.get("id")
         if isinstance(rule_id, str):
-            base_overrides_by_rule[rule_id] = dict(ovr)
+            d = dict(ovr)
+            d["source"] = "base"
+            base_overrides_by_rule[rule_id] = d
 
     for ovr in overlay.rule_overrides:
         rule_id = ovr.get("id")
@@ -122,6 +124,7 @@ def merge(
         # field, the base manifest itself must be changed.
         merged = dict(base_ovr) if base_ovr else {}
         merged.update(ovr)
+        merged["source"] = f"overlay:{overlay.overlay_for}"
         base_overrides_by_rule[rule_id] = merged
 
     merged_overrides = tuple(base_overrides_by_rule.values())

@@ -148,6 +148,7 @@ class BoundaryEntry:
     provenance: dict[str, object] | None = None
     bounded_context: dict[str, object] | None = None
     overlay_scope: str = ""
+    overlay_path: str = ""
 
 
 @dataclass(frozen=True)

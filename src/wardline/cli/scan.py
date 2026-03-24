@@ -210,6 +210,8 @@ def _disabled_rule_findings(
               help="Emit GOVERNANCE finding for permissive distribution mode.")
 @click.option("--preview-phase2", is_flag=True, default=False,
               help="Output Phase 2 migration impact report (JSON) instead of SARIF.")
+@click.option("--resolved", default=None, type=click.Path(exists=True),
+              help="Pre-resolved manifest (wardline.resolved.json)")
 def scan(
     path: str,
     manifest: str | None,
@@ -222,6 +224,7 @@ def scan(
     allow_registry_mismatch: bool,
     allow_permissive_distribution: bool,
     preview_phase2: bool,
+    resolved: str | None,
 ) -> None:
     """Scan Python files for boundary violations."""
     _setup_logging(verbose=verbose, debug=debug)
@@ -307,11 +310,16 @@ def scan(
         exclude_paths = cfg.exclude_paths
 
     # --- Resolve overlay boundaries ---
-    from wardline.manifest.resolve import resolve_boundaries
-
     boundaries: tuple[_BoundaryEntry, ...] = ()
-    # manifest_path is threaded from _load_manifest — no re-discovery needed
-    boundaries = resolve_boundaries(manifest_path.parent, manifest_model)
+    resolved_rule_overrides: tuple[dict[str, object], ...] | None = None
+
+    if resolved:
+        boundaries, resolved_rule_overrides = _load_resolved(resolved)
+    else:
+        from wardline.manifest.resolve import resolve_boundaries
+
+        # manifest_path is threaded from _load_manifest — no re-discovery needed
+        boundaries = resolve_boundaries(manifest_path.parent, manifest_model)
 
     # --- Create engine and run scan ---
     from wardline.scanner.engine import ScanEngine, ScanResult
@@ -610,3 +618,36 @@ def _load_config(config_arg: str | None) -> ScannerConfig | None | _ConfigError:
     except Exception as exc:
         _error(f"config load error: {exc}")
         return _CONFIG_ERROR
+
+
+def _load_resolved(
+    resolved_path: str,
+) -> tuple[tuple[_BoundaryEntry, ...], tuple[dict[str, object], ...] | None]:
+    """Load boundaries and rule overrides from a wardline.resolved.json file."""
+    import json
+
+    from wardline.manifest.models import BoundaryEntry
+
+    data = json.loads(Path(resolved_path).read_text(encoding="utf-8"))
+
+    boundaries = tuple(
+        BoundaryEntry(
+            function=b["function"],
+            transition=b["transition"],
+            from_tier=b.get("from_tier"),
+            to_tier=b.get("to_tier"),
+            restored_tier=b.get("restored_tier"),
+            provenance=b.get("provenance"),
+            bounded_context=b.get("bounded_context"),
+            overlay_scope=b.get("overlay_scope", ""),
+            overlay_path=b.get("overlay_path", ""),
+        )
+        for b in data.get("boundaries", [])
+    )
+
+    raw_overrides = data.get("merged_rule_overrides")
+    rule_overrides: tuple[dict[str, object], ...] | None = None
+    if raw_overrides is not None:
+        rule_overrides = tuple(dict(ovr) for ovr in raw_overrides)
+
+    return boundaries, rule_overrides

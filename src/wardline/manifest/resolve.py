@@ -59,8 +59,9 @@ def resolve_boundaries(
 
         # Tag each boundary with the overlay's ABSOLUTE scope path
         scope = str((root / overlay.overlay_for).resolve())
+        rel_overlay = str(overlay_path.relative_to(root))
         for boundary in resolved.boundaries:
-            scoped = replace(boundary, overlay_scope=scope)
+            scoped = replace(boundary, overlay_scope=scope, overlay_path=rel_overlay)
             all_boundaries.append(scoped)
 
     return tuple(all_boundaries)
