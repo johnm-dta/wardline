@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/decorators/determinism.py
+# hypothesis_version: 6.151.9
+
+['deterministic', 'nondeterministic']

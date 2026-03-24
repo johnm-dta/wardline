@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/manifest/models.py
+# hypothesis_version: 6.151.9
+
+[100, 'RELAXED', 'analysis_level', 'default_taint', 'disabled_rules', 'enabled_rules', 'exclude_paths', 'overrides', 'rb', 'target_paths', 'wardline']

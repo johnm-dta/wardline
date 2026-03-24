@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/cli/regime_cmd.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.15, 100, '--gate', '--json', '--manifest', '--path', 'ERROR', 'Exceptions:', 'FAIL', 'JSON output.', 'PASS', 'WARNING', 'active', 'age_days', 'agent_originated', 'analysis_level', 'annotated', 'check', 'checks', 'coherence_checks', 'coverage_ratio', 'disabled', 'disabled_rules', 'evidence', 'exception_counts', 'expedited', 'expedited_ratio', 'expired', 'expired_exception', 'fingerprint_coverage', 'first_scan_perimeter', 'generated_at', 'governance_profile', 'manifest_file', 'manifest_loads', 'manifest_version', 'no', 'not set', 'orphaned_annotation', 'output_json', 'passed', 'present', 'ratification_current', 'ratification_date', 'ratification_overdue', 'review_interval_days', 'rules', 'scan_path', 'severity', 'standard', 'tier_distribution', 'tier_downgrade', 'total', 'undeclared_boundary', 'unknown', 'wardline.toml', 'yes', '─']

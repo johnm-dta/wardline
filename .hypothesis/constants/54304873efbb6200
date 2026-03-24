@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/scanner/rules/py_wl_006.py
+# hypothesis_version: 6.151.9
+
+['BaseException', 'Exception', '_', 'audit', 'critical', 'debug', 'emit', 'error', 'exception', 'fatal', 'info', 'insert', 'log', 'persist', 'print', 'record', 'save', 'store', 'warn', 'warning', 'write']

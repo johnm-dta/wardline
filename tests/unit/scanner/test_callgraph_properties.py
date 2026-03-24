@@ -88,7 +88,7 @@ def test_convergence(
     """Random graphs with random taints -> propagation terminates."""
     edges, taint_map, taint_sources, resolved_counts, unresolved_counts = data
     # Must return without hanging or raising
-    result_map, result_prov = propagate_callgraph_taints(
+    result_map, result_prov, _diags = propagate_callgraph_taints(
         edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
     )
     # Basic structural checks
@@ -112,7 +112,7 @@ def test_module_default_monotone_downward(
     Fallback functions are explicitly excluded -- they CAN be refined upward.
     """
     edges, taint_map, taint_sources, resolved_counts, unresolved_counts = data
-    result_map, _ = propagate_callgraph_taints(
+    result_map, _, _diags = propagate_callgraph_taints(
         edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
     )
     for func, source in taint_sources.items():
@@ -140,10 +140,10 @@ def test_idempotence(
     """Running propagation twice on same input produces identical output."""
     edges, taint_map, taint_sources, resolved_counts, unresolved_counts = data
 
-    result1, prov1 = propagate_callgraph_taints(
+    result1, prov1, _diags1 = propagate_callgraph_taints(
         edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
     )
-    result2, prov2 = propagate_callgraph_taints(
+    result2, prov2, _diags2 = propagate_callgraph_taints(
         edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
     )
 
@@ -167,7 +167,7 @@ def test_anchored_immutability(
 ) -> None:
     """Anchored (decorator-sourced) functions' taints unchanged regardless of graph."""
     edges, taint_map, taint_sources, resolved_counts, unresolved_counts = data
-    result_map, _ = propagate_callgraph_taints(
+    result_map, _, _diags = propagate_callgraph_taints(
         edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
     )
     for func, source in taint_sources.items():
@@ -195,7 +195,7 @@ def test_fallback_bounded_by_callees(
     The <= here means the result rank is at most the max callee rank.
     """
     edges, taint_map, taint_sources, resolved_counts, unresolved_counts = data
-    result_map, _ = propagate_callgraph_taints(
+    result_map, _, _diags = propagate_callgraph_taints(
         edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
     )
     for func, source in taint_sources.items():

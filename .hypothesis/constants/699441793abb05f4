@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/cli/scan.py
+# hypothesis_version: 6.151.9
+
+[0.0, 100, '\n---\n', '*.yaml', '*.yml', '--config', '--debug', '--manifest', '--output', '--preview-phase2', '--quiet', '--verbose', '--verification-mode', '-dirty', '-o', '-v', '.', 'HEAD', 'Loaded manifest: %s', 'diff', 'expedited', 'git', 'overlays', 'path', 'rev-parse', 'sha256:', 'utf-8', 'wardline']

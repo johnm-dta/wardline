@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/core/severity.py
+# hypothesis_version: 6.151.9
+
+['ERROR', 'PY-WL-001', 'PY-WL-002', 'PY-WL-003', 'PY-WL-004', 'PY-WL-005', 'PY-WL-006', 'PY-WL-007', 'PY-WL-008', 'PY-WL-009', 'RELAXED', 'STANDARD', 'SUPPRESS', 'TOOL-ERROR', 'TRANSPARENT', 'UNCONDITIONAL', 'WARNING', 'expedited', 'standard']

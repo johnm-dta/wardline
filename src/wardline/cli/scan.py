@@ -350,10 +350,13 @@ def scan(
     expedited_exception_ratio = 0.0
 
     if exceptions:
+        # NOTE: taint_map is not passed here. ScanResult does not carry a
+        # global taint_map, and L3 taint propagation is per-file (intra-module).
+        # Taint-drift detection is available via `wardline exception preview-drift`
+        # (CLI path). The scan path detects level-stale only.
         processed, governance_ex = apply_exceptions(
             result.findings, exceptions, project_root=manifest_path.parent,
             analysis_level=analysis_level,
-            taint_map=getattr(result, 'taint_map', None),
         )
         result.findings = processed
         governance_findings.extend(governance_ex)
@@ -455,8 +458,11 @@ def scan(
     manifest_hash = _compute_manifest_hash(manifest_path)
     if manifest_hash is None:
         logger.warning("Manifest hash unavailable — SARIF report has no policy binding")
+    import wardline as _wardline_pkg
+
     sarif_report = SarifReport(
         findings=all_findings,
+        tool_version=_wardline_pkg.__version__,
         verification_mode=verification_mode,
         implemented_rule_ids=loaded_rule_ids,
         unknown_raw_count=unknown_raw_count,

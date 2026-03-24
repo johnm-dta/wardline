@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/decorators/secrets.py
+# hypothesis_version: 6.151.9
+
+['handles_secrets', 'redacts_output']

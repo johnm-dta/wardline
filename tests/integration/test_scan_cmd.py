@@ -197,10 +197,10 @@ class TestRegistrySync:
 
         manifest = _minimal_manifest(tmp_path)
         runner = CliRunner()
-        # Patch _make_rules to return only a subset, creating a mismatch
+        # Patch make_rules to return only a subset, creating a mismatch
         # with the canonical registry (which has all 9 rules).
         with patch(
-            "wardline.cli.scan._make_rules",
+            "wardline.scanner.rules.make_rules",
             return_value=(),
         ):
             result = runner.invoke(cli, [
@@ -218,9 +218,9 @@ class TestRegistrySync:
 
         manifest = _minimal_manifest(tmp_path)
         runner = CliRunner()
-        # Patch _make_rules to return only a subset, creating a mismatch
+        # Patch make_rules to return only a subset, creating a mismatch
         with patch(
-            "wardline.cli.scan._make_rules",
+            "wardline.scanner.rules.make_rules",
             return_value=(),
         ):
             result = runner.invoke(cli, [

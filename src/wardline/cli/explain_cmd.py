@@ -260,7 +260,6 @@ def _build_exception_section(
     import datetime
 
     from wardline.manifest.exceptions import load_exceptions
-    from wardline.scanner.exceptions import _parse_location
 
     exceptions_list: list[dict] = []
     all_exceptions: tuple = ()
@@ -289,7 +288,6 @@ def _build_exception_section(
         # Find matching exception for this (rule, taint_state, location)
         matched_exc = None
         for exc in all_exceptions:
-            exc_file, exc_qualname = _parse_location(exc.location)
             exc_location = exc.location
             if exc.rule == rule_str and exc.taint_state == taint_state and exc_location == location_key:
                 matched_exc = exc

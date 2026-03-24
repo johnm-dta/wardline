@@ -142,6 +142,7 @@ class TestMigrate:
                 "migrate",
                 "--analysis-level", "3",
                 "--path", str(tmp_path),
+                "--actor", "test-user",
                 "--confirm",
             ])
 
@@ -165,6 +166,7 @@ class TestMigrate:
                 "migrate",
                 "--analysis-level", "3",
                 "--path", str(tmp_path),
+                "--actor", "test-user",
                 "--confirm",
             ])
 
@@ -188,6 +190,7 @@ class TestMigrate:
                 "migrate",
                 "--analysis-level", "3",
                 "--path", str(tmp_path),
+                "--actor", "test-user",
                 "--confirm",
             ])
 
@@ -214,6 +217,7 @@ class TestMigrate:
                     "migrate",
                     "--analysis-level", "3",
                     "--path", str(tmp_path),
+                    "--actor", "test-user",
                     "--confirm",
                 ])
             assert result.exit_code == 0
@@ -238,6 +242,7 @@ class TestMigrate:
                 "migrate",
                 "--analysis-level", "3",
                 "--path", str(tmp_path),
+                "--actor", "test-user",
             ])
 
         assert result.exit_code != 0

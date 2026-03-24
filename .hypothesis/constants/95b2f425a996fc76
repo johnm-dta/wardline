@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/scanner/fingerprint.py
+# hypothesis_version: 6.151.9
+
+[0.0, ',', '.', '.py', '.venv', '__pycache__', 'construction', 'enforcement', 'external_boundary', 'external_validation', 'ingress', 'policy', 'rb', 'semantic_validation', 'shape_validation', 'utf-8', 'validates_external', 'validates_semantic', 'validates_shape']

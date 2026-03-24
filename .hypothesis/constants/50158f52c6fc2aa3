@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/scanner/taint/function_level.py
+# hypothesis_version: 6.151.9
+
+['audit_writer', 'decorator', 'external_boundary', 'fallback', 'module_default', 'tier1_read', 'validates_external', 'validates_semantic', 'validates_shape']

@@ -102,6 +102,7 @@ def apply_exceptions(
             stale_exception_ids.add(exc.id)
 
     # Taint-drift detection: exception taint_state vs current effective taint
+    drifted_ids: set[str] = set()
     if taint_map is not None:
         for exc in exceptions:
             # Skip expired exceptions
@@ -128,6 +129,7 @@ def apply_exceptions(
                         exception_id=exc.id,
                         original_rule=exc.rule,
                     ))
+                    drifted_ids.add(exc.id)
 
     for finding in findings:
         if finding.qualname is None:
@@ -173,6 +175,10 @@ def apply_exceptions(
         for exc in candidates:
             # Level-stale exceptions are inactive — skip them
             if exc.id in stale_exception_ids:
+                continue
+
+            # Drifted exceptions are inactive — skip them
+            if exc.id in drifted_ids:
                 continue
 
             # Check expiry

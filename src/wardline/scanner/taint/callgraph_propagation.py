@@ -18,6 +18,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Multiplier for the per-SCC convergence safety bound.  The worklist is
+# allowed at most ``_CONVERGENCE_BOUND_FACTOR * len(scc)`` iterations.
+_CONVERGENCE_BOUND_FACTOR: int = 8
+
 
 # ── Provenance dataclass ──────────────────────────────────────────
 
@@ -44,7 +48,7 @@ def propagate_callgraph_taints(
     taint_sources: dict[str, TaintSource],
     resolved_counts: dict[str, int],
     unresolved_counts: dict[str, int],
-) -> tuple[dict[str, TaintState], dict[str, TaintProvenance]]:
+) -> tuple[dict[str, TaintState], dict[str, TaintProvenance], list[tuple[str, str]]]:
     """Run SCC-based fixed-point propagation to refine L1 taints.
 
     Args:
@@ -55,12 +59,16 @@ def propagate_callgraph_taints(
         unresolved_counts: Unresolved call-site counts per caller.
 
     Returns:
-        Tuple of ``(refined_taint_map, provenance_map)``.
+        Tuple of ``(refined_taint_map, provenance_map, diagnostics)``.
+        Diagnostics is a list of ``(code, message)`` tuples for
+        L3_CONVERGENCE_BOUND and L3_LOW_RESOLUTION conditions.
     """
     from wardline.core.taints import TaintState
 
     if not taint_map:
-        return {}, {}
+        return {}, {}, []
+
+    diagnostics: list[tuple[str, str]] = []
 
     # --- 1. Classify functions ------------------------------------------------
     anchored: set[str] = set()
@@ -100,8 +108,6 @@ def propagate_callgraph_taints(
     sccs = compute_sccs(scc_graph)
 
     # --- 5. Worklist iteration per SCC ----------------------------------------
-    convergence_bound_hit = False
-
     # Pre-compute rank-to-state reverse map (static, built once)
     rank_to_state = {r: s for s, r in TRUST_RANK.items()}
 
@@ -110,7 +116,7 @@ def propagate_callgraph_taints(
         if scc <= anchored:
             continue
 
-        safety_bound = 8 * len(scc)
+        safety_bound = _CONVERGENCE_BOUND_FACTOR * len(scc)
         iterations = 0
 
         # Phase 1: Compute external influence for each SCC member.
@@ -154,7 +160,10 @@ def propagate_callgraph_taints(
                     len(scc),
                     iterations,
                 )
-                convergence_bound_hit = True
+                diagnostics.append((
+                    "L3_CONVERGENCE_BOUND",
+                    f"SCC of size {len(scc)} hit iteration bound after {iterations} iterations",
+                ))
                 break
 
             func = min(worklist)  # deterministic pick
@@ -215,7 +224,7 @@ def propagate_callgraph_taints(
             )
             return dict(taint_map), _seed_provenance_only(
                 taint_map, taint_sources, resolved_counts, unresolved_counts,
-            )
+            ), diagnostics
 
     for func in floating_down:
         if TRUST_RANK[current[func]] < TRUST_RANK[taint_map[func]]:
@@ -227,7 +236,22 @@ def propagate_callgraph_taints(
             )
             return dict(taint_map), _seed_provenance_only(
                 taint_map, taint_sources, resolved_counts, unresolved_counts,
-            )
+            ), diagnostics
+
+    # --- 6b. L3_LOW_RESOLUTION detection --------------------------------------
+    for func in taint_map:
+        res = resolved_counts.get(func, 0)
+        unres = unresolved_counts.get(func, 0)
+        total_calls = res + unres
+        if total_calls > 0:
+            unresolved_ratio = unres / total_calls
+            if unresolved_ratio > 0.7:
+                pct = int(unresolved_ratio * 100)
+                diagnostics.append((
+                    "L3_LOW_RESOLUTION",
+                    f"Function {func} has {pct}% unresolved calls "
+                    f"({unres}/{total_calls})",
+                ))
 
     # --- 7. Build provenance records ------------------------------------------
     provenance: dict[str, TaintProvenance] = {}
@@ -262,7 +286,7 @@ def propagate_callgraph_taints(
                 unresolved_call_count=unresolved_counts.get(func, 0),
             )
 
-    return current, provenance
+    return current, provenance, diagnostics
 
 
 def _seed_provenance_only(

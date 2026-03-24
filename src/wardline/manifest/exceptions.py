@@ -71,6 +71,8 @@ def load_exceptions(manifest_dir: Path) -> tuple[ExceptionEntry, ...]:
             last_refreshed_by=raw.get("last_refreshed_by"),
             last_refresh_rationale=raw.get("last_refresh_rationale"),
             last_refreshed_at=raw.get("last_refreshed_at"),
+            analysis_level=raw.get("analysis_level", 1),
+            migrated_from=raw.get("migrated_from"),
         )
         _validate_not_unconditional(entry, path)
         entries.append(entry)

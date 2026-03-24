@@ -80,6 +80,7 @@ def exception() -> None:
 @click.option("--governance-path", default="standard", type=click.Choice(["standard", "expedited"]))
 @click.option("--expires", default=None, help="Expiry date (ISO 8601, e.g., 2027-03-23)")
 @click.option("--agent-originated", is_flag=True, default=False, help="Mark as agent-originated")
+@click.option("--analysis-level", default=1, type=int, help="Analysis level to stamp on the exception")
 def add(
     rule: str,
     location: str,
@@ -89,6 +90,7 @@ def add(
     governance_path: str,
     expires: str | None,
     agent_originated: bool,
+    analysis_level: int,
 ) -> None:
     """Add a new exception to the register."""
     # Validate rule ID
@@ -157,6 +159,7 @@ def add(
         "ast_fingerprint": fp,
         "recurrence_count": 0,
         "governance_path": governance_path,
+        "analysis_level": analysis_level,
     }
 
     # Load or create exceptions file
@@ -165,7 +168,7 @@ def add(
     data["exceptions"].append(entry)
     _write_exceptions(exc_path, data)
 
-    click.echo(f"Added exception {exc_id} for {rule} at {location}")
+    click.echo(f"Added exception {exc_id} for {rule} at {location} (analysis_level={analysis_level})")
 
 
 @exception.command()
@@ -454,12 +457,14 @@ def preview_drift(
 @click.option("--manifest", "manifest_path", default=None, type=click.Path(exists=True), help="Path to wardline.yaml")
 @click.option("--path", "scan_path", required=True, type=click.Path(exists=True), help="Path to scan for taint computation")
 @click.option("--confirm", is_flag=True, help="Required to actually perform migration")
+@click.option("--actor", required=True, help="Who is performing this migration")
 @click.option("--json", "json_output", is_flag=True, help="JSON output")
 def migrate(
     analysis_level: int,
     manifest_path: str | None,
     scan_path: str,
     confirm: bool,
+    actor: str,
     json_output: bool,
 ) -> None:
     """Migrate exception taint_state values to match current taint analysis."""
@@ -494,16 +499,14 @@ def migrate(
             entry["migrated_from"] = f"taint_state was {old_taint} at level {old_level}"
             entry["taint_state"] = new_taint
             entry["analysis_level"] = analysis_level
+            entry["migrated_by"] = actor
             migrated.append({
                 "id": entry["id"],
                 "location": location,
                 "old_taint": old_taint,
                 "new_taint": new_taint,
             })
-        else:
-            # Even if taint didn't change, stamp the analysis_level if it differs
-            if entry.get("analysis_level", 1) != analysis_level:
-                entry["analysis_level"] = analysis_level
+        # Non-drifted entries are left untouched
 
     _write_exceptions(exc_path, data)
 
@@ -630,8 +633,9 @@ def _compute_taints(
 ) -> dict[str, TaintState]:
     """Compute function-level taints for all .py files under scan_path.
 
-    Returns a merged dict mapping qualname -> TaintState across all files.
-    When analysis_level >= 3, runs L3 call-graph propagation.
+    This is the authoritative implementation of taint computation for CLI
+    commands.  Returns a merged dict mapping qualname -> TaintState across
+    all files.  When analysis_level >= 3, runs L3 call-graph propagation.
     """
     from wardline.manifest.loader import load_manifest
     from wardline.scanner._qualnames import build_qualname_map
@@ -645,10 +649,6 @@ def _compute_taints(
         manifest = load_manifest(Path(manifest_path))
 
     merged_taint: dict[str, TaintState] = {}
-    merged_sources: dict[str, str] = {}  # qualname -> TaintSource
-    merged_edges: dict[str, set[str]] = {}
-    merged_resolved: dict[str, int] = {}
-    merged_unresolved: dict[str, int] = {}
 
     root = Path(scan_path).resolve()
     py_files: list[Path] = []
@@ -675,28 +675,19 @@ def _compute_taints(
         except Exception:
             continue
 
-        merged_taint.update(taint_map)
-        merged_sources.update(taint_sources)
-
-        if analysis_level >= 3:
+        # L3: run per-file propagation (intra-module), matching engine behavior
+        if analysis_level >= 3 and taint_map:
             try:
                 qualname_map = build_qualname_map(tree)
                 edges, resolved, unresolved = extract_call_edges(tree, qualname_map)
-                merged_edges.update(edges)
-                merged_resolved.update(resolved)
-                merged_unresolved.update(unresolved)
+                refined, _provenance, _diagnostics = propagate_callgraph_taints(
+                    edges, taint_map, taint_sources,
+                    resolved, unresolved,
+                )
+                taint_map = refined
             except Exception:
-                pass
+                pass  # Fall back to L1 taints for this file
 
-    # If analysis_level >= 3, run L3 propagation on merged data
-    if analysis_level >= 3 and merged_taint:
-        try:
-            refined, _provenance = propagate_callgraph_taints(
-                merged_edges, merged_taint, merged_sources,
-                merged_resolved, merged_unresolved,
-            )
-            merged_taint = refined
-        except Exception:
-            pass  # Fall back to L1 taints
+        merged_taint.update(taint_map)
 
     return merged_taint

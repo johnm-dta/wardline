@@ -54,6 +54,10 @@ _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
     RuleId.GOVERNANCE_RECURRING_EXCEPTION: "Recurring exception — multiple renewals (governance)",
     RuleId.GOVERNANCE_BATCH_REFRESH: "Batch exception refresh performed (governance)",
     RuleId.GOVERNANCE_NO_EXPIRY_EXCEPTION: "Exception has no expiry date (governance)",
+    RuleId.GOVERNANCE_EXCEPTION_TAINT_DRIFT: "Exception taint state no longer matches function's effective taint",
+    RuleId.GOVERNANCE_EXCEPTION_LEVEL_STALE: "Exception granted at lower analysis level than active scan",
+    RuleId.L3_LOW_RESOLUTION: "L3 call-graph taint based on minority of call edges (>70% unresolved)",
+    RuleId.L3_CONVERGENCE_BOUND: "L3 propagation hit iteration safety bound — results may be incomplete",
 }
 
 # Pseudo-rule-IDs that should NOT appear in implementedRules.
@@ -219,7 +223,9 @@ class SarifReport:
                    else {}),
                 "wardline.conformanceGaps": [],
                 "wardline.implementedRules": self._implemented_rules(),
-                "wardline.manifestHash": self.manifest_hash,
+                **({"wardline.manifestHash": self.manifest_hash}
+                   if self.manifest_hash is not None
+                   else {}),
                 "wardline.propertyBagVersion": "0.2",
                 **({"wardline.scanTimestamp": self.scan_timestamp}
                    if not self.verification_mode and self.scan_timestamp

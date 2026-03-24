@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/runtime/types.py
+# hypothesis_version: 6.151.9
+
+['FailFast', 'Tier1', 'Tier2', 'Tier3', 'Tier4', 'tier']

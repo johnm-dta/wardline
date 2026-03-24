@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/decorators/sensitivity.py
+# hypothesis_version: 6.151.9
+
+['financial_data', 'phi_handler', 'pii_handler']

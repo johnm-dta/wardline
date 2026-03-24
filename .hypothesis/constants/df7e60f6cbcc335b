@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/cli/manifest_cmds.py
+# hypothesis_version: 6.151.9
+
+['--approve', '--manifest', 'action', 'baseline', 'default_taint', 'description', 'file', 'id', 'manifest_file', 'module_paths', 'module_tiers', 'path', 'tier', 'tiers', 'update', 'utf-8']

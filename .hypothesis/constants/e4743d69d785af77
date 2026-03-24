@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/scanner/taint/callgraph_propagation.py
+# hypothesis_version: 6.151.9
+
+[0.7, 100, 'L3_CONVERGENCE_BOUND', 'L3_LOW_RESOLUTION', 'callgraph', 'decorator', 'fallback', 'module_default']

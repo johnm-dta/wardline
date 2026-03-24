@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/decorators/authority.py
+# hypothesis_version: 6.151.9
+
+['audit_writer', 'external_boundary', 'tier1_read', 'validates_external', 'validates_semantic', 'validates_shape']

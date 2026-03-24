@@ -37,9 +37,9 @@ if TYPE_CHECKING:
 
     from wardline.core.taints import TaintState
     from wardline.core.taints import TaintState as _TS
-    from wardline.scanner.taint.function_level import TaintSource
     from wardline.manifest.models import BoundaryEntry, WardlineManifest
     from wardline.scanner.rules.base import RuleBase
+    from wardline.scanner.taint.function_level import TaintSource
 
 logger = logging.getLogger(__name__)
 
@@ -260,9 +260,34 @@ class ScanEngine:
             edges, resolved_counts, unresolved_counts = extract_call_edges(
                 tree, qualname_map
             )
-            refined_map, provenance = propagate_callgraph_taints(
+            refined_map, provenance, l3_diagnostics = propagate_callgraph_taints(
                 edges, taint_map, taint_sources, resolved_counts, unresolved_counts
             )
+            # Convert L3 diagnostics to Finding objects
+            _diag_rule_map = {
+                "L3_CONVERGENCE_BOUND": RuleId.L3_CONVERGENCE_BOUND,
+                "L3_LOW_RESOLUTION": RuleId.L3_LOW_RESOLUTION,
+            }
+            for diag_code, diag_msg in l3_diagnostics:
+                diag_rule = _diag_rule_map.get(diag_code)
+                if diag_rule is not None:
+                    result.findings.append(
+                        Finding(
+                            rule_id=diag_rule,
+                            file_path=str(file_path),
+                            line=1,
+                            col=0,
+                            end_line=None,
+                            end_col=None,
+                            message=diag_msg,
+                            severity=Severity.WARNING,
+                            exceptionability=Exceptionability.UNCONDITIONAL,
+                            taint_state=None,
+                            analysis_level=3,
+                            source_snippet=None,
+                            qualname=None,
+                        )
+                    )
             return refined_map, provenance
         except Exception as exc:
             logger.warning(

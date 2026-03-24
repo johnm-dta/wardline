@@ -6,7 +6,6 @@ optionally gates on ERROR-level issues.
 
 from __future__ import annotations
 
-import ast
 import json as json_mod
 import sys
 from pathlib import Path
@@ -42,23 +41,9 @@ def _discover_all_annotations(
     scan_path: Path,
 ) -> dict[tuple[str, str], list]:
     """Walk .py files under *scan_path*, parse to AST, discover annotations."""
-    from wardline.scanner.discovery import discover_annotations
+    from wardline.cli._helpers import discover_all_annotations
 
-    all_annotations: dict[tuple[str, str], list] = {}
-
-    for py_file in sorted(scan_path.rglob("*.py")):
-        try:
-            source = py_file.read_text(encoding="utf-8")
-        except (OSError, PermissionError):
-            continue
-        try:
-            tree = ast.parse(source, filename=str(py_file))
-        except SyntaxError:
-            continue
-        file_annotations = discover_annotations(tree, py_file)
-        all_annotations.update(file_annotations)
-
-    return all_annotations
+    return discover_all_annotations(scan_path)
 
 
 @click.command("coherence")

@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/cli/corpus_cmds.py
+# hypothesis_version: 6.151.9
+
+[0.0, '**/*.yaml', '**/*.yml', '--analysis-level', '--corpus-dir', '<specimen>', 'No specimens found.', 'body', 'corpus/', 'finalbody', 'fragment', 'handlers', 'known_false_negative', 'orelse', 'rule', 'rule_id', 'sha256', 'source', 'taint_state', 'true_negative', 'true_positive', 'utf-8', 'verdict']

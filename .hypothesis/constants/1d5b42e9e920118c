@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/cli/coherence_cmd.py
+# hypothesis_version: 6.151.9
+
+['*.py', '--gate', '--json', '--manifest', '--path', '0 issues found', 'ERROR', 'JSON output.', 'WARNING', 'category', 'check_name', 'coherence', 'enforcement', 'expired_exception', 'file_path', 'first_scan_perimeter', 'function', 'manifest_file', 'message', 'orphaned_annotation', 'output_json', 'policy', 'scan_path', 'severity', 'tier_distribution', 'tier_downgrade', 'undeclared_boundary', 'utf-8']

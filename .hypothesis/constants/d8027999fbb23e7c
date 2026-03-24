@@ -1,0 +1,4 @@
+# file: /home/john/wardline/src/wardline/manifest/discovery.py
+# hypothesis_version: 6.151.9
+
+['*', '.git', 'wardline.yaml']

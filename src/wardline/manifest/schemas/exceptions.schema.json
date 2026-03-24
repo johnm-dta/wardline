@@ -99,6 +99,10 @@
           "migrated_from": {
             "type": ["string", "null"],
             "description": "Previous taint_state before migration (audit trail)."
+          },
+          "migrated_by": {
+            "type": ["string", "null"],
+            "description": "Who performed the taint migration."
           }
         },
         "required": [
