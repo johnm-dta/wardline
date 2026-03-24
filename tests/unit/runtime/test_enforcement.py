@@ -27,7 +27,7 @@ def _reset_enforcement():
     _reset_enforcement_state()
     yield
     _reset_enforcement_state()
-    enforcement.on_violation = None
+    enforcement.set_violation_handler(None)
 
 
 # ── Enable/disable ────────────────────────────────────────────
@@ -250,7 +250,9 @@ class TestCheckTierBoundary:
     def test_calls_on_violation(self) -> None:
         enforcement.enable()
         called_with: list[tuple[object, int, int | None]] = []
-        enforcement.on_violation = lambda obj, exp, act: called_with.append((obj, exp, act))
+        enforcement.set_violation_handler(
+            lambda obj, exp, act: called_with.append((obj, exp, act))
+        )
 
         obj = _make_tier_obj(4)
         with pytest.raises(TierViolationError):
@@ -264,20 +266,29 @@ class TestCheckTierBoundary:
         obj = _make_tier_obj(4)
         check_tier_boundary(obj, expected_min_tier=1)  # should not raise
 
-    def test_on_violation_exception_propagation(self) -> None:
-        """If on_violation raises, TierViolationError still propagates."""
+    def test_on_violation_exception_is_caught(self) -> None:
+        """If on_violation raises, TierViolationError still propagates (callback isolated)."""
         enforcement.enable()
 
         def bad_callback(obj: object, exp: int, act: int | None) -> None:
             raise RuntimeError("callback failed")
 
-        enforcement.on_violation = bad_callback
+        enforcement.set_violation_handler(bad_callback)
 
         obj = _make_tier_obj(4)
-        # The callback raises RuntimeError, but TierViolationError should
-        # still be raised (callback exception may propagate instead if not caught)
-        with pytest.raises((TierViolationError, RuntimeError)):
+        # Callback exception is caught; TierViolationError always propagates
+        with pytest.raises(TierViolationError):
             check_tier_boundary(obj, expected_min_tier=1)
+
+    def test_fails_tier_out_of_range(self) -> None:
+        enforcement.enable()
+        obj = _make_tier_obj(5)
+        with pytest.raises(TierViolationError, match="out of valid range 1-4"):
+            check_tier_boundary(obj, expected_min_tier=2)
+
+        obj0 = _make_tier_obj(0)
+        with pytest.raises(TierViolationError, match="out of valid range 1-4"):
+            check_tier_boundary(obj0, expected_min_tier=2)
 
     def test_on_tierstamped_object(self) -> None:
         """check_tier_boundary works on TierStamped objects."""
@@ -301,6 +312,10 @@ class TestCheckValidatedRecord:
     def test_accepts_set_groups(self) -> None:
         enforcement.enable()
         check_validated_record(_SetGroupsRecord())
+
+    def test_accepts_frozenset_groups(self) -> None:
+        enforcement.enable()
+        check_validated_record(_FrozensetGroupsRecord())
 
     def test_rejects_missing_tier(self) -> None:
         enforcement.enable()
@@ -437,8 +452,65 @@ class _BadTierTypeRecord:
         return (1,)
 
 
+class _FrozensetGroupsRecord:
+    @property
+    def _wardline_tier(self) -> int:
+        return 2
+
+    @property
+    def _wardline_groups(self) -> frozenset[int]:
+        return frozenset({1, 3})
+
+
 def _make_tier_obj(tier: int) -> object:
     """Create a simple object with _wardline_tier set."""
     obj = _Stampable()
     obj._wardline_tier = tier  # type: ignore[attr-defined]
     return obj
+
+
+# ── check_subclass_tier_consistency (direct) ────────────────
+
+
+class TestCheckSubclassTierConsistency:
+    """F8: Direct tests for check_subclass_tier_consistency warnings list."""
+
+    def test_consistent_class_returns_empty(self) -> None:
+        from wardline.decorators.authority import tier1_read
+
+        class Consistent:
+            @tier1_read
+            def read_a(self) -> None:
+                pass
+
+            @tier1_read
+            def read_b(self) -> None:
+                pass
+
+        warnings = check_subclass_tier_consistency(Consistent)
+        assert warnings == []
+
+    def test_mixed_tiers_returns_warnings(self) -> None:
+        from wardline.decorators.authority import external_boundary, tier1_read
+
+        class Mixed:
+            @external_boundary
+            def ingest(self) -> None:
+                pass
+
+            @tier1_read
+            def read(self) -> None:
+                pass
+
+        warnings = check_subclass_tier_consistency(Mixed)
+        assert len(warnings) == 1
+        assert "spanning multiple tiers" in warnings[0]
+        assert "Mixed" in warnings[0]
+
+    def test_no_decorated_methods_returns_empty(self) -> None:
+        class Plain:
+            def method(self) -> None:
+                pass
+
+        warnings = check_subclass_tier_consistency(Plain)
+        assert warnings == []

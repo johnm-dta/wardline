@@ -27,7 +27,6 @@ TAINT_TO_TIER: MappingProxyType[TaintState, AuthorityTier] = MappingProxyType({
 })
 
 # Explicit check (not assert — survives python -O)
-if len(TAINT_TO_TIER) != len(TaintState):
-    raise ValueError(
-        f"TAINT_TO_TIER covers {len(TAINT_TO_TIER)} but TaintState has {len(TaintState)}"
-    )
+missing = set(TaintState) - TAINT_TO_TIER.keys()
+if missing:
+    raise ValueError(f"TAINT_TO_TIER missing entries for: {missing}")

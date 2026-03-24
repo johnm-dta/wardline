@@ -10,7 +10,7 @@ from wardline.runtime.enforcement import (
     disable,
     enable,
     is_enabled,
-    on_violation,
+    set_violation_handler,
     stamp_tier,
     unstamp,
 )
@@ -44,7 +44,7 @@ __all__ = [
     "disable",
     "enable",
     "is_enabled",
-    "on_violation",
+    "set_violation_handler",
     "stamp_tier",
     "unstamp",
 ]

@@ -25,7 +25,7 @@ def _reset_enforcement():
     _reset_enforcement_state()
     yield
     _reset_enforcement_state()
-    enforcement.on_violation = None
+    enforcement.set_violation_handler(None)
 
 
 class TestDecoratedFunctionStampsReturn:

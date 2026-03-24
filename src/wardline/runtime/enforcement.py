@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -71,6 +72,8 @@ def disable() -> None:
 
 def _reset_enforcement_state() -> None:
     """Reset enforcement state to defaults. INTERNAL — for test fixtures only."""
+    if "pytest" not in sys.modules and not os.environ.get("WARDLINE_TESTING"):
+        raise RuntimeError("_reset_enforcement_state is for test use only")
     global _enforcement_enabled, _first_check_done  # noqa: PLW0603
     _enforcement_enabled = os.environ.get("WARDLINE_ENFORCE", "") == "1"
     _first_check_done = False
@@ -78,7 +81,13 @@ def _reset_enforcement_state() -> None:
 
 # ── Optional violation callback ──────────────────────────────
 
-on_violation: Callable[..., Any] | None = None
+_on_violation: Callable[..., Any] | None = None
+
+
+def set_violation_handler(handler: Callable[..., Any] | None) -> None:
+    """Register a violation callback. None clears."""
+    global _on_violation  # noqa: PLW0603
+    _on_violation = handler
 
 
 # ── TierViolationError ───────────────────────────────────────
@@ -114,7 +123,7 @@ class TierViolationError(Exception):
 
 
 @dataclass(frozen=True, slots=True)
-class TierStamped[T]:
+class TierStamped[T]:  # PEP 695 syntax; works on 3.12+, stabilised in 3.13
     """Frozen wrapper that carries tier metadata for unstampable objects.
 
     Used when the result of a decorated function cannot have attributes
@@ -248,6 +257,21 @@ def check_tier_boundary(
             actual_tier=None,
         )
 
+    if not (1 <= tier <= 4):
+        ctx = f" (context: {context})" if context else ""
+        msg = (
+            f"{type(obj).__name__} has _wardline_tier={tier} "
+            f"out of valid range 1-4{ctx}"
+        )
+        logger.warning("Tier boundary violation: %s", msg)
+        _invoke_on_violation(obj, expected_min_tier, tier)
+        raise TierViolationError(
+            msg,
+            obj=obj,
+            expected_tier=expected_min_tier,
+            actual_tier=tier,
+        )
+
     if tier > expected_min_tier:
         ctx = f" (context: {context})" if context else ""
         msg = (
@@ -270,8 +294,13 @@ def _invoke_on_violation(
     actual_tier: int | None,
 ) -> None:
     """Call the on_violation callback if set."""
-    if on_violation is not None:
-        on_violation(obj, expected_tier, actual_tier)
+    if _on_violation is not None:
+        try:
+            _on_violation(obj, expected_tier, actual_tier)
+        except Exception:
+            logging.getLogger("wardline").warning(
+                "on_violation callback raised — enforcement continues"
+            )
 
 
 def check_validated_record(obj: Any) -> None:
@@ -310,9 +339,9 @@ def check_validated_record(obj: Any) -> None:
         raise TierViolationError(msg, obj=obj)
 
     groups = obj._wardline_groups
-    if not isinstance(groups, (tuple, set)):
+    if not isinstance(groups, (tuple, set, frozenset)):
         msg = (
-            f"{type(obj).__name__}._wardline_groups must be tuple or set, "
+            f"{type(obj).__name__}._wardline_groups must be tuple, set, or frozenset, "
             f"got {type(groups).__name__}"
         )
         logger.warning("ValidatedRecord check failed: %s", msg)
