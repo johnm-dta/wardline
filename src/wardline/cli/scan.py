@@ -20,6 +20,7 @@ from wardline.core.severity import (
     Severity,
 )
 from wardline.scanner.context import Finding, make_governance_finding
+from wardline.scanner.rules import make_rules
 from wardline.scanner.sarif import _PSEUDO_RULE_IDS, SarifReport
 
 if TYPE_CHECKING:
@@ -56,7 +57,10 @@ def _compute_manifest_hash(manifest_path: Path) -> str | None:
         parts: list[str] = [manifest_path.read_text(encoding="utf-8")]
         overlay_dir = manifest_path.parent / "overlays"
         if overlay_dir.is_dir():
-            for overlay_file in sorted(overlay_dir.rglob("*.yaml")):
+            overlay_files = sorted(
+                [*overlay_dir.rglob("*.yaml"), *overlay_dir.rglob("*.yml")]
+            )
+            for overlay_file in overlay_files:
                 if overlay_file.is_symlink():
                     continue
                 parts.append(overlay_file.read_text(encoding="utf-8"))
@@ -85,35 +89,22 @@ def _git_head_ref() -> str | None:
             timeout=5,
         )
         if result.returncode == 0:
-            return result.stdout.strip()
+            head = result.stdout.strip()
+            # Check if working tree is dirty
+            try:
+                dirty_check = subprocess.run(
+                    ["git", "diff", "--quiet"],
+                    capture_output=True,
+                    timeout=5,
+                )
+                if dirty_check.returncode != 0:
+                    return head + "-dirty"
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+            return head
     except (OSError, subprocess.TimeoutExpired):
         pass
     return None
-
-
-def _make_rules() -> tuple[RuleBase, ...]:
-    """Instantiate all available rule classes."""
-    from wardline.scanner.rules.py_wl_001 import RulePyWl001
-    from wardline.scanner.rules.py_wl_002 import RulePyWl002
-    from wardline.scanner.rules.py_wl_003 import RulePyWl003
-    from wardline.scanner.rules.py_wl_004 import RulePyWl004
-    from wardline.scanner.rules.py_wl_005 import RulePyWl005
-    from wardline.scanner.rules.py_wl_006 import RulePyWl006
-    from wardline.scanner.rules.py_wl_007 import RulePyWl007
-    from wardline.scanner.rules.py_wl_008 import RulePyWl008
-    from wardline.scanner.rules.py_wl_009 import RulePyWl009
-
-    return (
-        RulePyWl001(),
-        RulePyWl002(),
-        RulePyWl003(),
-        RulePyWl004(),
-        RulePyWl005(),
-        RulePyWl006(),
-        RulePyWl007(),
-        RulePyWl008(),
-        RulePyWl009(),
-    )
 
 
 def _canonical_registry() -> frozenset[RuleId]:
@@ -261,7 +252,7 @@ def scan(
             effective_allow_permissive = cfg.allow_permissive_distribution
 
     # --- Create rules ---
-    all_rules = _make_rules()
+    all_rules = make_rules()
 
     # --- Filter out disabled rules ---
     disabled_rules: tuple[RuleId, ...] = ()
@@ -459,6 +450,9 @@ def scan(
 
     # --- Build SARIF output ---
     loaded_rule_ids = frozenset(r.RULE_ID for r in active_rules)
+    manifest_hash = _compute_manifest_hash(manifest_path)
+    if manifest_hash is None:
+        logger.warning("Manifest hash unavailable — SARIF report has no policy binding")
     sarif_report = SarifReport(
         findings=all_findings,
         verification_mode=verification_mode,
@@ -469,7 +463,7 @@ def scan(
         stale_exception_count=stale_exception_count,
         expedited_exception_ratio=expedited_exception_ratio,
         analysis_level=analysis_level,
-        manifest_hash=_compute_manifest_hash(manifest_path),
+        manifest_hash=manifest_hash,
         scan_timestamp=_utc_timestamp(),
         commit_ref=_git_head_ref(),
     )

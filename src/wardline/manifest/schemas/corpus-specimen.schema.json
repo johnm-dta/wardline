@@ -31,11 +31,6 @@
       ],
       "description": "Taint state context for this specimen."
     },
-    "expected_rules": {
-      "type": "array",
-      "description": "Rules expected to fire on this specimen.",
-      "items": { "type": "string" }
-    },
     "rule": {
       "type": "string",
       "description": "The rule ID this specimen targets (e.g. PY-WL-001)."

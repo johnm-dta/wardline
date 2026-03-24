@@ -18,6 +18,7 @@ import click
 import yaml
 
 from wardline.manifest.loader import make_wardline_loader
+from wardline.scanner.rules import make_rules
 
 if TYPE_CHECKING:
     from wardline.scanner.context import ScanContext
@@ -41,31 +42,6 @@ class _RuleStats:
         return self.tp + self.fp + self.tn + self.fn + self.kfn
 
 
-def _make_rules() -> tuple[RuleBase, ...]:
-    """Instantiate all available rule classes."""
-    from wardline.scanner.rules.py_wl_001 import RulePyWl001
-    from wardline.scanner.rules.py_wl_002 import RulePyWl002
-    from wardline.scanner.rules.py_wl_003 import RulePyWl003
-    from wardline.scanner.rules.py_wl_004 import RulePyWl004
-    from wardline.scanner.rules.py_wl_005 import RulePyWl005
-    from wardline.scanner.rules.py_wl_006 import RulePyWl006
-    from wardline.scanner.rules.py_wl_007 import RulePyWl007
-    from wardline.scanner.rules.py_wl_008 import RulePyWl008
-    from wardline.scanner.rules.py_wl_009 import RulePyWl009
-
-    return (
-        RulePyWl001(),
-        RulePyWl002(),
-        RulePyWl003(),
-        RulePyWl004(),
-        RulePyWl005(),
-        RulePyWl006(),
-        RulePyWl007(),
-        RulePyWl008(),
-        RulePyWl009(),
-    )
-
-
 def _collect_qualnames(
     nodes: list[ast.stmt],
     prefix: str,
@@ -80,6 +56,15 @@ def _collect_qualnames(
         elif isinstance(node, ast.ClassDef):
             new_prefix = f"{prefix}.{node.name}" if prefix else node.name
             _collect_qualnames(node.body, new_prefix, result)
+        else:
+            # Recurse into control-flow blocks (if/for/while/with/try)
+            for attr in ("body", "orelse", "finalbody"):
+                sub = getattr(node, attr, None)
+                if sub:
+                    _collect_qualnames(sub, prefix, result)
+            for handler in getattr(node, "handlers", ()) or ():
+                if hasattr(handler, "body"):
+                    _collect_qualnames(handler.body, prefix, result)
 
 
 def _build_specimen_context(
@@ -171,6 +156,11 @@ def _evaluate_specimen(
         else:
             stats[rule_id].tn += 1
     elif verdict == "known_false_negative":
+        if rule_fired:
+            click.echo(
+                f"notice: {rule_id} fired on KFN specimen — consider promoting to true_positive",
+                err=True,
+            )
         stats[rule_id].kfn += 1
 
 
@@ -239,7 +229,7 @@ def verify(corpus_dir: str, analysis_level: int) -> None:
         raise SystemExit(1)
 
     WardlineSafeLoader = make_wardline_loader()
-    rules = _make_rules()
+    rules = make_rules()
     stats: dict[str, _RuleStats] = {}
     errors = 0
     total = 0

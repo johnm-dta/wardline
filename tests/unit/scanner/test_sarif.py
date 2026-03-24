@@ -256,3 +256,75 @@ class TestSarifOutput:
         result = data["runs"][0]["results"][0]
         assert '"hello"' in result["message"]["text"]
         assert "\n" in result["message"]["text"]
+
+
+# ---------------------------------------------------------------------------
+# TestSarifGovernanceMetadata
+# ---------------------------------------------------------------------------
+
+
+class TestSarifGovernanceMetadata:
+    """Tests for WP 2.4 governance metadata fields in run-level properties."""
+
+    def test_analysis_level_in_run_properties(self) -> None:
+        report = SarifReport(findings=[], analysis_level=3)
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.analysisLevel"] == 3
+
+    def test_analysis_level_defaults_to_1(self) -> None:
+        report = SarifReport(findings=[])
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.analysisLevel"] == 1
+
+    def test_manifest_hash_present_when_set(self) -> None:
+        report = SarifReport(findings=[], manifest_hash="abc123def")
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.manifestHash"] == "abc123def"
+
+    def test_manifest_hash_none_when_not_set(self) -> None:
+        report = SarifReport(findings=[])
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.manifestHash"] is None
+
+    def test_scan_timestamp_present_when_not_verification_mode(self) -> None:
+        report = SarifReport(
+            findings=[],
+            verification_mode=False,
+            scan_timestamp="2026-03-24T12:00:00Z",
+        )
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.scanTimestamp"] == "2026-03-24T12:00:00Z"
+
+    def test_scan_timestamp_absent_in_verification_mode(self) -> None:
+        report = SarifReport(
+            findings=[],
+            verification_mode=True,
+            scan_timestamp="2026-03-24T12:00:00Z",
+        )
+        props = report.to_dict()["runs"][0]["properties"]
+        assert "wardline.scanTimestamp" not in props
+
+    def test_commit_ref_present_when_not_verification_mode(self) -> None:
+        report = SarifReport(
+            findings=[],
+            verification_mode=False,
+            commit_ref="a1b2c3d4",
+        )
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.commitRef"] == "a1b2c3d4"
+
+    def test_commit_ref_absent_in_verification_mode(self) -> None:
+        report = SarifReport(
+            findings=[],
+            verification_mode=True,
+            commit_ref="a1b2c3d4",
+        )
+        props = report.to_dict()["runs"][0]["properties"]
+        assert "wardline.commitRef" not in props
+
+    def test_defaults_all_none_except_analysis_level(self) -> None:
+        report = SarifReport(findings=[])
+        assert report.analysis_level == 1
+        assert report.manifest_hash is None
+        assert report.scan_timestamp is None
+        assert report.commit_ref is None
