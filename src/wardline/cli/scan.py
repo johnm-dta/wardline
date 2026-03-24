@@ -48,6 +48,47 @@ def _error(msg: str) -> None:
     click.echo(f"error: {msg}", err=True)
 
 
+def _compute_manifest_hash(manifest_path: Path) -> str | None:
+    """SHA-256 of manifest + sorted overlay contents. Binds findings to policy version."""
+    import hashlib
+
+    try:
+        parts: list[str] = [manifest_path.read_text(encoding="utf-8")]
+        overlay_dir = manifest_path.parent / "overlays"
+        if overlay_dir.is_dir():
+            for overlay_file in sorted(overlay_dir.rglob("*.yaml")):
+                parts.append(overlay_file.read_text(encoding="utf-8"))
+        combined = "\n---\n".join(parts)
+        return "sha256:" + hashlib.sha256(combined.encode("utf-8")).hexdigest()
+    except OSError:
+        return None
+
+
+def _utc_timestamp() -> str:
+    """ISO 8601 UTC timestamp for scan temporal binding."""
+    from datetime import UTC, datetime
+
+    return datetime.now(UTC).isoformat()
+
+
+def _git_head_ref() -> str | None:
+    """Git HEAD commit hash, or None if not in a git repo."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return None
+
+
 def _make_rules() -> tuple[RuleBase, ...]:
     """Instantiate all available rule classes."""
     from wardline.scanner.rules.py_wl_001 import RulePyWl001
@@ -425,6 +466,10 @@ def scan(
         active_exception_count=active_exception_count,
         stale_exception_count=stale_exception_count,
         expedited_exception_ratio=expedited_exception_ratio,
+        analysis_level=analysis_level,
+        manifest_hash=_compute_manifest_hash(manifest_path),
+        scan_timestamp=_utc_timestamp(),
+        commit_ref=_git_head_ref(),
     )
 
     sarif_text = report.to_json_string() + "\n"

@@ -274,8 +274,10 @@ def verify(corpus_dir: str, analysis_level: int) -> None:
             continue
 
         # Skip specimens that require a higher analysis level
+        # Skip specimens that require a higher analysis level
         required_level = int(data.get("analysis_level_required", 1))
         if required_level > analysis_level:
+            skipped += 1
             total -= 1  # Don't count skipped specimens
             continue
 
@@ -326,7 +328,8 @@ def verify(corpus_dir: str, analysis_level: int) -> None:
             errors += 1
             continue
 
-    click.echo(f"Lite bootstrap: {total} specimens")
+    skip_msg = f" ({skipped} skipped, level > {analysis_level})" if skipped else ""
+    click.echo(f"Lite bootstrap: {total} specimens{skip_msg}")
     _print_stats(stats)
 
     if errors:

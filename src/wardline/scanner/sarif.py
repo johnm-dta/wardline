@@ -161,6 +161,11 @@ class SarifReport:
     active_exception_count: int = 0
     stale_exception_count: int = 0
     expedited_exception_ratio: float = 0.0
+    # WP 2.4: Governance metadata
+    analysis_level: int = 1
+    manifest_hash: str | None = None
+    scan_timestamp: str | None = None
+    commit_ref: str | None = None
 
     def _implemented_rules(self) -> list[str]:
         """Return sorted list of canonical rule ID values (excludes pseudo-IDs).
@@ -204,9 +209,15 @@ class SarifReport:
 
         run: dict[str, Any] = {
             "properties": {
+                "wardline.analysisLevel": self.analysis_level,
+                "wardline.commitRef": self.commit_ref,
                 "wardline.conformanceGaps": [],
                 "wardline.implementedRules": self._implemented_rules(),
+                "wardline.manifestHash": self.manifest_hash,
                 "wardline.propertyBagVersion": "0.2",
+                **({"wardline.scanTimestamp": self.scan_timestamp}
+                   if not self.verification_mode and self.scan_timestamp
+                   else {}),
                 "wardline.suppressedFindingCount": sum(
                     1 for f in self.findings if f.exception_id is not None
                 ),
