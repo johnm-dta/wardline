@@ -47,7 +47,9 @@ def is_enabled() -> bool:
 def enable() -> None:
     """Enable runtime enforcement hooks.
 
-    Idempotent — calling multiple times is safe.
+    Idempotent — calling multiple times is safe. Unlike ``disable()``,
+    ``enable()`` is not blocked by the call-once latch because enabling
+    enforcement is always safe (it adds safety, never removes it).
     """
     global _enforcement_enabled  # noqa: PLW0603
     _enforcement_enabled = True
@@ -326,6 +328,7 @@ def check_validated_record(obj: Any) -> None:
             f"(missing _wardline_tier or _wardline_groups)"
         )
         logger.warning("ValidatedRecord check failed: %s", msg)
+        _invoke_on_violation(obj, 0, None)
         raise TierViolationError(msg, obj=obj)
 
     # Post-isinstance type validation
@@ -336,6 +339,7 @@ def check_validated_record(obj: Any) -> None:
             f"got {tier!r}"
         )
         logger.warning("ValidatedRecord check failed: %s", msg)
+        _invoke_on_violation(obj, 0, tier if isinstance(tier, int) else None)
         raise TierViolationError(msg, obj=obj)
 
     groups = obj._wardline_groups
@@ -345,6 +349,7 @@ def check_validated_record(obj: Any) -> None:
             f"got {type(groups).__name__}"
         )
         logger.warning("ValidatedRecord check failed: %s", msg)
+        _invoke_on_violation(obj, 0, tier)
         raise TierViolationError(msg, obj=obj)
 
 
@@ -362,7 +367,7 @@ def check_subclass_tier_consistency(cls: type) -> list[str]:
     from wardline.core.tiers import TAINT_TO_TIER
 
     warnings: list[str] = []
-    tier_methods: dict[int, list[str]] = {}
+    tier_methods: dict[int, set[str]] = {}
 
     for name, value in cls.__dict__.items():
         if name.startswith("_") and not name.startswith("__"):
@@ -379,7 +384,7 @@ def check_subclass_tier_consistency(cls: type) -> list[str]:
         if tier_source is not None:
             tier_val = TAINT_TO_TIER.get(tier_source)
             if tier_val is not None:
-                tier_methods.setdefault(int(tier_val), []).append(name)
+                tier_methods.setdefault(int(tier_val), set()).add(name)
 
         # Derive tier from _wardline_transition (use "to" state = index 1)
         transition = getattr(value, "_wardline_transition", None)
@@ -387,11 +392,11 @@ def check_subclass_tier_consistency(cls: type) -> list[str]:
             to_state = transition[1]
             tier_val = TAINT_TO_TIER.get(to_state)
             if tier_val is not None:
-                tier_methods.setdefault(int(tier_val), []).append(name)
+                tier_methods.setdefault(int(tier_val), set()).add(name)
 
     if len(tier_methods) > 1:
         tiers_str = ", ".join(
-            f"tier {t}: {', '.join(methods)}"
+            f"tier {t}: {', '.join(sorted(methods))}"
             for t, methods in sorted(tier_methods.items())
         )
         warnings.append(

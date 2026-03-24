@@ -48,7 +48,7 @@ def _try_stamp_tier(
     Returns the (possibly wrapped) result.
 
     - Tries setattr on the result directly.
-    - On AttributeError/TypeError (frozen/slotted objects): logs WARNING,
+    - On TypeError (frozen/slotted objects): logs WARNING,
       returns TierStamped wrapper instead.
     - On ValueError (pre-stamped result, overwrite=False): silently returns
       the pre-stamped result (innermost tier wins for stacked decorators).

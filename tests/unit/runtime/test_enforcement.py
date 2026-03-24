@@ -399,6 +399,30 @@ class TestEnforceConstruction:
 
         enforce_construction(Anything())  # should not raise
 
+    def test_async_auto_stamping(self) -> None:
+        """Async decorated function stamps tier metadata on result."""
+        import asyncio
+
+        from wardline.decorators.authority import tier1_read
+
+        enforcement.enable()
+
+        @tier1_read
+        async def fetch_data() -> dict[str, int]:
+            return {"key": 42}
+
+        result = asyncio.run(fetch_data())
+        assert hasattr(result, "_wardline_tier") or hasattr(result, "value")
+        # Could be directly stamped or wrapped in TierStamped
+        from wardline.runtime.enforcement import TierStamped
+
+        if isinstance(result, TierStamped):
+            assert result._wardline_tier == 1
+            assert result.value == {"key": 42}
+        else:
+            assert result._wardline_tier == 1
+            assert result["key"] == 42
+
     def test_zero_decorated_methods_no_warning(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
