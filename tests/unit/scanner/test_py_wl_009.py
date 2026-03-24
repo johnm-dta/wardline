@@ -268,3 +268,121 @@ if data["amount"] > 100:
         )
 
         assert len(rule.findings) == 0
+
+
+# -- Pattern A: isinstance in condition guards attribute access -------------
+
+
+class TestInlineShapeCheck:
+    """If the condition itself IS a shape check, don't flag it."""
+
+    def test_isinstance_with_qualified_type_silent(self) -> None:
+        """isinstance(x, mod.Type) — mod.Type is attribute access but the
+        whole condition is a shape check, not a semantic check."""
+        rule = _run_rule(
+            """\
+if isinstance(stmt, ast.Assign):
+    handle(stmt)
+"""
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_isinstance_and_attr_access_in_same_condition_silent(self) -> None:
+        """isinstance(x, T) && x.attr — isinstance guards the attr access."""
+        rule = _run_rule(
+            """\
+if isinstance(node, ast.Name) and node.id in NAMES:
+    process(node)
+"""
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_hasattr_in_condition_silent(self) -> None:
+        """hasattr(x, 'y') && x.y — hasattr guards the access."""
+        rule = _run_rule(
+            """\
+if hasattr(obj, "value") and obj.value > 0:
+    process(obj)
+"""
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_membership_test_in_condition_silent(self) -> None:
+        """'key' in data && data['key'] — membership guards the subscript."""
+        rule = _run_rule(
+            """\
+if "key" in data and data["key"] > 0:
+    process(data)
+"""
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_plain_attr_access_without_isinstance_still_fires(self) -> None:
+        """obj.attr access in condition without any shape guard must fire."""
+        rule = _run_rule(
+            """\
+if obj.value > threshold:
+    reject(obj)
+"""
+        )
+
+        assert len(rule.findings) == 1
+
+
+# -- Pattern B: schema library validation calls ----------------------------
+
+
+class TestSchemaLibraryValidation:
+    """Schema validation via library calls suppresses PY-WL-009."""
+
+    def test_jsonschema_validate_before_silent(self) -> None:
+        """jsonschema.validate(data, schema) is a shape validation."""
+        rule = _run_rule(
+            """\
+jsonschema.validate(data, schema)
+if data["amount"] > 100:
+    flag()
+"""
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_schema_obj_validate_before_silent(self) -> None:
+        """schema.validate(data) — receiver contains 'schema'."""
+        rule = _run_rule(
+            """\
+schema.validate(data)
+if data["key"] == "admin":
+    reject()
+"""
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_validator_is_valid_before_silent(self) -> None:
+        """validator.is_valid(data) — is_valid on schema-like receiver."""
+        rule = _run_rule(
+            """\
+json_schema.is_valid(data)
+if data["role"] == "admin":
+    reject()
+"""
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_unrelated_validate_still_fires(self) -> None:
+        """obj.validate() without schema context is not a shape check."""
+        rule = _run_rule(
+            """\
+form.validate()
+if data["amount"] > 100:
+    flag()
+"""
+        )
+
+        assert len(rule.findings) == 1

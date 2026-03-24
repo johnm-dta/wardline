@@ -141,8 +141,8 @@ class TestSelfHostingScan:
         counts = Counter(r["ruleId"] for r in scan_findings)
 
         # Per-rule baselines by analysis level.
-        # L1: measured 2026-03-24, +/- 50% tolerance.
-        # L3: measured 2026-03-24, +/- 100% tolerance (wide initial ranges).
+        # L1: measured 2026-03-25, +/- 50% tolerance.
+        # L3: measured 2026-03-25, +/- 100% tolerance (wide initial ranges).
         expected_ranges_by_level: dict[int, dict[str, tuple[int, int]]] = {
             1: {
                 "PY-WL-001": (51, 204),
@@ -153,7 +153,7 @@ class TestSelfHostingScan:
                 "PY-WL-006": (3, 10),
                 "PY-WL-007": (80, 320),
                 "PY-WL-008": (13, 52),
-                "PY-WL-009": (84, 336),
+                "PY-WL-009": (58, 174),
             },
             3: {
                 "PY-WL-001": (0, 204),
@@ -164,7 +164,7 @@ class TestSelfHostingScan:
                 "PY-WL-006": (0, 10),
                 "PY-WL-007": (0, 320),
                 "PY-WL-008": (0, 52),
-                "PY-WL-009": (0, 336),
+                "PY-WL-009": (0, 174),
             },
         }
 

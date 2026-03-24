@@ -35,6 +35,10 @@ _SHAPE_VALIDATION_NAMES = frozenset({
 # Substrings in function names that suggest shape validation.
 _SHAPE_VALIDATION_SUBSTRINGS = ("schema", "shape", "structure")
 
+# Generic method names that become shape validators when the receiver
+# (object they're called on) has a schema-related name.
+_SCHEMA_QUALIFIED_METHODS = frozenset({"validate", "is_valid"})
+
 
 def _has_shape_check_before(
     stmts: list[ast.stmt],
@@ -61,7 +65,17 @@ def _has_shape_check_before(
 
 
 def _is_shape_validation_call(call: ast.Call) -> bool:
-    """Check if a call is isinstance, hasattr, or a shape-validation function."""
+    """Check if a call is isinstance, hasattr, or a shape-validation function.
+
+    Recognised patterns:
+    - ``isinstance(x, T)`` / ``hasattr(x, "a")``
+    - Bare calls whose name matches ``_SHAPE_VALIDATION_NAMES`` or contains
+      a ``_SHAPE_VALIDATION_SUBSTRINGS`` fragment.
+    - Method calls ``obj.method(...)`` where *method* matches the above.
+    - Schema-qualified calls: ``jsonschema.validate()``, ``schema.is_valid()``
+      — a generic method name in ``_SCHEMA_QUALIFIED_METHODS`` called on a
+      receiver whose name contains a schema-related substring.
+    """
     if isinstance(call.func, ast.Name):
         name = call.func.id
         if name in ("isinstance", "hasattr"):
@@ -78,7 +92,31 @@ def _is_shape_validation_call(call: ast.Call) -> bool:
         for sub in _SHAPE_VALIDATION_SUBSTRINGS:
             if sub in attr.lower():
                 return True
+        # Schema-qualified: receiver.validate() where receiver name
+        # contains a schema-related term (e.g. jsonschema.validate).
+        if attr in _SCHEMA_QUALIFIED_METHODS:
+            receiver = _receiver_name(call.func.value)
+            if receiver:
+                receiver_lower = receiver.lower()
+                for sub in _SHAPE_VALIDATION_SUBSTRINGS:
+                    if sub in receiver_lower:
+                        return True
     return False
+
+
+def _receiver_name(node: ast.expr) -> str | None:
+    """Extract a dotted name from an expression for receiver matching.
+
+    Returns the name for ``ast.Name`` (e.g. ``"jsonschema"``) or the
+    full dotted chain for ``ast.Attribute`` (e.g. ``"json_schema"``).
+    Returns ``None`` for complex expressions.
+    """
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _receiver_name(node.value)
+        return f"{parent}.{node.attr}" if parent else node.attr
+    return None
 
 
 def _is_membership_test(compare: ast.Compare) -> bool:
@@ -91,6 +129,21 @@ def _has_subscript_or_attr_access(node: ast.AST) -> bool:
     return any(isinstance(child, (ast.Subscript, ast.Attribute)) for child in ast.walk(node))
 
 
+def _test_contains_shape_check(test: ast.expr) -> bool:
+    """Check if a conditional test already contains an inline shape validation.
+
+    When a condition like ``isinstance(x, T) and x.attr > 0`` is found,
+    the isinstance IS the shape guard for the attribute access in the same
+    expression.  These should not be classified as unguarded semantic checks.
+    """
+    for child in ast.walk(test):
+        if isinstance(child, ast.Call) and _is_shape_validation_call(child):
+            return True
+        if isinstance(child, ast.Compare) and _is_membership_test(child):
+            return True
+    return False
+
+
 def _get_semantic_check_nodes(
     node: ast.FunctionDef | ast.AsyncFunctionDef,
 ) -> list[ast.AST]:
@@ -99,11 +152,20 @@ def _get_semantic_check_nodes(
     A semantic check is an if-test or assert that accesses data via
     subscript (data["key"]) and compares or tests a value — business
     logic validation on the data's content rather than its shape.
+
+    Conditions that already contain an inline shape check (isinstance,
+    hasattr, membership test) are excluded — the shape guard in the
+    condition itself covers the attribute/subscript access.
     """
     results: list[ast.AST] = []
     for child in walk_skip_nested_defs(node):
-        if (isinstance(child, (ast.If, ast.Assert))) and _has_subscript_or_attr_access(child.test):
-            results.append(child)
+        if not isinstance(child, (ast.If, ast.Assert)):
+            continue
+        if not _has_subscript_or_attr_access(child.test):
+            continue
+        if _test_contains_shape_check(child.test):
+            continue
+        results.append(child)
     return results
 
 
