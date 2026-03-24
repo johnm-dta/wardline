@@ -2,12 +2,21 @@
 
 from wardline.runtime.base import WardlineBase
 from wardline.runtime.descriptors import AuthoritativeAccessError, AuthoritativeField
-from wardline.runtime.types import FailFast, Tier1, Tier2, Tier3, Tier4, TierMarker
+from wardline.runtime.types import (
+    TIER_REGISTRY,
+    FailFast,
+    Tier1,
+    Tier2,
+    Tier3,
+    Tier4,
+    TierMarker,
+)
 
 __all__ = [
     "AuthoritativeAccessError",
     "AuthoritativeField",
     "FailFast",
+    "TIER_REGISTRY",
     "Tier1",
     "Tier2",
     "Tier3",

@@ -1,13 +1,15 @@
-"""Tests for runtime type markers — TierMarker, Tier1-Tier4, FailFast."""
+"""Tests for runtime type markers — TierMarker, Tier1-Tier4 (NewType), FailFast, TIER_REGISTRY."""
 
 from __future__ import annotations
 
-from typing import Annotated, Any, get_args
+from types import MappingProxyType
+from typing import Annotated, get_args
 
 import pytest
 
 from wardline.core.tiers import AuthorityTier
 from wardline.runtime.types import (
+    TIER_REGISTRY,
     FailFast,
     Tier1,
     Tier2,
@@ -46,30 +48,61 @@ class TestTierMarker:
         assert hash(TierMarker(1)) != hash(TierMarker(2))
 
 
-class TestAnnotatedAliases:
-    """Tier1-Tier4 are valid Annotated[Any, TierMarker(N)] aliases."""
+class TestNewTypeTiers:
+    """Tier1-Tier4 are NewType wrappers giving mypy tier-mismatch detection."""
 
     @pytest.mark.parametrize(
-        "alias,expected_tier",
-        [(Tier1, 1), (Tier2, 2), (Tier3, 3), (Tier4, 4)],
+        "tier_type,name",
+        [(Tier1, "Tier1"), (Tier2, "Tier2"), (Tier3, "Tier3"), (Tier4, "Tier4")],
     )
-    def test_annotated_structure(
-        self, alias: type, expected_tier: int
-    ) -> None:
-        # Python 3.12 `type` statement produces TypeAliasType;
-        # unwrap via __value__ to reach the underlying Annotated form.
-        resolved = alias.__value__ if hasattr(alias, "__value__") else alias
-        args = get_args(resolved)
-        assert len(args) == 2
-        assert args[0] is Any
-        assert isinstance(args[1], TierMarker)
-        assert args[1].tier == AuthorityTier(expected_tier)
+    def test_newtype_callable(self, tier_type: type, name: str) -> None:
+        """Each TierN is callable (NewType constructor) and returns its argument."""
+        value = tier_type("test_value")
+        assert value == "test_value"
+
+    @pytest.mark.parametrize(
+        "tier_type,name",
+        [(Tier1, "Tier1"), (Tier2, "Tier2"), (Tier3, "Tier3"), (Tier4, "Tier4")],
+    )
+    def test_newtype_supertype(self, tier_type: type, name: str) -> None:
+        """Each TierN has __supertype__ == object (NewType base)."""
+        assert tier_type.__supertype__ is object
+
+    def test_tiers_are_distinct(self) -> None:
+        """Each tier is a distinct type (not aliases of each other)."""
+        assert Tier1 is not Tier2
+        assert Tier2 is not Tier3
+        assert Tier3 is not Tier4
 
     def test_usable_as_bare_annotation(self) -> None:
-        """Tier aliases can be used as bare annotations."""
-        # This should not raise — it's a valid type hint
-        x: Tier1 = "some value"  # type: ignore[valid-type]
+        """NewType tiers can be used as annotations."""
+        x: Tier1 = Tier1("some value")  # type: ignore[assignment]
         assert x == "some value"
+
+
+class TestTierRegistry:
+    """TIER_REGISTRY maps tier type names to TierMarker instances."""
+
+    def test_registry_has_all_four_tiers(self) -> None:
+        assert len(TIER_REGISTRY) == 4
+        for name in ("Tier1", "Tier2", "Tier3", "Tier4"):
+            assert name in TIER_REGISTRY
+
+    def test_registry_values_are_tier_markers(self) -> None:
+        for name, marker in TIER_REGISTRY.items():
+            assert isinstance(marker, TierMarker)
+
+    @pytest.mark.parametrize(
+        "name,expected_tier",
+        [("Tier1", 1), ("Tier2", 2), ("Tier3", 3), ("Tier4", 4)],
+    )
+    def test_registry_tier_values(self, name: str, expected_tier: int) -> None:
+        assert TIER_REGISTRY[name].tier == AuthorityTier(expected_tier)
+
+    def test_registry_is_frozen(self) -> None:
+        assert isinstance(TIER_REGISTRY, MappingProxyType)
+        with pytest.raises(TypeError):
+            TIER_REGISTRY["Tier5"] = TierMarker(1)  # type: ignore[index]
 
 
 class TestFailFast:

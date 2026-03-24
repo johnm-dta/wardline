@@ -1,13 +1,20 @@
-"""Runtime type markers — Annotated aliases for tier-aware type hints.
+"""Runtime type markers — NewType tier types for static type checking.
 
-Provides ``Tier1`` through ``Tier4`` as ``Annotated[Any, TierMarker(N)]``
-aliases, allowing user code to annotate variables and parameters with
-their expected authority tier::
+Provides ``Tier1`` through ``Tier4`` as ``NewType`` wrappers over
+``object``, giving mypy native tier-mismatch detection without a
+custom plugin::
 
     from wardline.runtime.types import Tier1, Tier4
 
     def process(raw: Tier4, validated: Tier1) -> None:
         ...
+
+    # mypy error: Argument 1 has incompatible type "Tier4"; expected "Tier1"
+    process(raw=fetch_external(), validated=fetch_external())
+
+``Tier1(value)`` is an explicit trust boundary crossing — visible in
+code review. The ``TIER_REGISTRY`` maps each NewType back to its
+``TierMarker`` for runtime introspection.
 
 Also provides ``FailFast``, a marker annotation indicating that a
 function should abort immediately on authority violations rather than
@@ -16,7 +23,8 @@ accumulating findings.
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from types import MappingProxyType
+from typing import NewType
 
 from wardline.core.tiers import AuthorityTier
 
@@ -76,19 +84,33 @@ class _FailFastMarker:
         return hash("FailFast")
 
 
-# ── Public Annotated aliases ──────────────────────────────────
+# ── Public NewType tier types ─────────────────────────────────
 #
-# Known limitation: PEP 695 ``type`` aliases produce ``TypeAliasType``
-# objects that do NOT support subscripting at runtime.  ``Tier1[str]``
-# raises ``TypeError``.  These aliases work correctly in static type
-# checkers (mypy, pyright) but cannot be parameterised at runtime.
-# The v0.3.0 mypy spike recommends switching to ``NewType`` which
-# supports runtime subscripting.  Until then, use ``Annotated[str,
-# TierMarker(1)]`` directly when a parameterised form is needed.
+# Each TierN is a distinct nominal type. mypy treats assignments between
+# different tiers as type errors without any plugin:
+#
+#   x: Tier1 = Tier4(raw_data)  # mypy error
+#   y: Tier1 = Tier1(validated) # ok — explicit trust boundary crossing
+#
+# Tier1(value) is a no-op at runtime (NewType is erased) but serves as
+# a visible trust boundary marker in code.
 
-type Tier1 = Annotated[Any, TierMarker(1)]
-type Tier2 = Annotated[Any, TierMarker(2)]
-type Tier3 = Annotated[Any, TierMarker(3)]
-type Tier4 = Annotated[Any, TierMarker(4)]
+Tier1 = NewType("Tier1", object)
+Tier2 = NewType("Tier2", object)
+Tier3 = NewType("Tier3", object)
+Tier4 = NewType("Tier4", object)
+
+# ── Tier registry for runtime introspection ───────────────────
+#
+# NewType erases at runtime, so code that needs to know "which tier
+# does this type represent?" uses this registry. Frozen to prevent
+# post-construction mutation.
+
+TIER_REGISTRY: MappingProxyType[str, TierMarker] = MappingProxyType({
+    "Tier1": TierMarker(1),
+    "Tier2": TierMarker(2),
+    "Tier3": TierMarker(3),
+    "Tier4": TierMarker(4),
+})
 
 FailFast = _FailFastMarker()
