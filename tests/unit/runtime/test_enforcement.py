@@ -157,7 +157,10 @@ class TestStampTier:
             x: int = 1
 
         obj = Frozen()
-        with caplog.at_level(logging.WARNING, logger="wardline.runtime.enforcement"), pytest.raises(TypeError, match="Cannot set attributes"):
+        with (
+            caplog.at_level(logging.WARNING, logger="wardline.runtime.enforcement"),
+            pytest.raises(TypeError, match="Cannot set attributes"),
+        ):
             stamp_tier(obj, 1)
         assert "Cannot stamp tier" in caplog.text
 
