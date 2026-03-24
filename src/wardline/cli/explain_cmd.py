@@ -6,6 +6,7 @@ import ast
 import json as json_mod
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -100,7 +101,7 @@ def explain(
         taint = taint_map[qualname]
 
         # Build result dict for --json mode
-        result: dict = {
+        result: dict[str, Any] = {
             "qualname": qualname,
             "file": str(py_file),
             "taint_state": str(taint),
@@ -194,7 +195,7 @@ def explain(
             for r in RuleId
             if r not in _PSEUDO_RULE_IDS
         ]
-        rules_list: list[dict] = []
+        rules_list: list[dict[str, Any]] = []
         if not output_json:
             click.echo()
             click.echo("Rules evaluated at this taint state:")
@@ -253,16 +254,16 @@ def _build_exception_section(
     file_path_str: str,
     root: Path,
     manifest_path: Path | None,
-    canonical_rules: list,
+    canonical_rules: list[Any],
     output_json: bool,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Build exception status section for the explain output."""
     import datetime
 
     from wardline.manifest.exceptions import load_exceptions
 
-    exceptions_list: list[dict] = []
-    all_exceptions: tuple = ()
+    exceptions_list: list[dict[str, Any]] = []
+    all_exceptions: tuple[Any, ...] = ()
 
     if manifest_path is not None and manifest_path.exists():
         import contextlib
@@ -304,7 +305,7 @@ def _build_exception_section(
                 except ValueError:
                     pass
 
-            exc_info: dict = {
+            exc_info: dict[str, Any] = {
                 "rule": rule_str,
                 "id": matched_exc.id,
                 "status": status,
@@ -338,7 +339,7 @@ def _build_overlay_section(
     root: Path,
     manifest_model: object | None,
     output_json: bool,
-) -> dict | None:
+) -> dict[str, Any] | None:
     """Build overlay resolution section for the explain output."""
     from wardline.manifest.resolve import resolve_boundaries
 
@@ -383,7 +384,7 @@ def _build_overlay_section(
     # Determine schema_default governed status — boundaries exist in scope
     schema_default_governed = len(matching_boundaries) > 0
 
-    overlay_info: dict = {
+    overlay_info: dict[str, Any] = {
         "path": str(overlay_file_path) if overlay_file_path else rel_scope,
         "scope": rel_scope,
         "boundaries": len(matching_boundaries),
@@ -438,7 +439,7 @@ def _build_fingerprint_section(
     manifest_model: object | None,
     manifest_path: Path | None,
     output_json: bool,
-) -> dict:
+) -> dict[str, Any]:
     """Build fingerprint state section for the explain output."""
     import json as _json
 

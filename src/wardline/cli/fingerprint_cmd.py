@@ -10,6 +10,7 @@ import json as json_mod
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -27,7 +28,7 @@ def _error(msg: str) -> None:
 
 def _load_and_validate_baseline(
     baseline_path: Path,
-) -> dict:
+) -> dict[str, Any]:
     """Load a fingerprint baseline JSON and validate against schema.
 
     Normalises old baselines (``entries`` -> ``fingerprints``, missing
@@ -78,12 +79,13 @@ def _load_and_validate_baseline(
         _error(f"cannot load fingerprint schema: {exc}")
         sys.exit(EXIT_CONFIG_ERROR)
 
-    return data
+    result: dict[str, Any] = data
+    return result
 
 
 def _deserialize_entries(
-    data: dict,
-) -> list[dict]:
+    data: dict[str, Any],
+) -> list[dict[str, Any]]:
     """Deserialize fingerprint entries with backward-compat defaults."""
     entries = []
     for raw in data.get("fingerprints", []):
@@ -277,10 +279,10 @@ def diff(
     current_entries, coverage = batch_compute_fingerprints(root, manifest_model)
 
     # --- Build lookup maps ---
-    baseline_map: dict[str, dict] = {
+    baseline_map: dict[str, dict[str, Any]] = {
         e["qualified_name"]: e for e in baseline_entries
     }
-    current_map: dict[str, dict] = {
+    current_map: dict[str, dict[str, Any]] = {
         e.qualified_name: {
             "qualified_name": e.qualified_name,
             "module": e.module,
@@ -295,9 +297,9 @@ def diff(
     }
 
     # --- Compute diff ---
-    added: list[dict] = []
-    removed: list[dict] = []
-    modified: list[dict] = []
+    added: list[dict[str, Any]] = []
+    removed: list[dict[str, Any]] = []
+    modified: list[dict[str, Any]] = []
 
     # Added: in current but not in baseline
     for qn, entry in current_map.items():

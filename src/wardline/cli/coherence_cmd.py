@@ -9,6 +9,7 @@ from __future__ import annotations
 import json as json_mod
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -29,7 +30,7 @@ CATEGORY_MAP = {
 
 def _discover_all_annotations(
     scan_path: Path,
-) -> dict[tuple[str, str], list]:
+) -> dict[tuple[str, str], list[Any]]:
     """Walk .py files under *scan_path*, parse to AST, discover annotations."""
     from wardline.cli._helpers import discover_all_annotations
 
@@ -171,7 +172,7 @@ def coherence(
             sys.exit(1)
 
 
-def _format_text(issues: list) -> None:
+def _format_text(issues: list[Any]) -> None:
     """Print human-readable text output."""
     if not issues:
         click.echo("0 issues found")
@@ -199,7 +200,7 @@ def _format_text(issues: list) -> None:
     )
 
 
-def _format_json(issues: list) -> None:
+def _format_json(issues: list[Any]) -> None:
     """Print JSON output."""
     records = []
     for issue in issues:

@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Literal
 from wardline.scanner.taint.callgraph import TRUST_RANK
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from wardline.core.taints import TaintState
     from wardline.scanner.taint.function_level import TaintSource
 
@@ -347,7 +349,7 @@ def compute_sccs(graph: dict[str, set[str]]) -> list[set[str]]:
     result: list[set[str]] = []
 
     # Work stack frames: (node, neighbor_iterator, is_first_visit)
-    work_stack: list[tuple[str, object, bool]] = []
+    work_stack: list[tuple[str, Iterator[str], bool]] = []
 
     for start_node in sorted(graph):
         if start_node in indices:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import ast
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -24,11 +24,11 @@ COHERENCE_SEVERITY_MAP: dict[str, str] = {
 
 def discover_all_annotations(
     scan_path: Path,
-) -> dict[tuple[str, str], list]:
+) -> dict[tuple[str, str], list[Any]]:
     """Walk .py files under *scan_path*, parse to AST, discover annotations."""
     from wardline.scanner.discovery import discover_annotations
 
-    all_annotations: dict[tuple[str, str], list] = {}
+    all_annotations: dict[tuple[str, str], list[Any]] = {}
 
     for py_file in sorted(scan_path.rglob("*.py")):
         try:

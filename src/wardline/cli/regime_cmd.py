@@ -10,6 +10,7 @@ from __future__ import annotations
 import json as json_mod
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -23,7 +24,7 @@ from wardline.cli.scan import EXIT_CONFIG_ERROR
 
 def _discover_all_annotations(
     scan_path: Path,
-) -> dict[tuple[str, str], list]:
+) -> dict[tuple[str, str], list[Any]]:
     """Walk .py files under *scan_path*, parse to AST, discover annotations."""
     from wardline.cli._helpers import discover_all_annotations
 
@@ -33,7 +34,7 @@ def _discover_all_annotations(
 def _run_coherence_checks(
     manifest_path: Path,
     scan_path: Path,
-):
+) -> tuple[list[Any], str | None]:
     """Run all 8 coherence checks inline and return the list of issues.
 
     Returns ``(issues, error)`` where *error* is a string if the manifest
@@ -172,7 +173,7 @@ def status(
         _status_text(manifest_m, exception_m, fingerprint_m, rule_m)
 
 
-def _status_text(manifest_m, exception_m, fingerprint_m, rule_m) -> None:
+def _status_text(manifest_m: Any, exception_m: Any, fingerprint_m: Any, rule_m: Any) -> None:
     """Render human-readable status dashboard."""
     click.echo("Wardline Regime Status")
     click.echo("\u2500" * 22)
@@ -265,7 +266,7 @@ def _status_text(manifest_m, exception_m, fingerprint_m, rule_m) -> None:
     click.echo("To gate on governance health, use: wardline regime verify --gate")
 
 
-def _status_json(manifest_m, exception_m, fingerprint_m, rule_m) -> None:
+def _status_json(manifest_m: Any, exception_m: Any, fingerprint_m: Any, rule_m: Any) -> None:
     """Render JSON status output."""
     data = {
         "governance_profile": manifest_m.governance_profile,
@@ -364,7 +365,7 @@ def verify(
     config_path = manifest_dir / "wardline.toml"
 
     # --- Collect all checks ---
-    checks: list[dict] = []
+    checks: list[dict[str, Any]] = []
 
     # Check 1: Manifest loads
     manifest_load_ok = True
@@ -611,7 +612,7 @@ def verify(
             sys.exit(1)
 
 
-def _verify_text(checks: list[dict]) -> None:
+def _verify_text(checks: list[dict[str, Any]]) -> None:
     """Render human-readable verify output."""
     passed_count = sum(1 for c in checks if c["passed"])
     failed_count = sum(1 for c in checks if not c["passed"])
@@ -639,6 +640,6 @@ def _verify_text(checks: list[dict]) -> None:
     )
 
 
-def _verify_json(checks: list[dict]) -> None:
+def _verify_json(checks: list[dict[str, Any]]) -> None:
     """Render JSON verify output."""
     click.echo(json_mod.dumps({"checks": checks}, indent=2))
