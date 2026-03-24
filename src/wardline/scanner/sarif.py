@@ -210,7 +210,9 @@ class SarifReport:
         run: dict[str, Any] = {
             "properties": {
                 "wardline.analysisLevel": self.analysis_level,
-                "wardline.commitRef": self.commit_ref,
+                **({"wardline.commitRef": self.commit_ref}
+                   if not self.verification_mode and self.commit_ref
+                   else {}),
                 "wardline.conformanceGaps": [],
                 "wardline.implementedRules": self._implemented_rules(),
                 "wardline.manifestHash": self.manifest_hash,

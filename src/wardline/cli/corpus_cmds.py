@@ -274,8 +274,15 @@ def verify(corpus_dir: str, analysis_level: int) -> None:
             continue
 
         # Skip specimens that require a higher analysis level
-        # Skip specimens that require a higher analysis level
-        required_level = int(data.get("analysis_level_required", 1))
+        try:
+            required_level = int(data.get("analysis_level_required", 1))
+        except (ValueError, TypeError):
+            click.echo(
+                f"error: {specimen_path.name} has invalid analysis_level_required",
+                err=True,
+            )
+            errors += 1
+            continue
         if required_level > analysis_level:
             skipped += 1
             total -= 1  # Don't count skipped specimens

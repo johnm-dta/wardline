@@ -57,6 +57,8 @@ def _compute_manifest_hash(manifest_path: Path) -> str | None:
         overlay_dir = manifest_path.parent / "overlays"
         if overlay_dir.is_dir():
             for overlay_file in sorted(overlay_dir.rglob("*.yaml")):
+                if overlay_file.is_symlink():
+                    continue
                 parts.append(overlay_file.read_text(encoding="utf-8"))
         combined = "\n---\n".join(parts)
         return "sha256:" + hashlib.sha256(combined.encode("utf-8")).hexdigest()
