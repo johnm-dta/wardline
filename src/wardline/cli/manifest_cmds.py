@@ -14,6 +14,11 @@ def manifest() -> None:
     """Manifest validation and baseline management."""
 
 
+from wardline.cli.coherence_cmd import coherence  # noqa: E402
+
+manifest.add_command(coherence)
+
+
 @manifest.command()
 @click.argument("file", required=False, type=click.Path())
 def validate(file: str | None) -> None:
