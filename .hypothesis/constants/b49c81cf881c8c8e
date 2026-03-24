@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/cli/preview.py
-# hypothesis_version: 6.151.9
-
-['1.0', 'details', 'exception_id', 'file', 'line', 'location', 'message', 'no_expiry', 'qualname', 'reasons', 'recurring', 'rule', 'scan_metadata', 'scanned_path', 'stale_fingerprint', 'timestamp', 'total_phase2_impact', 'unknown_provenance', 'unverified_defaults', 'version', 'wardline_version']

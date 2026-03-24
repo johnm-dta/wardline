@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/manifest/merge.py
-# hypothesis_version: 6.151.9
-
-['/', 'CRITICAL', 'ERROR', 'INFO', 'OFF', 'WARNING', 'from_tier', 'id', 'severity', 'to_tier']

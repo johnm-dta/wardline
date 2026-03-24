@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/manifest/coherence.py
-# hypothesis_version: 6.151.9
-
-[60.0, 100.0, 365, ', ', '/', 'default_taint', 'expired_exception', 'first_scan_perimeter', 'id', 'module_tiers', 'orphaned_annotation', 'path', 'tier', 'tier_distribution', 'tier_downgrade', 'tiers', 'undeclared_boundary', 'wardline']

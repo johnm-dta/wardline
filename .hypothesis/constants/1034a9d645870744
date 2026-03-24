@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/cli/explain_cmd.py
-# hypothesis_version: 6.151.9
-
-['*.py', '--json', '--manifest', '--path', '.', '.venv', '/', 'Exceptions:', 'Fingerprint:', 'Output as JSON.', 'Overlay:', '__pycache__', 'active', 'annotation_hash', 'baseline_match', 'baseline_status', 'boundaries', 'decorator', 'decorators', 'entries', 'error', 'exceptionability', 'exceptions', 'expired', 'expires', 'fallback', 'file', 'fingerprint', 'governance_path', 'id', 'last_changed', 'module_default', 'module_tiers', 'no annotations', 'no baseline stored', 'no manifest', 'none', 'not governed', 'output_json', 'overlay', 'path', 'qualified_name', 'qualname', 'recurrence_count', 'resolution', 'rule', 'rule_id', 'rules', 'scan_path', 'scope', 'severity', 'source', 'status', 'taint_state', 'utf-8', 'yes']

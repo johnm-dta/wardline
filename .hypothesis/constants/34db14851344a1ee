@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/cli/fingerprint_cmd.py
-# hypothesis_version: 6.151.9
-
-['\n[enforcement]', '\n[policy]', '$id', '$schema', '--gate', '--json', '--manifest', '--path', 'ADDED', 'JSON output.', 'MODIFIED', 'REMOVED', 'added', 'annotated', 'annotation_hash', 'artefact_class', 'baseline', 'baseline_path', 'boundary_transition', 'change', 'coverage', 'current', 'decorators', 'diff', 'entries', 'fingerprint_count', 'fingerprints', 'generated_at', 'last_changed', 'manifest', 'manifest_file', 'modified', 'module', 'output_json', 'policy', 'python_version', 'qualified_name', 'ratio', 'reason', 'removed', 'scan_path', 'schemas', 'tier1_annotated', 'tier1_total', 'tier1_unannotated', 'tier_context', 'total', 'total_changes', 'update', 'utf-8']

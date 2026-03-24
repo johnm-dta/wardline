@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/scanner/rules/py_wl_008.py
-# hypothesis_version: 6.151.9
-
-['abort', 'check', 'col_offset', 'deny', 'end_col_offset', 'end_lineno', 'fail', 'inspect', 'lineno', 'raise', 'refuse', 'reject', 'sanitize', 'valid', 'verify']

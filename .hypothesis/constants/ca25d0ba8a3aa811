@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/scanner/engine.py
-# hypothesis_version: 6.151.9
-
-['.py', 'Cannot read %s: %s', 'L3_CONVERGENCE_BOUND', 'L3_LOW_RESOLUTION', 'utf-8']

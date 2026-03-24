@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/scanner/rules/py_wl_009.py
-# hypothesis_version: 6.151.9
-
-['check_schema', 'check_shape', 'check_structure', 'col_offset', 'end_col_offset', 'end_lineno', 'hasattr', 'isinstance', 'lineno', 'schema', 'shape', 'structure', 'validate_schema', 'validate_shape', 'validate_structure', 'verify_schema', 'verify_shape', 'verify_structure']

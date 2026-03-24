@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/manifest/exceptions.py
-# hypothesis_version: 6.151.9
-
-['agent_originated', 'ast_fingerprint', 'exceptionability', 'exceptions', 'expires', 'governance_path', 'id', 'last_refreshed_at', 'last_refreshed_by', 'location', 'provenance', 'rationale', 'recurrence_count', 'reviewer', 'rule', 'schemas', 'severity_at_grant', 'standard', 'taint_state', 'utf-8']

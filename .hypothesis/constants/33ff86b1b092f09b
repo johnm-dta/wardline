@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/manifest/discovery.py
-# hypothesis_version: 6.151.9
-
-['*', '.git', '.mypy_cache', '.nox', '.pytest_cache', '.ruff_cache', '.tox', '.venv', '__pycache__', 'node_modules', 'tests', 'wardline.yaml']

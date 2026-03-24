@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/scanner/rules/py_wl_003.py
-# hypothesis_version: 6.151.9
-
-['col_offset', 'end_col_offset', 'end_lineno', 'hasattr', 'lineno']

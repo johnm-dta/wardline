@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/scanner/taint/callgraph.py
-# hypothesis_version: 6.151.9
-
-['.', '__init__', 'self']

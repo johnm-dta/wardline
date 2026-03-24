@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/manifest/loader.py
-# hypothesis_version: 6.151.9
-
-[1000, 10000, 1048576, '$id', '/schemas/([^/]+)/', '0.1', 'RELAXED', 'authority', 'boundaries', 'bounded_context', 'contract', 'contract_bindings', 'default_authority', 'default_taint', 'delegation', 'description', 'from_tier', 'function', 'functions', 'grants', 'id', 'metadata', 'module_tiers', 'optional_fields', 'organisation', 'overlay.schema.json', 'overlay_for', 'overrides', 'path', 'provenance', 'ratification_date', 'ratified_by', 'restored_tier', 'review_interval_days', 'rule_overrides', 'rules', 'schemas', 'tier', 'tiers', 'to_tier', 'transition', 'utf-8', 'wardline', 'wardline.schema.json']

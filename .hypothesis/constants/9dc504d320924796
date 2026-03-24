@@ -1,4 +1,0 @@
-# file: /home/john/wardline/src/wardline/scanner/sarif.py
-# hypothesis_version: 6.151.9
-
-[0.0, '$schema', '0.1.0', '0.2', '2.1.0', 'Internal tool error', 'artifactLocation', 'defaultConfiguration', 'driver', 'endColumn', 'endLine', 'error', 'https://wardline.dev', 'id', 'informationUri', 'level', 'locations', 'message', 'name', 'note', 'physicalLocation', 'properties', 'region', 'results', 'ruleId', 'rules', 'runs', 'shortDescription', 'startColumn', 'startLine', 'text', 'tool', 'uri', 'utf-8', 'version', 'wardline', 'wardline.commitRef', 'wardline.exceptionId', 'wardline.rule', 'wardline.severity', 'wardline.taintState', 'warning']
