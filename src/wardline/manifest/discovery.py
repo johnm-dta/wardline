@@ -146,13 +146,25 @@ def _is_within_allowed(
     return False
 
 
+_OVERLAY_SKIP_DIRS = frozenset({
+    ".venv", ".git", "__pycache__", "node_modules", ".tox", ".nox",
+    ".mypy_cache", ".pytest_cache", ".ruff_cache", "tests",
+})
+
+
 def _find_all_overlays(root: Path) -> list[Path]:
     """Find all wardline.overlay.yaml files under root.
 
     Uses os.walk with followlinks=False for symlink safety.
+    Prunes virtual-environment, cache, and VCS directories that
+    should never contain production overlay files.
     """
     found: list[Path] = []
-    for dirpath, _dirnames, filenames in os.walk(root, followlinks=False):
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+        # Prune in-place so os.walk doesn't descend into these
+        dirnames[:] = [
+            d for d in dirnames if d not in _OVERLAY_SKIP_DIRS
+        ]
         if OVERLAY_FILENAME in filenames:
             found.append(Path(dirpath) / OVERLAY_FILENAME)
     return sorted(found)
