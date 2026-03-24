@@ -88,6 +88,8 @@ return result
 - `__slots__`-based objects: AST nodes, some C extension types
 - **Plain dicts:** `setattr({}, "x", 1)` raises `AttributeError` — dicts do not support arbitrary attribute assignment. Use `TierStamped` wrapping for dicts.
 
+**Auto-wrapping for unstampable returns:** When `_try_stamp_tier` detects an unstampable return value (dict, primitive, frozen), the decorator wrapper automatically returns `TierStamped(value=result, _wardline_tier=output_tier, ...)` instead of the raw result. This is the zero-ceremony path — users get `TierStamped` objects from boundary functions without writing any wrapping code. The WARNING log still fires to inform operators.
+
 **WARNING log on non-None skip:** When a non-None return value from a boundary-decorated function cannot be stamped, log at WARNING level: `"Auto-stamp skipped for {qualname} return type {type.__name__} — use TierStamped wrapping for this type"`. This prevents the silent escape hatch identified by the security review.
 
 **Output tier computed once at decorator construction time** — not per call. Zero overhead when disabled (single bool check).
@@ -104,18 +106,36 @@ Sets `_wardline_tier`, `_wardline_groups`, `_wardline_stamped_by` on `obj` via `
 
 **`_wardline_groups` normalization:** Groups are stored as `tuple(sorted(groups))` regardless of input type (set, list, tuple). This resolves the set-vs-tuple inconsistency.
 
-**`TierStamped`** — A frozen dataclass wrapper for any value:
+**`TierStamped[T]`** — The primary tier-aware data container. A frozen generic dataclass:
 
 ```python
-@dataclass(frozen=True)
-class TierStamped:
-    value: Any
+T = TypeVar("T")
+
+@dataclass(frozen=True, slots=True)
+class TierStamped(Generic[T]):
+    value: T
     _wardline_tier: int
     _wardline_groups: tuple[int, ...] = ()
     _wardline_stamped_by: str = ""
+
+    def __post_init__(self) -> None:
+        if self._wardline_tier not in (1, 2, 3, 4):
+            raise ValueError(f"tier must be 1-4, got {self._wardline_tier}")
 ```
 
-First-class primitive — "here's a standard envelope for tier-tagged data, use it wherever you want." Frozen = immutable = immune to post-stamp mutation. The recommended path for dicts, primitives, shared objects, or any case where in-place stamping is inappropriate.
+**This is the answer for dicts, primitives, and all unstampable types.** Generic parameter preserves inner type for mypy: `TierStamped[dict[str, int]]`. Frozen = immutable = tier cannot be escalated after construction. `slots=True` for performance.
+
+**7-reviewer panel decision (D over container subclasses):** Dict subclasses (`TieredDict`) were rejected 5-2 because `|`, `**unpacking`, `copy()`, `json.dumps` all silently strip the subclass, mutation invalidates the tier, mypy cannot distinguish tiers on the same class, and the test surface is unbounded (~80+ tests vs ~25). `TierStamped` makes the tier boundary explicit — the `.value` unwrap IS the trust boundary crossing.
+
+**Recommended lifecycle pattern (from IRAP assessor):**
+1. Build data with plain dicts/objects (mutable, no tier claims)
+2. Validate at boundary function (decorated with `@validates_shape` etc.)
+3. Freeze with `TierStamped` (decorator auto-wraps, or explicit construction)
+4. Downstream code receives `TierStamped` — unwraps via `.value` or `unstamp()`
+
+The type transition from mutable dict to frozen `TierStamped` IS the validation event.
+
+**Caveat:** `TierStamped.value` can be a mutable object (e.g., a dict). The wrapper is frozen but the wrapped value is not. Document: "TierStamped stamps a snapshot — if you mutate the underlying value after wrapping, the tier is no longer valid." Follow-up hardening: consider `copy.deepcopy` in constructor for mutable values.
 
 **`unstamp(obj)`** — Returns `obj.value` if `TierStamped`, otherwise returns `obj`.
 
