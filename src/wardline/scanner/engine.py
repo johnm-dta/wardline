@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
+from wardline.scanner._qualnames import build_qualname_map
 from wardline.scanner.context import Finding, ScanContext
 from wardline.scanner.discovery import discover_annotations
 from wardline.scanner.taint.function_level import assign_function_taints
@@ -227,25 +228,11 @@ class ScanEngine:
 
     @staticmethod
     def _build_qualname_map(tree: ast.Module) -> dict[int, str]:
-        """Build {id(node): qualname} for all functions in the module."""
-        result: dict[int, str] = {}
-        ScanEngine._walk_with_scope(tree, [], result)
-        return result
+        """Build {id(node): qualname} for all functions in the module.
 
-    @staticmethod
-    def _walk_with_scope(
-        node: ast.AST,
-        scope: list[str],
-        result: dict[int, str],
-    ) -> None:
-        """Recursively walk AST building qualnames with scope tracking."""
-        for child in ast.iter_child_nodes(node):
-            if isinstance(child, ast.ClassDef):
-                ScanEngine._walk_with_scope(child, scope + [child.name], result)
-            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                qualname = ".".join(scope + [child.name])
-                result[id(child)] = qualname
-                ScanEngine._walk_with_scope(child, scope + [child.name], result)
+        Delegates to the shared iterative implementation in ``scanner._qualnames``.
+        """
+        return build_qualname_map(tree)
 
     def _run_rule(
         self,
