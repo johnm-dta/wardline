@@ -15,6 +15,7 @@ from wardline.core.severity import Exceptionability, RuleId, Severity
 if TYPE_CHECKING:
     from wardline.core.taints import TaintState
     from wardline.manifest.models import BoundaryEntry
+    from wardline.scanner.taint.callgraph_propagation import TaintProvenance
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -83,6 +84,9 @@ class ScanContext:
     variable_taint_map: (
         MappingProxyType[str, MappingProxyType[str, TaintState]] | None
     ) = None
+    analysis_level: int = 1
+    # Level 3: maps qualname -> TaintProvenance. None when L3 didn't run.
+    taint_provenance: MappingProxyType[str, TaintProvenance] | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.function_level_taint_map, dict):
@@ -100,6 +104,12 @@ class ScanContext:
                 self,
                 "variable_taint_map",
                 MappingProxyType(frozen),
+            )
+        if isinstance(self.taint_provenance, dict):
+            object.__setattr__(
+                self,
+                "taint_provenance",
+                MappingProxyType(self.taint_provenance),
             )
 
 

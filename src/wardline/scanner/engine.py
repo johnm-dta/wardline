@@ -24,6 +24,11 @@ from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner._qualnames import build_qualname_map
 from wardline.scanner.context import Finding, ScanContext
 from wardline.scanner.discovery import discover_annotations
+from wardline.scanner.taint.callgraph import extract_call_edges
+from wardline.scanner.taint.callgraph_propagation import (
+    TaintProvenance,
+    propagate_callgraph_taints,
+)
 from wardline.scanner.taint.function_level import assign_function_taints
 from wardline.scanner.taint.variable_level import compute_variable_taints
 
@@ -32,6 +37,7 @@ if TYPE_CHECKING:
 
     from wardline.core.taints import TaintState
     from wardline.core.taints import TaintState as _TS
+    from wardline.scanner.taint.function_level import TaintSource
     from wardline.manifest.models import BoundaryEntry, WardlineManifest
     from wardline.scanner.rules.base import RuleBase
 
@@ -171,7 +177,14 @@ class ScanEngine:
             )
             taint_map, taint_sources = {}, {}
 
-        # Pass 1.5: Level 2 variable-level taint (when analysis_level >= 2)
+        # Pass 1.5: Level 3 call-graph taint (when analysis_level >= 3)
+        taint_provenance: dict[str, TaintProvenance] | None = None
+        if self._analysis_level >= 3 and taint_map:
+            taint_map, taint_provenance = self._run_callgraph_taint(
+                tree, taint_map, taint_sources, file_path, result
+            )
+
+        # Pass 1.75: Level 2 variable-level taint (when analysis_level >= 2)
         variable_taint_map: dict[str, dict[str, TaintState]] | None = None
         if self._analysis_level >= 2 and taint_map:
             variable_taint_map = self._run_variable_taint(
@@ -183,6 +196,8 @@ class ScanEngine:
             function_level_taint_map=taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
             boundaries=self._boundaries,
             variable_taint_map=variable_taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
+            analysis_level=self._analysis_level,
+            taint_provenance=taint_provenance,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
         )
 
         # Pass 2: Run rules with context
@@ -225,6 +240,58 @@ class ScanEngine:
             return None
 
         return var_map if var_map else None
+
+    def _run_callgraph_taint(
+        self,
+        tree: ast.Module,
+        taint_map: dict[str, TaintState],
+        taint_sources: dict[str, TaintSource],
+        file_path: Path,
+        result: ScanResult,
+    ) -> tuple[dict[str, TaintState], dict[str, TaintProvenance]]:
+        """Run Level 3 call-graph taint propagation.
+
+        On success, returns the refined taint map and provenance records.
+        On failure, emits a TOOL-ERROR finding and returns the original
+        taint map with no provenance.
+        """
+        try:
+            qualname_map = self._build_qualname_map(tree)
+            edges, resolved_counts, unresolved_counts = extract_call_edges(
+                tree, qualname_map
+            )
+            refined_map, provenance = propagate_callgraph_taints(
+                edges, taint_map, taint_sources, resolved_counts, unresolved_counts
+            )
+            return refined_map, provenance
+        except Exception as exc:
+            logger.warning(
+                "L3 call-graph taint failed for %s: %s", file_path, exc
+            )
+            result.errors.append(
+                f"L3 call-graph taint failed for {file_path}: {exc}"
+            )
+            result.findings.append(
+                Finding(
+                    rule_id=RuleId.TOOL_ERROR,
+                    file_path=str(file_path),
+                    line=1,
+                    col=0,
+                    end_line=None,
+                    end_col=None,
+                    message=(
+                        f"L3 call-graph taint failed: "
+                        f"{type(exc).__name__}: {exc}"
+                    ),
+                    severity=Severity.ERROR,
+                    exceptionability=Exceptionability.UNCONDITIONAL,
+                    taint_state=None,
+                    analysis_level=0,
+                    source_snippet=None,
+                    qualname=None,
+                )
+            )
+            return taint_map, None  # type: ignore[return-value]
 
     @staticmethod
     def _build_qualname_map(tree: ast.Module) -> dict[int, str]:
