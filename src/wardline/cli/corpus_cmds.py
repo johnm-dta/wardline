@@ -101,7 +101,7 @@ def _build_specimen_context(
     taint_map: dict[str, TaintState] = {qn: taint for qn in qualnames}
     return ScanContext(
         file_path="<specimen>",
-        function_level_taint_map=taint_map,
+        function_level_taint_map=taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
     )
 
 

@@ -459,7 +459,7 @@ def scan(
 
     # --- Build SARIF output ---
     loaded_rule_ids = frozenset(r.RULE_ID for r in active_rules)
-    report = SarifReport(
+    sarif_report = SarifReport(
         findings=all_findings,
         verification_mode=verification_mode,
         implemented_rule_ids=loaded_rule_ids,
@@ -474,7 +474,7 @@ def scan(
         commit_ref=_git_head_ref(),
     )
 
-    sarif_text = report.to_json_string() + "\n"
+    sarif_text = sarif_report.to_json_string() + "\n"
 
     if output is not None:
         try:

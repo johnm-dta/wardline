@@ -37,7 +37,7 @@ def _bool_entry(name: str, group: int) -> RegistryEntry:
     return RegistryEntry(
         canonical_name=name,
         group=group,
-        attrs={f"_wardline_{name}": bool},
+        attrs={f"_wardline_{name}": bool},  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
     )
 
 
@@ -52,32 +52,32 @@ REGISTRY: MappingProxyType[str, RegistryEntry] = MappingProxyType({
     "external_boundary": RegistryEntry(
         canonical_name="external_boundary",
         group=1,
-        attrs={"_wardline_tier_source": TaintState},
+        attrs={"_wardline_tier_source": TaintState},  # type: ignore[arg-type]  # __post_init__ converts
     ),
     "validates_shape": RegistryEntry(
         canonical_name="validates_shape",
         group=1,
-        attrs={"_wardline_transition": tuple},
+        attrs={"_wardline_transition": tuple},  # type: ignore[arg-type]  # __post_init__ converts
     ),
     "validates_semantic": RegistryEntry(
         canonical_name="validates_semantic",
         group=1,
-        attrs={"_wardline_transition": tuple},
+        attrs={"_wardline_transition": tuple},  # type: ignore[arg-type]  # __post_init__ converts
     ),
     "validates_external": RegistryEntry(
         canonical_name="validates_external",
         group=1,
-        attrs={"_wardline_transition": tuple},
+        attrs={"_wardline_transition": tuple},  # type: ignore[arg-type]  # __post_init__ converts
     ),
     "tier1_read": RegistryEntry(
         canonical_name="tier1_read",
         group=1,
-        attrs={"_wardline_tier_source": TaintState},
+        attrs={"_wardline_tier_source": TaintState},  # type: ignore[arg-type]  # __post_init__ converts
     ),
     "audit_writer": RegistryEntry(
         canonical_name="audit_writer",
         group=1,
-        attrs={
+        attrs={  # type: ignore[arg-type]  # __post_init__ converts
             "_wardline_tier_source": TaintState,
             "_wardline_audit_writer": bool,
         },
@@ -85,13 +85,13 @@ REGISTRY: MappingProxyType[str, RegistryEntry] = MappingProxyType({
     "authoritative_construction": RegistryEntry(
         canonical_name="authoritative_construction",
         group=1,
-        attrs={"_wardline_transition": tuple},
+        attrs={"_wardline_transition": tuple},  # type: ignore[arg-type]  # __post_init__ converts
     ),
     # --- Group 2: Audit ---
     "audit_critical": RegistryEntry(
         canonical_name="audit_critical",
         group=2,
-        attrs={"_wardline_audit_critical": bool},
+        attrs={"_wardline_audit_critical": bool},  # type: ignore[arg-type]  # __post_init__ converts
     ),
     # --- Group 3: Plugin ---
     "system_plugin": _bool_entry("system_plugin", 3),

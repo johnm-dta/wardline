@@ -387,7 +387,8 @@ def _find_exceptions_file() -> Path:
 def _load_or_create(path: Path) -> dict[str, Any]:
     """Load exceptions file or create empty structure."""
     if path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
+        result: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+        return result
     return {
         "$id": "https://wardline.dev/schemas/0.1/exceptions.schema.json",
         "exceptions": [],

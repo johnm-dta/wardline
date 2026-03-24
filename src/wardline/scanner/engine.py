@@ -179,9 +179,9 @@ class ScanEngine:
 
         ctx = ScanContext(
             file_path=str(file_path),
-            function_level_taint_map=taint_map,
+            function_level_taint_map=taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
             boundaries=self._boundaries,
-            variable_taint_map=variable_taint_map,
+            variable_taint_map=variable_taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
         )
 
         # Pass 2: Run rules with context

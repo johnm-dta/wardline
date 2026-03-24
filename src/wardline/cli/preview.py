@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from wardline.core.severity import RuleId
 
@@ -24,7 +24,7 @@ def build_preview_report(
     *,
     scanned_path: str,
     wardline_version: str,
-) -> dict:
+) -> dict[str, Any]:
     """Build the --preview-phase2 impact report.
 
     Pure function: filters findings and governance findings into
@@ -37,7 +37,7 @@ def build_preview_report(
     ]
 
     # Group governance findings by exception ID, aggregate reasons
-    exc_map: dict[str, dict] = {}
+    exc_map: dict[str, dict[str, Any]] = {}
     for gf in governance_findings:
         reason = _GOVERNANCE_REASON_MAP.get(gf.rule_id)
         if reason is None or gf.exception_id is None:
