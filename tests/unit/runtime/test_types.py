@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import MappingProxyType
 from typing import Annotated, get_args
 
@@ -124,3 +125,38 @@ class TestFailFast:
         args = get_args(hint)
         assert args[0] is str
         assert args[1] is FailFast
+
+
+# ---------------------------------------------------------------------------
+# TestMypyCrossTierAssignment
+# ---------------------------------------------------------------------------
+
+
+class TestMypyCrossTierAssignment:
+    """mypy catches cross-tier NewType assignment errors."""
+
+    def test_mypy_catches_cross_tier_assignment(self, tmp_path: Path) -> None:
+        """mypy flags Tier4 value assigned to Tier1 variable."""
+        import subprocess
+        import textwrap
+
+        source = textwrap.dedent("""\
+            from wardline.runtime.types import Tier1, Tier4
+
+            def fetch() -> Tier4:
+                return Tier4("raw_data")
+
+            x: Tier1 = fetch()  # mypy should flag this
+        """)
+        f = tmp_path / "check_tiers.py"
+        f.write_text(source)
+        result = subprocess.run(
+            ["uv", "run", "mypy", "--strict", str(f)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode != 0, (
+            f"mypy should have flagged cross-tier assignment:\n{result.stdout}"
+        )
+        assert "incompatible type" in result.stdout.lower() or "assignment" in result.stdout.lower()

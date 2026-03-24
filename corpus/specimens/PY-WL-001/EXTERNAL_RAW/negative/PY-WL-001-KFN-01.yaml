@@ -1,6 +1,6 @@
 specimen_id: PY-WL-001-KFN-01
-description: 'KFN: cross-function default hidden from call site (safe_lookup defined
-  elsewhere)'
+description: 'L3 TP: cross-function default hidden from call site (safe_lookup defined
+  elsewhere) — requires analysis_level 3 for inter-procedural taint tracking'
 rule: PY-WL-001
 fragment: "def process(data):\n    result = safe_lookup(data, \"key\")\n    return\
   \ result\n"
@@ -8,6 +8,7 @@ taint_state: EXTERNAL_RAW
 expected_rules: []
 expected_severity: null
 expected_exceptionability: null
-expected_match: false
+expected_match: true
 sha256: 2e98701803d209a5d0e6dffb065ec0545b144e7971eb01f0faac31375beff6b4
-verdict: known_false_negative
+verdict: true_positive
+analysis_level_required: 3

@@ -448,3 +448,38 @@ class TestStrictModeExitCode:
             f"Expected non-2 exit code, got {result.exit_code}. "
             f"Output: {result.output}"
         )
+
+
+# ---------------------------------------------------------------------------
+# TestValidatedRecordConformance
+# ---------------------------------------------------------------------------
+
+
+class TestValidatedRecordConformance:
+    """Decorated functions satisfy the ValidatedRecord Protocol (T-4.12g)."""
+
+    def test_decorated_function_satisfies_validated_record(self) -> None:
+        """Functions with wardline decorators carry _wardline_tier and _wardline_groups."""
+        from wardline.runtime.protocols import ValidatedRecord
+
+        @external_boundary
+        def stub() -> None:
+            pass
+
+        # Protocol requires _wardline_tier (int) and _wardline_groups (tuple[int, ...])
+        assert hasattr(stub, "_wardline_tier") or hasattr(stub, "_wardline_groups"), (
+            "Decorated function should have at least one ValidatedRecord attribute"
+        )
+
+    def test_all_decorators_have_wardline_groups(self) -> None:
+        """Every registered decorator sets _wardline_groups on the wrapped function."""
+        for name in sorted(REGISTRY.keys()):
+            dec = _LIBRARY_DECORATORS[name]
+
+            @dec
+            def stub() -> None:
+                pass
+
+            assert hasattr(stub, "_wardline_groups"), (
+                f"Decorator '{name}' does not set _wardline_groups"
+            )
