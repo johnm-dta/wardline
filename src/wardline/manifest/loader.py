@@ -20,6 +20,7 @@ from wardline.manifest.models import (
     DelegationConfig,
     DelegationGrant,
     ManifestMetadata,
+    OptionalFieldEntry,
     ModuleTierEntry,
     RulesConfig,
     TierEntry,
@@ -281,6 +282,13 @@ def _build_overlay(data: dict[str, Any]) -> WardlineOverlay:
         overlay_for=data.get("overlay_for", ""),
         boundaries=boundaries,
         rule_overrides=tuple(data.get("rule_overrides", [])),
-        optional_fields=tuple(data.get("optional_fields", [])),
+        optional_fields=tuple(
+            OptionalFieldEntry(
+                field=entry["field"],
+                approved_default=entry["approved_default"],
+                rationale=entry["rationale"],
+            )
+            for entry in data.get("optional_fields", [])
+        ),
         contract_bindings=contract_bindings,
     )

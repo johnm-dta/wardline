@@ -311,13 +311,14 @@ def scan(
 
     # --- Resolve overlay boundaries ---
     boundaries: tuple[_BoundaryEntry, ...] = ()
+    optional_fields: tuple[object, ...] = ()
     resolved_rule_overrides: tuple[dict[str, object], ...] | None = None
 
     if resolved:
         loaded = _load_resolved(resolved, manifest_path)
         if loaded is None:
             sys.exit(EXIT_CONFIG_ERROR)
-        boundaries, resolved_rule_overrides = loaded
+        boundaries, resolved_rule_overrides, optional_fields = loaded
         if resolved_rule_overrides is not None:
             import dataclasses as _dc
 
@@ -328,10 +329,17 @@ def scan(
                 rules=RulesConfig(overrides=resolved_rule_overrides),
             )
     else:
-        from wardline.manifest.resolve import resolve_boundaries
+        from wardline.manifest.resolve import (
+            resolve_boundaries,
+            resolve_optional_fields,
+        )
 
         # manifest_path is threaded from _load_manifest — no re-discovery needed
         boundaries = resolve_boundaries(manifest_path.parent, manifest_model)
+        optional_fields = resolve_optional_fields(
+            manifest_path.parent,
+            manifest_model,
+        )
 
     # --- Create engine and run scan ---
     from wardline.scanner.engine import ScanEngine, ScanResult
@@ -343,6 +351,7 @@ def scan(
         rules=active_rules,
         manifest=manifest_model,
         boundaries=boundaries,
+        optional_fields=optional_fields,  # type: ignore[arg-type]
         analysis_level=analysis_level,
     )
 
@@ -635,7 +644,11 @@ def _load_config(config_arg: str | None) -> ScannerConfig | None | _ConfigError:
 def _load_resolved(
     resolved_path: str,
     manifest_path: Path,
-) -> tuple[tuple[_BoundaryEntry, ...], tuple[dict[str, object], ...] | None] | None:
+) -> tuple[
+    tuple[_BoundaryEntry, ...],
+    tuple[dict[str, object], ...] | None,
+    tuple[object, ...],
+] | None:
     """Load boundaries and rule overrides from a wardline.resolved.json file.
 
     Returns ``None`` on error (after printing a structured error message).
@@ -643,7 +656,7 @@ def _load_resolved(
     import hashlib
     import json
 
-    from wardline.manifest.models import BoundaryEntry
+    from wardline.manifest.models import BoundaryEntry, OptionalFieldEntry
 
     try:
         data = json.loads(Path(resolved_path).read_text(encoding="utf-8"))
@@ -688,7 +701,20 @@ def _load_resolved(
         if raw_overrides is not None:
             rule_overrides = tuple(dict(ovr) for ovr in raw_overrides)
 
-        return boundaries, rule_overrides
+        optional_fields = tuple(
+            OptionalFieldEntry(
+                field=entry["field"],
+                approved_default=entry["approved_default"],
+                rationale=entry["rationale"],
+                overlay_scope=str(
+                    (project_root / entry.get("overlay_scope", "")).resolve()
+                ),
+                overlay_path=entry.get("overlay_path", ""),
+            )
+            for entry in data.get("optional_fields", [])
+        )
+
+        return boundaries, rule_overrides, optional_fields
     except (json.JSONDecodeError, KeyError, TypeError, OSError) as exc:
         _error(f"resolved manifest invalid: {exc}")
         return None

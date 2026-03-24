@@ -1,13 +1,10 @@
-"""PY-WL-008: Validation with no rejection path.
+"""PY-WL-008: Declared boundary with no rejection path.
 
-Detects functions that call validation-like functions, capture the
-result, but never use that result in a conditional (if/assert/raise)
-to reject invalid data.  The validation computes a pass/fail verdict
-but the function ignores it — creating false security.
-
-Structural-conditional definition (wardline-5c56619b22): a *rejection
-path* is an ``if``/``assert``/``raise`` that references the variable
-holding the validation result.
+Detects declared validation and restoration boundaries whose bodies do
+not contain a structural rejection path. Under the authoritative
+binding/spec contract, WL-007 applies to the boundary function itself:
+the body must reject invalid input via a raised exception or a guarded
+early return that clearly represents rejection.
 """
 
 from __future__ import annotations
@@ -16,133 +13,90 @@ import ast
 
 from wardline.core import matrix
 from wardline.core.severity import RuleId
+from wardline.manifest.scope import path_within_scope
 from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
 
-# Substrings in function names that indicate validation.
-_VALIDATION_SUBSTRINGS = ("valid", "check", "verify", "sanitize", "inspect")
+_BOUNDARY_TRANSITIONS = frozenset({
+    "shape_validation",
+    "semantic_validation",
+    "external_validation",
+    "combined_validation",
+    "restoration",
+})
+
+_BOUNDARY_DECORATORS = frozenset({
+    "validates_shape",
+    "validates_semantic",
+    "validates_external",
+    "restoration_boundary",
+})
 
 
-def _is_validation_call(call: ast.Call) -> bool:
-    """Check if a function call looks like a validation function."""
-    name = _call_name(call)
-    if name is None:
-        return False
-    lower = name.lower()
-    return any(sub in lower for sub in _VALIDATION_SUBSTRINGS)
+def _is_negative_guard(expr: ast.expr) -> bool:
+    """Return True for simple guards that indicate rejection on this branch."""
+    if isinstance(expr, ast.UnaryOp) and isinstance(expr.op, ast.Not):
+        return True
+    if isinstance(expr, ast.Compare):
+        return any(
+            isinstance(op, (ast.IsNot, ast.NotEq))
+            or (
+                isinstance(op, (ast.Is, ast.Eq))
+                and isinstance(comparator, ast.Constant)
+                and comparator.value in (False, None)
+            )
+            for op, comparator in zip(expr.ops, expr.comparators, strict=False)
+        )
+    return False
 
 
-def _call_name(call: ast.Call) -> str | None:
-    """Extract the simple name from a Call node."""
-    if isinstance(call.func, ast.Name):
-        return call.func.id
-    if isinstance(call.func, ast.Attribute):
-        return call.func.attr
+def _branch_has_rejection_terminator(stmts: list[ast.stmt]) -> bool:
+    """Return True when the branch contains a terminating rejection action."""
+    for stmt in stmts:
+        for node in ast.walk(stmt):
+            if isinstance(node, ast.Raise):
+                return True
+            if isinstance(node, ast.Return):
+                return True
+    return False
+
+
+def _decorator_name(decorator: ast.expr) -> str | None:
+    """Return the terminal decorator name for ``@name`` and ``@pkg.name``."""
+    target = decorator.func if isinstance(decorator, ast.Call) else decorator
+    if isinstance(target, ast.Name):
+        return target.id
+    if isinstance(target, ast.Attribute):
+        return target.attr
     return None
 
 
-def _find_validation_assignments(
+def _has_direct_boundary_decorator(
     node: ast.FunctionDef | ast.AsyncFunctionDef,
-) -> list[tuple[str | None, ast.Assign | ast.AnnAssign | ast.Expr]]:
-    """Find assignments where the RHS is a validation call, or bare calls.
-
-    Returns (variable_name, node) pairs.  For bare expression-statement
-    calls the variable name is ``None`` — these always fire because the
-    result is discarded entirely.
-    """
-    results: list[tuple[str | None, ast.Assign | ast.AnnAssign | ast.Expr]] = []
-    for child in walk_skip_nested_defs(node):
-        if isinstance(child, ast.Assign) and len(child.targets) == 1:
-            target = child.targets[0]
-            if (
-                isinstance(target, ast.Name)
-                and isinstance(child.value, ast.Call)
-                and _is_validation_call(child.value)
-            ):
-                results.append((target.id, child))
-        elif isinstance(child, ast.AnnAssign):
-            if (
-                child.value is not None
-                and isinstance(child.target, ast.Name)
-                and isinstance(child.value, ast.Call)
-                and _is_validation_call(child.value)
-            ):
-                results.append((child.target.id, child))
-        elif isinstance(child, ast.Expr) and isinstance(child.value, ast.Call):
-            if _is_validation_call(child.value) and not _is_rejection_call(
-                child.value
-            ):
-                results.append((None, child))
-    return results
-
-
-def _variable_used_in_rejection_path(
-    node: ast.FunctionDef | ast.AsyncFunctionDef,
-    var_name: str,
 ) -> bool:
-    """Check if *var_name* is used in a genuine rejection path.
+    """Check for direct wardline boundary decorators in source."""
+    return any(
+        _decorator_name(decorator) in _BOUNDARY_DECORATORS
+        for decorator in node.decorator_list
+    )
 
-    This is the structural-conditional definition: a rejection path
-    exists if the variable appears in:
-    - The test of an ``if`` whose body or else-body contains a
-      ``raise``, ``return``, or rejection-named call
-    - The test of an ``assert`` statement
-    - A ``raise`` statement (the variable is the exception or part of it)
-    - A ``return`` statement (delegation of validation responsibility)
-    """
+
+def _has_rejection_path(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """Return True when the boundary body contains a structural rejection path."""
     for child in walk_skip_nested_defs(node):
-        if isinstance(child, ast.If):
-            if _name_appears_in(child.test, var_name) and (_branch_has_rejection(child.body) or _branch_has_rejection(
-                child.orelse
-            )):
-                return True
-        elif isinstance(child, ast.Assert):
-            if _name_appears_in(child.test, var_name):
-                return True
-        elif isinstance(child, ast.Raise):
-            if child.exc is not None and _name_appears_in(child.exc, var_name):
-                return True
-        elif isinstance(child, ast.Call):
-            # Check for patterns like: abort_if_invalid(result)
-            # where the variable is passed to a function that rejects
-            if _name_appears_in(child, var_name) and _is_rejection_call(child):
-                return True
-        elif isinstance(child, ast.Return) and child.value is not None and _name_appears_in(child.value, var_name):
-            # return result — delegates rejection responsibility to caller
+        if isinstance(child, ast.Raise):
+            return True
+        if not isinstance(child, ast.If):
+            continue
+        if _is_negative_guard(child.test) and _branch_has_rejection_terminator(child.body):
+            return True
+        if child.orelse and _branch_has_rejection_terminator(child.orelse):
             return True
     return False
 
 
-def _branch_has_rejection(stmts: list[ast.stmt]) -> bool:
-    """Return True if a list of statements contains raise, return, or a rejection call."""
-    for stmt in stmts:
-        for node in ast.walk(stmt):
-            if isinstance(node, (ast.Raise, ast.Return)):
-                return True
-            if isinstance(node, ast.Call) and _is_rejection_call(node):
-                return True
-    return False
-
-
-def _is_rejection_call(call: ast.Call) -> bool:
-    """Check if a call looks like a rejection function (abort, reject, fail)."""
-    name = _call_name(call)
-    if name is None:
-        return False
-    lower = name.lower()
-    return any(
-        sub in lower
-        for sub in ("abort", "reject", "fail", "raise", "deny", "refuse")
-    )
-
-
-def _name_appears_in(node: ast.AST, name: str) -> bool:
-    """Check if an ``ast.Name`` with id == *name* appears anywhere in *node*."""
-    return any(isinstance(child, ast.Name) and child.id == name for child in ast.walk(node))
-
-
 class RulePyWl008(RuleBase):
-    """Detect validation with no rejection path.
+    """Detect declared boundaries with no rejection path.
 
     Collects findings into ``self.findings`` during AST traversal.
     The engine reads this list after rule execution.
@@ -160,17 +114,27 @@ class RulePyWl008(RuleBase):
         *,
         is_async: bool,
     ) -> None:
-        """Walk function body for validation calls without rejection paths."""
-        assignments = _find_validation_assignments(node)
-        if not assignments:
+        """Walk declared boundary bodies for a structural rejection path."""
+        if not self._is_checked_boundary(node):
             return
+        if _has_rejection_path(node):
+            return
+        self._emit_finding(node)
 
-        for var_name, assign_node in assignments:
-            if var_name is None:
-                # Bare validation call — result discarded, always a finding
-                self._emit_finding(assign_node)
-            elif not _variable_used_in_rejection_path(node, var_name):
-                self._emit_finding(assign_node)
+    def _is_checked_boundary(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> bool:
+        """Return True for validation/restoration boundaries under this rule."""
+        if self._context is not None:
+            for boundary in self._context.boundaries:
+                if (
+                    boundary.function == self._current_qualname
+                    and boundary.transition in _BOUNDARY_TRANSITIONS
+                    and path_within_scope(self._file_path, boundary.overlay_scope)
+                ):
+                    return True
+        return _has_direct_boundary_decorator(node)
 
     def _emit_finding(self, node: ast.AST) -> None:
         """Emit a PY-WL-008 finding."""
@@ -185,9 +149,8 @@ class RulePyWl008(RuleBase):
                 end_line=getattr(node, "end_lineno", None),
                 end_col=getattr(node, "end_col_offset", None),
                 message=(
-                    "Validation with no rejection path — "
-                    "validation result is captured but never used "
-                    "to reject invalid data"
+                    "Declared validation/restoration boundary has no "
+                    "rejection path"
                 ),
                 severity=cell.severity,
                 exceptionability=cell.exceptionability,

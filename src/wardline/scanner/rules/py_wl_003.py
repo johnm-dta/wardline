@@ -13,23 +13,27 @@ structural gate:
 from __future__ import annotations
 
 import ast
+from typing import TYPE_CHECKING
 
 from wardline.core import matrix
 from wardline.core.severity import RuleId
-from wardline.core.taints import TaintState
+from wardline.manifest.scope import path_within_scope
 from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
 
-# PY-WL-003 only fires at these taint states.
-# MIXED_RAW included: matrix shows (E,St) same as EXTERNAL_RAW/UNKNOWN_RAW.
-# Temporary divergence from matrix for suppressed states — the matrix shows
-# (E,U) at AUDIT_TRAIL/PIPELINE/SHAPE_VALIDATED but we suppress here because
-# "key in config" is a normal pattern in safe contexts, not a structural gate.
-# Tracked: wardline-a87ea844eb (reconcile _ACTIVE_TAINTS with matrix)
-_ACTIVE_TAINTS = frozenset({
-    TaintState.EXTERNAL_RAW,
-    TaintState.UNKNOWN_RAW,
-    TaintState.MIXED_RAW,
+if TYPE_CHECKING:
+    from wardline.core.taints import TaintState
+
+# Boundary transitions whose bodies are expected to perform existence checks
+# as part of structural validation. We accept both manifest-style transition
+# names and decorator-style names because tests and local tooling currently
+# use both spellings.
+_SUPPRESSED_BOUNDARY_TRANSITIONS = frozenset({
+    "shape_validation",
+    "combined_validation",
+    "external_validation",
+    "validates_shape",
+    "validates_external",
 })
 
 
@@ -53,9 +57,9 @@ class RulePyWl003(RuleBase):
         is_async: bool,
     ) -> None:
         """Walk the function body looking for PY-WL-003 patterns."""
-        taint = self._get_function_taint(self._current_qualname)
-        if taint not in _ACTIVE_TAINTS:
+        if self._is_structural_validation_boundary():
             return
+        taint = self._get_function_taint(self._current_qualname)
         for child in walk_skip_nested_defs(node):
             if isinstance(child, ast.Compare):
                 self._check_compare(child, node, taint)
@@ -77,6 +81,22 @@ class RulePyWl003(RuleBase):
                     "structural pattern match on class",
                     taint,
                 )
+
+    def _is_structural_validation_boundary(self) -> bool:
+        """Return True when this function is a shape/combined validator.
+
+        The authoritative Wardline spec suppresses PY-WL-003 inside
+        declared shape-validation and combined-validation boundaries,
+        where existence-checking is the purpose of the boundary body.
+        """
+        if self._context is None:
+            return False
+        return any(
+            boundary.function == self._current_qualname
+            and boundary.transition in _SUPPRESSED_BOUNDARY_TRANSITIONS
+            and path_within_scope(self._file_path, boundary.overlay_scope)
+            for boundary in self._context.boundaries
+        )
 
     def _check_compare(
         self,

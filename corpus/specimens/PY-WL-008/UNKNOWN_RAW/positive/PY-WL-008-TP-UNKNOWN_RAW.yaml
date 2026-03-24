@@ -4,6 +4,9 @@ description: PY-WL-008 true_positive at UNKNOWN_RAW
 rule: PY-WL-008
 fragment: "def process(data):\n    result = validate(data)\n    return data\n"
 taint_state: UNKNOWN_RAW
+boundaries:
+- function: process
+  transition: shape_validation
 expected_rules:
 - PY-WL-008
 expected_severity: ERROR

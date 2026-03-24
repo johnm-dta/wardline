@@ -47,15 +47,16 @@ def _write_source_file(src_dir: Path) -> Path:
     app_py.write_text(
         '"""Test fixture for preview-phase2 integration tests."""\n'
         "\n"
+        "from wardline import schema_default\n"
         "\n"
         "def ungoverned_fn(data):\n"
         "    \"\"\"schema_default() with no overlay boundary → PY-WL-001-UNGOVERNED-DEFAULT.\"\"\"\n"
-        "    return data.get(\"key\", schema_default(\"key\"))\n"
+        "    return schema_default(data.get(\"key\", \"\"))\n"
         "\n"
         "\n"
         "def governed_fn(data):\n"
         "    \"\"\"schema_default() covered by overlay boundary → PY-WL-001-GOVERNED-DEFAULT (SUPPRESS).\"\"\"\n"
-        "    return data.get(\"key\", schema_default(\"key\"))\n"
+        "    return schema_default(data.get(\"key\", \"\"))\n"
         "\n"
         "\n"
         "def get_fn(data):\n"
@@ -73,7 +74,11 @@ def _write_overlay(src_dir: Path) -> None:
         "overlay_for: src\n"
         "boundaries:\n"
         "  - function: governed_fn\n"
-        "    transition: construction\n",
+        "    transition: shape_validation\n"
+        "optional_fields:\n"
+        "  - field: key\n"
+        "    approved_default: \"\"\n"
+        "    rationale: Approved empty default in validation boundary\n",
         encoding="utf-8",
     )
 

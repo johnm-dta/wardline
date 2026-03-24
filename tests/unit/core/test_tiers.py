@@ -20,3 +20,11 @@ def test_tier_json_serialisation() -> None:
     """IntEnum members serialise as integers via json.dumps."""
     assert json.dumps(AuthorityTier.TIER_1) == "1"
     assert json.dumps(AuthorityTier.TIER_4) == "4"
+
+
+def test_tier_ordering_and_comparison_operators() -> None:
+    """IntEnum members compare using their numeric tier values."""
+    assert AuthorityTier.TIER_1 < AuthorityTier.TIER_2
+    assert AuthorityTier.TIER_2 <= AuthorityTier.TIER_2
+    assert AuthorityTier.TIER_3 > AuthorityTier.TIER_2
+    assert AuthorityTier.TIER_4 >= AuthorityTier.TIER_3

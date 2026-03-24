@@ -24,107 +24,8 @@ def _run_rule_module(source: str) -> RulePyWl006:
     return rule
 
 
-# -- Positive: logger calls in broad handlers ------------------------------
-
-
-class TestLoggerInBroadHandler:
-    """Logger calls inside broad exception handlers fire PY-WL-006."""
-
-    def test_logger_error_in_except_exception(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except Exception:
-    logger.error("failed")
-"""
-        )
-
-        assert len(rule.findings) == 1
-        assert rule.findings[0].rule_id == RuleId.PY_WL_006
-        assert rule.findings[0].severity == Severity.ERROR
-
-    def test_logger_info_in_bare_except(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except:
-    logger.info("something happened")
-"""
-        )
-
-        assert len(rule.findings) == 1
-        assert rule.findings[0].rule_id == RuleId.PY_WL_006
-
-    def test_logger_warning_in_except_base_exception(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except BaseException:
-    logger.warning("base exception caught")
-"""
-        )
-
-        assert len(rule.findings) == 1
-        assert rule.findings[0].rule_id == RuleId.PY_WL_006
-
-    def test_logger_debug_fires(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except Exception:
-    logger.debug("debug info")
-"""
-        )
-
-        assert len(rule.findings) == 1
-
-    def test_logger_critical_fires(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except Exception:
-    logger.critical("critical failure")
-"""
-        )
-
-        assert len(rule.findings) == 1
-
-    def test_logger_exception_fires(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except Exception as e:
-    logger.exception("unhandled error")
-"""
-        )
-
-        assert len(rule.findings) == 1
-
-
-# -- Positive: database/audit writes in broad handlers --------------------
-
-
-class TestAuditWritesInBroadHandler:
-    """Database and audit writes inside broad handlers fire PY-WL-006."""
-
-    def test_db_record_failure_fires(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except Exception:
-    db.record_failure(data)
-"""
-        )
-
-        assert len(rule.findings) == 1
-        assert rule.findings[0].rule_id == RuleId.PY_WL_006
+class TestAuditShapedSinks:
+    """Clearly audit-shaped sinks in broad handlers fire PY-WL-006."""
 
     def test_audit_emit_fires(self) -> None:
         rule = _run_rule(
@@ -137,127 +38,104 @@ except Exception:
         )
 
         assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_006
+        assert rule.findings[0].severity == Severity.ERROR
 
-    def test_store_save_fires(self) -> None:
+    def test_db_record_failure_fires(self) -> None:
         rule = _run_rule(
             """\
 try:
     process(data)
 except Exception:
-    store.save(record)
-"""
-        )
-
-        assert len(rule.findings) == 1
-
-    def test_db_insert_fires(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except Exception as e:
-    db.insert(error_record)
-"""
-        )
-
-        assert len(rule.findings) == 1
-
-    def test_writer_write_fires(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except Exception:
-    writer.write(log_entry)
-"""
-        )
-
-        assert len(rule.findings) == 1
-
-
-# -- Positive: multiple audit writes in one handler -----------------------
-
-
-class TestMultipleAuditWrites:
-    """Multiple audit writes in a single handler each produce a finding."""
-
-    def test_two_writes_produce_two_findings(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except Exception:
-    logger.error("failed")
     db.record_failure(data)
 """
         )
 
-        assert len(rule.findings) == 2
+        assert len(rule.findings) == 1
 
-    def test_two_broad_handlers_each_with_writes(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    foo()
-except Exception:
-    logger.error("foo failed")
-
-try:
-    bar()
-except BaseException:
-    logger.error("bar failed")
-"""
-        )
-
-        assert len(rule.findings) == 2
-
-
-# -- Positive: tuple with broad member ------------------------------------
-
-
-class TestTupleBroadHandler:
-    """except (Exception, ValueError) is still broad."""
-
-    def test_tuple_with_exception_fires(self) -> None:
+    def test_ledger_emit_event_fires(self) -> None:
         rule = _run_rule(
             """\
 try:
     process(data)
-except (Exception, ValueError):
+except Exception:
+    audit_ledger.emit_event(data)
+"""
+        )
+
+        assert len(rule.findings) == 1
+
+
+class TestDecoratedAuditTargets:
+    """Locally declared audit writers and critical paths count as audit-critical."""
+
+    def test_local_audit_writer_call_fires(self) -> None:
+        rule = _run_rule_module(
+            """\
+@audit_writer
+def write_audit(data):
+    return None
+
+def target():
+    try:
+        process(data)
+    except Exception:
+        write_audit(data)
+"""
+        )
+
+        assert len(rule.findings) == 1
+
+    def test_local_audit_critical_call_fires(self) -> None:
+        rule = _run_rule_module(
+            """\
+@audit_critical
+def emit_legal_record(data):
+    return None
+
+def target():
+    try:
+        process(data)
+    except Exception:
+        emit_legal_record(data)
+"""
+        )
+
+        assert len(rule.findings) == 1
+
+
+class TestSpecificHandlersNoFire:
+    """Specific exception handlers do not trigger PY-WL-006."""
+
+    def test_audit_call_in_specific_handler_silent(self) -> None:
+        rule = _run_rule(
+            """\
+try:
+    process(data)
+except ValueError:
+    audit.emit("failed", data)
+"""
+        )
+
+        assert len(rule.findings) == 0
+
+
+class TestNonAuditTelemetryNoFire:
+    """Generic telemetry is not treated as audit-critical by this rule."""
+
+    def test_logger_error_silent(self) -> None:
+        rule = _run_rule(
+            """\
+try:
+    process(data)
+except Exception:
     logger.error("failed")
 """
         )
 
-        assert len(rule.findings) == 1
+        assert len(rule.findings) == 0
 
-
-# -- Positive: async function ---------------------------------------------
-
-
-class TestAsyncFunction:
-    """Broad handlers in async functions fire PY-WL-006."""
-
-    def test_async_except_exception_fires(self) -> None:
-        rule = _run_rule_module(
-            """\
-async def target():
-    try:
-        await process(data)
-    except Exception:
-        logger.error("async failed")
-"""
-        )
-
-        assert len(rule.findings) == 1
-
-
-# -- Positive: bare function names ----------------------------------------
-
-
-class TestBareFunctionAuditCalls:
-    """Bare audit function calls in broad handlers fire."""
-
-    def test_print_in_broad_handler_fires(self) -> None:
+    def test_print_silent(self) -> None:
         rule = _run_rule(
             """\
 try:
@@ -267,59 +145,9 @@ except Exception:
 """
         )
 
-        assert len(rule.findings) == 1
-
-
-# -- Negative: specific exception handlers --------------------------------
-
-
-class TestSpecificHandlersNoFire:
-    """Audit writes in specific exception handlers do NOT fire PY-WL-006."""
-
-    def test_logger_in_value_error_handler_silent(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except ValueError:
-    logger.error("value error")
-"""
-        )
-
         assert len(rule.findings) == 0
 
-    def test_logger_in_key_error_handler_silent(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except KeyError as e:
-    logger.error("key error: %s", e)
-"""
-        )
-
-        assert len(rule.findings) == 0
-
-    def test_logger_in_specific_tuple_handler_silent(self) -> None:
-        rule = _run_rule(
-            """\
-try:
-    process(data)
-except (TypeError, ValueError):
-    logger.error("type or value error")
-"""
-        )
-
-        assert len(rule.findings) == 0
-
-
-# -- Negative: non-audit calls in broad handlers --------------------------
-
-
-class TestNonAuditCallsNoFire:
-    """Non-audit calls in broad handlers do NOT fire PY-WL-006."""
-
-    def test_regular_method_call_silent(self) -> None:
+    def test_cleanup_call_silent(self) -> None:
         rule = _run_rule(
             """\
 try:
@@ -331,48 +159,98 @@ except Exception:
 
         assert len(rule.findings) == 0
 
-    def test_data_processing_in_handler_silent(self) -> None:
+
+class TestAuditPathDominance:
+    """Success paths that bypass audit should fire PY-WL-006."""
+
+    def test_success_branch_without_audit_fires(self) -> None:
+        rule = _run_rule(
+            """\
+if ok:
+    audit.emit("success", data)
+    return result
+return cached_result
+"""
+        )
+
+        assert len(rule.findings) == 1
+        assert "bypass audit" in rule.findings[0].message
+
+    def test_broad_handler_fallback_success_without_audit_fires(self) -> None:
         rule = _run_rule(
             """\
 try:
     process(data)
 except Exception:
-    result = transform(data)
+    return cached_result
+audit.emit("processed", data)
+return result
+"""
+        )
+
+        assert len(rule.findings) == 1
+        assert "bypass audit" in rule.findings[0].message
+
+    def test_local_audit_writer_must_dominate_success_paths(self) -> None:
+        rule = _run_rule_module(
+            """\
+@audit_writer
+def write_audit(data):
+    return None
+
+def target():
+    if skip:
+        return result
+    write_audit(data)
+    return result
+"""
+        )
+
+        assert len(rule.findings) == 1
+        assert "bypass audit" in rule.findings[0].message
+
+    def test_rejection_path_without_audit_is_allowed(self) -> None:
+        rule = _run_rule(
+            """\
+if not ok:
+    raise ValueError("bad")
+audit.emit("success", data)
+return result
 """
         )
 
         assert len(rule.findings) == 0
 
-    def test_reraise_only_silent(self) -> None:
+    def test_fallback_raise_without_audit_is_allowed(self) -> None:
         rule = _run_rule(
             """\
 try:
     process(data)
 except Exception:
     raise
+audit.emit("processed", data)
+return result
 """
         )
 
         assert len(rule.findings) == 0
 
 
-# -- Negative: no try/except at all ---------------------------------------
+class TestNestedAndAsyncBehavior:
+    """Nested scopes and async handlers still work."""
 
+    def test_async_broad_handler_with_audit_emit_fires(self) -> None:
+        rule = _run_rule_module(
+            """\
+async def target():
+    try:
+        await process(data)
+    except Exception:
+        audit.emit("async failed", data)
+"""
+        )
 
-class TestNoTryExcept:
-    """No try/except produces no findings."""
-
-    def test_plain_function_silent(self) -> None:
-        rule = _run_rule("x = 1\n")
-
-        assert len(rule.findings) == 0
-
-
-# -- Edge: nested functions ------------------------------------------------
-
-
-class TestNestedFunctions:
-    """Audit writes in nested function broad handlers are separate findings."""
+        assert len(rule.findings) == 1
 
     def test_nested_function_handler_fires_separately(self) -> None:
         rule = _run_rule_module(
@@ -381,13 +259,13 @@ def outer():
     try:
         pass
     except Exception:
-        logger.error("outer")
+        audit.emit("outer", data)
 
     def inner():
         try:
             pass
         except Exception:
-            logger.error("inner")
+            audit.emit("inner", data)
 """
         )
 

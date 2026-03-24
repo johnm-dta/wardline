@@ -96,7 +96,16 @@
     },
     "optional_fields": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "approved_default": {},
+          "rationale": { "type": "string" }
+        },
+        "required": ["field", "approved_default", "rationale"],
+        "additionalProperties": false
+      }
     },
     "contract_bindings": {
       "type": "array",

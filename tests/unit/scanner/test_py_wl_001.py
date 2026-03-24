@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
-from wardline.manifest.models import BoundaryEntry
+from wardline.manifest.models import BoundaryEntry, OptionalFieldEntry
 from wardline.scanner.context import ScanContext
 from wardline.scanner.rules.py_wl_001 import RulePyWl001
 
@@ -30,6 +30,7 @@ def _run_rule_with_context(
     source: str,
     *,
     boundaries: tuple[BoundaryEntry, ...] = (),
+    optional_fields: tuple[OptionalFieldEntry, ...] = (),
     file_path: str = "/project/src/adapters/handler.py",
 ) -> RulePyWl001:
     """Parse source inside a function, set context with boundaries, run rule."""
@@ -39,6 +40,7 @@ def _run_rule_with_context(
         file_path=file_path,
         function_level_taint_map={},
         boundaries=boundaries,
+        optional_fields=optional_fields,
     )
     rule.set_context(ctx)
     rule.visit(tree)
@@ -144,15 +146,22 @@ class TestDefaultdict:
 class TestSchemaDefaultGoverned:
     """schema_default() with matching boundary -> SUPPRESS (governed)."""
 
-    def test_get_with_boundary_suppresses(self) -> None:
+    def test_wrapped_get_with_boundary_and_optional_field_suppresses(self) -> None:
         boundary = BoundaryEntry(
             function="target",
-            transition="construction",
+            transition="shape_validation",
+            overlay_scope="/project/src/adapters",
+        )
+        optional_field = OptionalFieldEntry(
+            field="key",
+            approved_default="fallback",
+            rationale="Optional by partner contract",
             overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
-            'd.get("key", schema_default("fallback"))\n',
+            'schema_default(d.get("key", "fallback"))\n',
             boundaries=(boundary,),
+            optional_fields=(optional_field,),
         )
         assert len(rule.findings) == 1
         f = rule.findings[0]
@@ -160,29 +169,23 @@ class TestSchemaDefaultGoverned:
         assert f.severity == Severity.SUPPRESS
         assert f.exceptionability == Exceptionability.TRANSPARENT
 
-    def test_setdefault_with_boundary_suppresses(self) -> None:
-        boundary = BoundaryEntry(
-            function="target",
-            transition="restoration",
-            overlay_scope="/project/src/adapters",
-        )
-        rule = _run_rule_with_context(
-            'd.setdefault("key", schema_default([]))\n',
-            boundaries=(boundary,),
-        )
-        assert len(rule.findings) == 1
-        assert rule.findings[0].rule_id == RuleId.PY_WL_001_GOVERNED_DEFAULT
-
     def test_matching_scope_suppresses(self) -> None:
-        """Positive test: file within non-empty overlay scope -> SUPPRESS (E8)."""
+        """Positive test: file within non-empty overlay scope -> SUPPRESS."""
         boundary = BoundaryEntry(
             function="target",
-            transition="construction",
+            transition="validates_external",
+            overlay_scope="/project/src/adapters",
+        )
+        optional_field = OptionalFieldEntry(
+            field="key",
+            approved_default="x",
+            rationale="Optional by contract",
             overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
-            'd.get("key", schema_default("x"))\n',
+            'schema_default(d.get("key", "x"))\n',
             boundaries=(boundary,),
+            optional_fields=(optional_field,),
             file_path="/project/src/adapters/handler.py",
         )
         assert len(rule.findings) == 1
@@ -192,12 +195,18 @@ class TestSchemaDefaultGoverned:
         source = '''
 class MyClass:
     def handle(self):
-        d.get("key", schema_default("x"))
+        schema_default(d.get("key", "x"))
 '''
         tree = parse_module_source(source)
         boundary = BoundaryEntry(
             function="MyClass.handle",
-            transition="construction",
+            transition="shape_validation",
+            overlay_scope="/project/src/adapters",
+        )
+        optional_field = OptionalFieldEntry(
+            field="key",
+            approved_default="x",
+            rationale="Optional by contract",
             overlay_scope="/project/src/adapters",
         )
         rule = RulePyWl001(file_path="/project/src/adapters/handler.py")
@@ -205,21 +214,62 @@ class MyClass:
             file_path="/project/src/adapters/handler.py",
             function_level_taint_map={},
             boundaries=(boundary,),
+            optional_fields=(optional_field,),
         )
         rule.set_context(ctx)
         rule.visit(tree)
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_GOVERNED_DEFAULT
+
+    def test_most_specific_optional_field_scope_wins(self) -> None:
+        parent_boundary = BoundaryEntry(
+            function="target",
+            transition="shape_validation",
+            overlay_scope="/project/src",
+        )
+        child_boundary = BoundaryEntry(
+            function="target",
+            transition="shape_validation",
+            overlay_scope="/project/src/adapters",
+        )
+        parent_optional_field = OptionalFieldEntry(
+            field="key",
+            approved_default="parent-default",
+            rationale="Parent scope",
+            overlay_scope="/project/src",
+        )
+        child_optional_field = OptionalFieldEntry(
+            field="key",
+            approved_default="child-default",
+            rationale="Child scope",
+            overlay_scope="/project/src/adapters",
+        )
+
+        rule = _run_rule_with_context(
+            'schema_default(d.get("key", "child-default"))\n',
+            boundaries=(parent_boundary, child_boundary),
+            optional_fields=(parent_optional_field, child_optional_field),
+            file_path="/project/src/adapters/handler.py",
+        )
 
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_001_GOVERNED_DEFAULT
 
     def test_multiple_boundaries_only_match_suppresses(self) -> None:
         boundaries = (
-            BoundaryEntry(function="other", transition="construction", overlay_scope="/project/src/adapters"),
-            BoundaryEntry(function="target", transition="construction", overlay_scope="/project/src/adapters"),
+            BoundaryEntry(function="other", transition="shape_validation", overlay_scope="/project/src/adapters"),
+            BoundaryEntry(function="target", transition="shape_validation", overlay_scope="/project/src/adapters"),
+        )
+        optional_field = OptionalFieldEntry(
+            field="key",
+            approved_default=42,
+            rationale="Optional by contract",
+            overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
-            'd.get("key", schema_default(42))\n',
+            'schema_default(d.get("key", 42))\n',
             boundaries=boundaries,
+            optional_fields=(optional_field,),
         )
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_001_GOVERNED_DEFAULT
@@ -230,22 +280,30 @@ class TestSchemaDefaultUngoverned:
 
     def test_no_boundary_emits_error(self) -> None:
         rule = _run_rule_with_context(
-            'd.get("key", schema_default("fallback"))\n',
+            'schema_default(d.get("key", "fallback"))\n',
         )
         assert len(rule.findings) == 1
         f = rule.findings[0]
         assert f.rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
         assert f.severity == Severity.ERROR
+        assert f.exceptionability == Exceptionability.STANDARD
 
     def test_wrong_function_emits_error(self) -> None:
         boundary = BoundaryEntry(
             function="other_fn",
-            transition="construction",
+            transition="shape_validation",
+            overlay_scope="/project/src/adapters",
+        )
+        optional_field = OptionalFieldEntry(
+            field="key",
+            approved_default=42,
+            rationale="Optional by contract",
             overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
-            'd.get("key", schema_default(42))\n',
+            'schema_default(d.get("key", 42))\n',
             boundaries=(boundary,),
+            optional_fields=(optional_field,),
         )
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
@@ -253,12 +311,19 @@ class TestSchemaDefaultUngoverned:
     def test_wrong_transition_emits_error(self) -> None:
         boundary = BoundaryEntry(
             function="target",
-            transition="shape_validation",
+            transition="semantic_validation",
+            overlay_scope="/project/src/adapters",
+        )
+        optional_field = OptionalFieldEntry(
+            field="key",
+            approved_default=42,
+            rationale="Optional by contract",
             overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
-            'd.get("key", schema_default(42))\n',
+            'schema_default(d.get("key", 42))\n',
             boundaries=(boundary,),
+            optional_fields=(optional_field,),
         )
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
@@ -266,12 +331,19 @@ class TestSchemaDefaultUngoverned:
     def test_wrong_scope_emits_error(self) -> None:
         boundary = BoundaryEntry(
             function="target",
-            transition="construction",
+            transition="shape_validation",
+            overlay_scope="/project/services",
+        )
+        optional_field = OptionalFieldEntry(
+            field="key",
+            approved_default=42,
+            rationale="Optional by contract",
             overlay_scope="/project/services",
         )
         rule = _run_rule_with_context(
-            'd.get("key", schema_default(42))\n',
+            'schema_default(d.get("key", 42))\n',
             boundaries=(boundary,),
+            optional_fields=(optional_field,),
             file_path="/project/src/adapters/handler.py",
         )
         assert len(rule.findings) == 1
@@ -281,19 +353,26 @@ class TestSchemaDefaultUngoverned:
         """Empty overlay_scope must NOT match (E4)."""
         boundary = BoundaryEntry(
             function="target",
-            transition="construction",
+            transition="shape_validation",
+            overlay_scope="",
+        )
+        optional_field = OptionalFieldEntry(
+            field="key",
+            approved_default=42,
+            rationale="Optional by contract",
             overlay_scope="",
         )
         rule = _run_rule_with_context(
-            'd.get("key", schema_default(42))\n',
+            'schema_default(d.get("key", 42))\n',
             boundaries=(boundary,),
+            optional_fields=(optional_field,),
         )
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
 
     def test_no_context_emits_error(self) -> None:
         tree = parse_function_source(
-            'd.get("key", schema_default(42))\n'
+            'schema_default(d.get("key", 42))\n'
         )
         rule = RulePyWl001(file_path="test.py")
         # No set_context call -- _context is None
@@ -306,21 +385,63 @@ class TestSchemaDefaultUngoverned:
     def test_case_sensitive_qualname(self) -> None:
         boundary = BoundaryEntry(
             function="Target",
-            transition="construction",
+            transition="shape_validation",
+            overlay_scope="/project/src/adapters",
+        )
+        optional_field = OptionalFieldEntry(
+            field="key",
+            approved_default=42,
+            rationale="Optional by contract",
             overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(
-            'd.get("key", schema_default(42))\n',
+            'schema_default(d.get("key", 42))\n',
+            boundaries=(boundary,),
+            optional_fields=(optional_field,),
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
+
+    def test_missing_optional_field_declaration_emits_error(self) -> None:
+        boundary = BoundaryEntry(
+            function="target",
+            transition="shape_validation",
+            overlay_scope="/project/src/adapters",
+        )
+        rule = _run_rule_with_context(
+            'schema_default(d.get("key", 42))\n',
             boundaries=(boundary,),
         )
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
+        assert rule.findings[0].exceptionability == Exceptionability.STANDARD
+
+    def test_mismatched_approved_default_is_unconditional(self) -> None:
+        boundary = BoundaryEntry(
+            function="target",
+            transition="shape_validation",
+            overlay_scope="/project/src/adapters",
+        )
+        optional_field = OptionalFieldEntry(
+            field="key",
+            approved_default=[],
+            rationale="Optional by contract",
+            overlay_scope="/project/src/adapters",
+        )
+        rule = _run_rule_with_context(
+            'schema_default(d.get("key", 42))\n',
+            boundaries=(boundary,),
+            optional_fields=(optional_field,),
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001_UNGOVERNED_DEFAULT
+        assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
 
     def test_non_schema_default_unchanged(self) -> None:
         """Regular default -> ERROR regardless of boundaries."""
         boundary = BoundaryEntry(
             function="target",
-            transition="construction",
+            transition="shape_validation",
             overlay_scope="/project/src/adapters",
         )
         rule = _run_rule_with_context(

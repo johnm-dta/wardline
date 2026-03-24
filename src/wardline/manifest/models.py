@@ -152,6 +152,17 @@ class BoundaryEntry:
 
 
 @dataclass(frozen=True)
+class OptionalFieldEntry:
+    """An optional-by-contract field declaration from an overlay."""
+
+    field: str
+    approved_default: object
+    rationale: str
+    overlay_scope: str = ""
+    overlay_path: str = ""
+
+
+@dataclass(frozen=True)
 class ContractBinding:
     """Binds a named contract to implementing functions."""
 
@@ -177,7 +188,7 @@ class WardlineOverlay:
     overlay_for: str = ""
     boundaries: tuple[BoundaryEntry, ...] = ()
     rule_overrides: tuple[dict[str, object], ...] = ()
-    optional_fields: tuple[str, ...] = ()
+    optional_fields: tuple[OptionalFieldEntry, ...] = ()
     contract_bindings: tuple[ContractBinding, ...] = ()
 
 

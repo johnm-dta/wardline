@@ -15,11 +15,19 @@ Without a matching boundary, it emits ERROR (``PY-WL-001``).
 from __future__ import annotations
 
 import ast
+from typing import TYPE_CHECKING
 
 from wardline.core import matrix
 from wardline.core.severity import Exceptionability, RuleId, Severity
+from wardline.manifest.scope import path_within_scope, scope_specificity
 from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
+
+if TYPE_CHECKING:
+    from wardline.manifest.models import OptionalFieldEntry
+
+
+_UNPARSEABLE_DEFAULT = object()
 
 
 class RulePyWl001(RuleBase):
@@ -30,7 +38,13 @@ class RulePyWl001(RuleBase):
     """
 
     RULE_ID = RuleId.PY_WL_001
-    _GOVERNED_TRANSITIONS = frozenset({"construction", "restoration"})
+    _GOVERNED_TRANSITIONS = frozenset({
+        "shape_validation",
+        "external_validation",
+        "combined_validation",
+        "validates_shape",
+        "validates_external",
+    })
 
     def __init__(self, *, file_path: str = "") -> None:
         super().__init__()
@@ -48,9 +62,15 @@ class RulePyWl001(RuleBase):
         function definitions — those are visited separately by the base
         class ``_dispatch`` / ``generic_visit``.
         """
+        handled_calls: set[int] = set()
         for child in walk_skip_nested_defs(node):
             if not isinstance(child, ast.Call):
                 continue
+            if id(child) in handled_calls:
+                continue
+            wrapped_get = self._unwrap_schema_default_get(child)
+            if wrapped_get is not None:
+                handled_calls.add(id(wrapped_get))
             self._check_call(child, node)
 
     def _check_call(
@@ -59,20 +79,18 @@ class RulePyWl001(RuleBase):
         enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> None:
         """Check a single Call node for PY-WL-001 patterns."""
+        if self._unwrap_schema_default_get(call) is not None:
+            self._emit_schema_default_finding(call)
+            return
+
         # Pattern 1: d.get(key, default) — .get() with ≥2 args
         if self._is_method_call(call, "get") and len(call.args) >= 2:
-            if self._is_schema_default_arg(call.args[1]):
-                self._emit_unverified_default(call, enclosing_func)
-            else:
-                self._emit_finding(call, enclosing_func)
+            self._emit_finding(call, enclosing_func)
             return
 
         # Pattern 2: d.setdefault(key, default)
         if self._is_method_call(call, "setdefault") and len(call.args) >= 2:
-            if self._is_schema_default_arg(call.args[1]):
-                self._emit_unverified_default(call, enclosing_func)
-            else:
-                self._emit_finding(call, enclosing_func)
+            self._emit_finding(call, enclosing_func)
             return
 
         # Pattern 3: defaultdict(factory)
@@ -105,21 +123,46 @@ class RulePyWl001(RuleBase):
         )
 
     @staticmethod
-    def _is_schema_default_arg(node: ast.expr) -> bool:
-        """Check if an argument is ``schema_default(...)``.
-
-        Known limitation: only matches the bare name ``schema_default``.
-        Aliased imports (e.g. ``from wardline.core import schema_default as sd``)
-        are NOT detected and will produce a false-positive PY-WL-001 finding
-        instead of the governed PY-WL-001-GOVERNED-DEFAULT. Fixing this would
-        require import-tracking across the AST, which is deferred to the L3
-        call-graph analysis (v0.3.0).
-        """
+    def _is_schema_default_call(node: ast.expr) -> bool:
+        """Check if an expression is ``schema_default(...)``."""
         return (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
             and node.func.id == "schema_default"
         )
+
+    def _unwrap_schema_default_get(self, call: ast.Call) -> ast.Call | None:
+        """Return wrapped ``.get()`` call from ``schema_default(d.get(...))``."""
+        if not self._is_schema_default_call(call) or len(call.args) != 1:
+            return None
+        wrapped = call.args[0]
+        if (
+            isinstance(wrapped, ast.Call)
+            and self._is_method_call(wrapped, "get")
+            and len(wrapped.args) >= 2
+        ):
+            return wrapped
+        return None
+
+    @staticmethod
+    def _extract_field_name(call: ast.Call) -> str | None:
+        """Extract literal field name from ``d.get(\"field\", default)``."""
+        if not call.args:
+            return None
+        key_arg = call.args[0]
+        if isinstance(key_arg, ast.Constant) and isinstance(key_arg.value, str):
+            return key_arg.value
+        return None
+
+    @staticmethod
+    def _extract_default_value(call: ast.Call) -> object:
+        """Extract the runtime-equivalent literal default, or a sentinel."""
+        if len(call.args) < 2:
+            return _UNPARSEABLE_DEFAULT
+        try:
+            return ast.literal_eval(call.args[1])
+        except (ValueError, SyntaxError):
+            return _UNPARSEABLE_DEFAULT
 
     def _emit_finding(
         self,
@@ -150,15 +193,25 @@ class RulePyWl001(RuleBase):
             )
         )
 
-    def _emit_unverified_default(
+    def _emit_schema_default_finding(
         self,
         call: ast.Call,
-        enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> None:
-        """Emit governed (SUPPRESS) or ungoverned (ERROR) for schema_default()."""
+        """Emit governed or ungoverned finding for ``schema_default(d.get(...))``."""
         taint = self._get_function_taint(self._current_qualname)
+        wrapped_get = self._unwrap_schema_default_get(call)
+        if wrapped_get is None:
+            return
 
-        if self._is_governed_by_boundary():
+        field_name = self._extract_field_name(wrapped_get)
+        default_value = self._extract_default_value(wrapped_get)
+        optional_field = self._find_matching_optional_field(field_name)
+
+        if (
+            optional_field is not None
+            and default_value == optional_field.approved_default
+            and self._is_governed_by_boundary(optional_field.overlay_scope)
+        ):
             self.findings.append(
                 Finding(
                     rule_id=RuleId.PY_WL_001_GOVERNED_DEFAULT,
@@ -180,6 +233,20 @@ class RulePyWl001(RuleBase):
                 )
             )
         else:
+            message = (
+                "schema_default() without approved overlay declaration — "
+                "ungoverned default value"
+            )
+            exceptionability = Exceptionability.STANDARD
+            if (
+                optional_field is not None
+                and default_value != optional_field.approved_default
+            ):
+                message = (
+                    "schema_default() default does not match overlay approved "
+                    "default"
+                )
+                exceptionability = Exceptionability.UNCONDITIONAL
             self.findings.append(
                 Finding(
                     rule_id=RuleId.PY_WL_001_UNGOVERNED_DEFAULT,
@@ -188,12 +255,9 @@ class RulePyWl001(RuleBase):
                     col=call.col_offset,
                     end_line=call.end_lineno,
                     end_col=call.end_col_offset,
-                    message=(
-                        "schema_default() without overlay boundary — "
-                        "ungoverned default value"
-                    ),
+                    message=message,
                     severity=Severity.ERROR,
-                    exceptionability=Exceptionability.STANDARD,
+                    exceptionability=exceptionability,
                     taint_state=taint,
                     analysis_level=1,
                     source_snippet=None,
@@ -201,12 +265,34 @@ class RulePyWl001(RuleBase):
                 )
             )
 
-    def _is_governed_by_boundary(self) -> bool:
+    def _find_matching_optional_field(
+        self, field_name: str | None
+    ) -> OptionalFieldEntry | None:
+        """Return scoped optional-field declaration for the current file/function."""
+        if self._context is None or field_name is None:
+            return None
+
+        best_match: OptionalFieldEntry | None = None
+        for optional_field in self._context.optional_fields:
+            if (
+                optional_field.field == field_name
+                and optional_field.overlay_scope
+                and path_within_scope(self._file_path, optional_field.overlay_scope)
+                and (
+                    best_match is None
+                    or scope_specificity(optional_field.overlay_scope)
+                    > scope_specificity(best_match.overlay_scope)
+                )
+            ):
+                best_match = optional_field
+        return best_match
+
+    def _is_governed_by_boundary(self, overlay_scope: str) -> bool:
         """Check if current function has a matching governance boundary.
 
         Three conditions must ALL be met:
         1. Exact qualname match (boundary.function == self._current_qualname)
-        2. Transition type is governance-relevant (construction or restoration)
+        2. Transition type is governance-relevant (shape or combined validation)
         3. File is within the boundary's overlay scope (non-empty, path-prefix)
         """
         if self._context is None:
@@ -216,8 +302,9 @@ class RulePyWl001(RuleBase):
             if (
                 boundary.function == self._current_qualname
                 and boundary.transition in self._GOVERNED_TRANSITIONS
-                and boundary.overlay_scope  # non-empty required (E4)
-                and self._file_path.startswith(boundary.overlay_scope + "/")
+                and overlay_scope
+                and boundary.overlay_scope == overlay_scope
+                and path_within_scope(self._file_path, overlay_scope)
             ):
                 return True
         return False

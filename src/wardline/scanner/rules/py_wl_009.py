@@ -1,13 +1,9 @@
-"""PY-WL-009: Semantic validation without prior shape validation.
+"""PY-WL-009: Semantic boundary without prior shape validation.
 
-Detects functions that perform semantic checks (business-logic validation
-on data values) without first performing shape validation (checking that
-required keys/attributes exist and have expected types).
-
-Pattern: subscript access (``data["key"]``) or attribute access in a
-conditional (if/assert), where the function body has no prior shape
-check — ``isinstance()``, ``hasattr()``, ``"key" in data``, or a
-structural validation call (``validate_schema``, ``check_shape``, etc.).
+Detects declared semantic-validation boundaries whose semantic checks
+have no prior structural validation evidence within the boundary body.
+Combined validation boundaries are excluded because they satisfy the
+ordering requirement internally by definition.
 """
 
 from __future__ import annotations
@@ -16,8 +12,17 @@ import ast
 
 from wardline.core import matrix
 from wardline.core.severity import RuleId
+from wardline.manifest.scope import path_within_scope
 from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
+
+_SEMANTIC_BOUNDARY_TRANSITIONS = frozenset({"semantic_validation"})
+_COMBINED_BOUNDARY_TRANSITIONS = frozenset({
+    "combined_validation",
+    "external_validation",
+})
+_SEMANTIC_BOUNDARY_DECORATORS = frozenset({"validates_semantic"})
+_COMBINED_BOUNDARY_DECORATORS = frozenset({"validates_external"})
 
 # Function name fragments that indicate shape validation.
 _SHAPE_VALIDATION_NAMES = frozenset({
@@ -62,6 +67,27 @@ def _has_shape_check_before(
         elif isinstance(node, ast.Compare) and _is_membership_test(node):
             return True
     return False
+
+
+def _decorator_name(decorator: ast.expr) -> str | None:
+    """Return the terminal decorator name for ``@name`` and ``@pkg.name``."""
+    target = decorator.func if isinstance(decorator, ast.Call) else decorator
+    if isinstance(target, ast.Name):
+        return target.id
+    if isinstance(target, ast.Attribute):
+        return target.attr
+    return None
+
+
+def _has_direct_decorator(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    names: frozenset[str],
+) -> bool:
+    """Check whether the function has any decorator whose terminal name matches."""
+    return any(
+        _decorator_name(decorator) in names
+        for decorator in node.decorator_list
+    )
 
 
 def _is_shape_validation_call(call: ast.Call) -> bool:
@@ -199,7 +225,11 @@ class RulePyWl009(RuleBase):
         *,
         is_async: bool,
     ) -> None:
-        """Walk function body for semantic checks without shape validation."""
+        """Walk semantic-validation boundaries for missing shape-validation evidence."""
+        if self._is_combined_boundary(node):
+            return
+        if not self._is_semantic_boundary(node):
+            return
         semantic_checks = _get_semantic_check_nodes(node)
         if not semantic_checks:
             return
@@ -209,6 +239,36 @@ class RulePyWl009(RuleBase):
             check_line = getattr(check, "lineno", 0)
             if not _has_shape_check_before(node.body, stop_line=check_line):
                 self._emit_finding(check)
+
+    def _is_semantic_boundary(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> bool:
+        """Return True when this function is a declared semantic validator."""
+        if self._context is not None:
+            for boundary in self._context.boundaries:
+                if (
+                    boundary.function == self._current_qualname
+                    and boundary.transition in _SEMANTIC_BOUNDARY_TRANSITIONS
+                    and path_within_scope(self._file_path, boundary.overlay_scope)
+                ):
+                    return True
+        return _has_direct_decorator(node, _SEMANTIC_BOUNDARY_DECORATORS)
+
+    def _is_combined_boundary(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> bool:
+        """Return True when this function is a declared combined validator."""
+        if self._context is not None:
+            for boundary in self._context.boundaries:
+                if (
+                    boundary.function == self._current_qualname
+                    and boundary.transition in _COMBINED_BOUNDARY_TRANSITIONS
+                    and path_within_scope(self._file_path, boundary.overlay_scope)
+                ):
+                    return True
+        return _has_direct_decorator(node, _COMBINED_BOUNDARY_DECORATORS)
 
     def _emit_finding(self, node: ast.AST) -> None:
         """Emit a PY-WL-009 finding."""

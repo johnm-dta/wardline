@@ -28,7 +28,7 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
     from wardline.manifest.discovery import discover_manifest, discover_overlays
     from wardline.manifest.loader import ManifestLoadError, load_manifest, load_overlay
     from wardline.manifest.merge import merge
-    from wardline.manifest.resolve import resolve_boundaries
+    from wardline.manifest.resolve import resolve_boundaries, resolve_optional_fields
 
     root = Path(path).resolve()
 
@@ -58,6 +58,7 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
 
     # --- Resolve boundaries (with overlay_path + overlay_scope) ---
     boundaries = resolve_boundaries(root, manifest_model)
+    optional_fields = resolve_optional_fields(root, manifest_model)
 
     # --- Discover overlays and build per-overlay summary + merged overrides ---
     overlay_file_paths = discover_overlays(root, manifest_model)
@@ -158,6 +159,19 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
                 "overlay_path": b.overlay_path,
             }
             for b in boundaries
+        ],
+        "optional_fields": [
+            {
+                "field": f.field,
+                "approved_default": f.approved_default,
+                "rationale": f.rationale,
+                "overlay_scope": (
+                    str(Path(f.overlay_scope).relative_to(root))
+                    if f.overlay_scope else ""
+                ),
+                "overlay_path": f.overlay_path,
+            }
+            for f in optional_fields
         ],
         "governance_signals": all_governance_signals,
         "overlays_discovered": overlays_discovered,

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from wardline.core.severity import RuleId, Severity
+from wardline.core.taints import TaintState
+from wardline.manifest.models import BoundaryEntry
+from wardline.scanner.context import ScanContext
 from wardline.scanner.rules.py_wl_003 import RulePyWl003
 
 from .conftest import parse_function_source, parse_module_source
@@ -12,6 +15,35 @@ def _run_rule(source: str) -> RulePyWl003:
     """Parse source inside a function and run PY-WL-003."""
     tree = parse_function_source(source)
     rule = RulePyWl003(file_path="test.py")
+    rule.visit(tree)
+    return rule
+
+
+def _run_rule_with_boundary(
+    source: str,
+    *,
+    qualname: str = "target",
+    transition: str = "shape_validation",
+    taint: TaintState = TaintState.EXTERNAL_RAW,
+    overlay_scope: str = "/project/src/api",
+    file_path: str = "/project/src/api/handler.py",
+) -> RulePyWl003:
+    """Parse source inside a function, attach boundary context, run the rule."""
+    tree = parse_function_source(source, name=qualname)
+    rule = RulePyWl003(file_path=file_path)
+    rule.set_context(
+        ScanContext(
+            file_path=file_path,
+            function_level_taint_map={qualname: taint},
+            boundaries=(
+                BoundaryEntry(
+                    function=qualname,
+                    transition=transition,
+                    overlay_scope=overlay_scope,
+                ),
+            ),
+        )
+    )
     rule.visit(tree)
     return rule
 
@@ -219,3 +251,55 @@ class TestNoFalsePositives:
         rule = _run_rule_match(source)
 
         assert len(rule.findings) == 0
+
+
+class TestDeclaredValidationBoundarySuppression:
+    """Shape and combined validators suppress PY-WL-003 inside the body."""
+
+    def test_shape_validation_boundary_silent(self) -> None:
+        rule = _run_rule_with_boundary('"key" in d\n')
+
+        assert len(rule.findings) == 0
+
+    def test_validates_external_boundary_silent(self) -> None:
+        rule = _run_rule_with_boundary(
+            '"key" in d\n',
+            transition="validates_external",
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_boundary_outside_overlay_scope_does_not_suppress(self) -> None:
+        rule = _run_rule_with_boundary(
+            '"key" in d\n',
+            overlay_scope="/project/src/other",
+            file_path="/project/src/api/handler.py",
+        )
+
+        assert len(rule.findings) == 1
+
+    def test_boundary_with_matching_overlay_scope_suppresses(self) -> None:
+        rule = _run_rule_with_boundary(
+            '"key" in d\n',
+            overlay_scope="/project/src/api",
+            file_path="/project/src/api/handler.py",
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_combined_validation_boundary_silent(self) -> None:
+        rule = _run_rule_with_boundary(
+            '"key" in d\n',
+            transition="combined_validation",
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_other_boundary_transition_still_fires(self) -> None:
+        rule = _run_rule_with_boundary(
+            '"key" in d\n',
+            transition="construction",
+        )
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_003

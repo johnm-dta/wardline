@@ -17,6 +17,11 @@ from wardline.manifest.loader import (
     make_wardline_loader,
 )
 from wardline.manifest.models import WardlineManifest, WardlineOverlay
+from wardline.manifest.resolve import (
+    GovernanceError,
+    resolve_boundaries,
+    resolve_optional_fields,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -118,6 +123,132 @@ contract_bindings:
         assert overlay.contract_bindings[0].contract == "landscape_recording"
         assert len(overlay.contract_bindings[0].functions) == 2
 
+    def test_overlay_with_optional_fields_loads(self, tmp_path: Path) -> None:
+        f = tmp_path / "wardline.overlay.yaml"
+        f.write_text("""\
+overlay_for: "adapters/"
+optional_fields:
+  - field: "middle_name"
+    approved_default: ""
+    rationale: "Not present in all partner systems"
+  - field: "risk_indicators"
+    approved_default: []
+    rationale: "Some feeds omit this field"
+""")
+        overlay = load_overlay(f)
+        assert len(overlay.optional_fields) == 2
+        assert overlay.optional_fields[0].field == "middle_name"
+        assert overlay.optional_fields[0].approved_default == ""
+        assert overlay.optional_fields[1].approved_default == []
+
+    def test_conflicting_optional_fields_across_same_scope_rejected(self, tmp_path: Path) -> None:
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text("""\
+module_tiers:
+  - path: "src/"
+    default_taint: "EXTERNAL_RAW"
+""")
+        root_model = load_manifest(manifest)
+
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        (src_dir / "wardline.overlay.yaml").write_text("""\
+overlay_for: "src/"
+optional_fields:
+  - field: "middle_name"
+    approved_default: ""
+    rationale: "top-level default"
+""")
+        nested = src_dir / "nested"
+        nested.mkdir()
+        (nested / "wardline.overlay.yaml").write_text("""\
+overlay_for: "src/"
+optional_fields:
+  - field: "middle_name"
+    approved_default: "UNKNOWN"
+    rationale: "conflicting nested default"
+""")
+
+        with pytest.raises(GovernanceError, match="Conflicting optional_fields declarations"):
+            resolve_optional_fields(tmp_path, root_model)
+
+    def test_nested_optional_fields_scopes_are_both_resolved(self, tmp_path: Path) -> None:
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text("""\
+module_tiers:
+  - path: "src/"
+    default_taint: "EXTERNAL_RAW"
+""")
+        root_model = load_manifest(manifest)
+
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        (src_dir / "wardline.overlay.yaml").write_text("""\
+overlay_for: "src/"
+optional_fields:
+  - field: "middle_name"
+    approved_default: ""
+    rationale: "parent default"
+""")
+        nested = src_dir / "nested"
+        nested.mkdir()
+        (nested / "wardline.overlay.yaml").write_text("""\
+overlay_for: "src/nested/"
+optional_fields:
+  - field: "middle_name"
+    approved_default: "UNKNOWN"
+    rationale: "child override"
+""")
+
+        resolved = resolve_optional_fields(tmp_path, root_model)
+
+        assert len(resolved) == 2
+
+    def test_overlay_for_sibling_prefix_spoof_rejected_for_boundaries(self, tmp_path: Path) -> None:
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text("""\
+module_tiers:
+  - path: "src/"
+    default_taint: "EXTERNAL_RAW"
+""")
+        root_model = load_manifest(manifest)
+
+        spoof_dir = tmp_path / "src" / "apiary"
+        spoof_dir.mkdir(parents=True)
+        (spoof_dir / "wardline.overlay.yaml").write_text("""\
+overlay_for: "src/api/"
+boundaries:
+  - function: "target"
+    transition: "shape_validation"
+    from_tier: 4
+    to_tier: 3
+""")
+
+        with pytest.raises(GovernanceError, match="claims overlay_for"):
+            resolve_boundaries(tmp_path, root_model)
+
+    def test_overlay_for_sibling_prefix_spoof_rejected_for_optional_fields(self, tmp_path: Path) -> None:
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text("""\
+module_tiers:
+  - path: "src/"
+    default_taint: "EXTERNAL_RAW"
+""")
+        root_model = load_manifest(manifest)
+
+        spoof_dir = tmp_path / "src" / "apiary"
+        spoof_dir.mkdir(parents=True)
+        (spoof_dir / "wardline.overlay.yaml").write_text("""\
+overlay_for: "src/api/"
+optional_fields:
+  - field: "middle_name"
+    approved_default: ""
+    rationale: "spoofed"
+""")
+
+        with pytest.raises(GovernanceError, match="claims overlay_for"):
+            resolve_optional_fields(tmp_path, root_model)
+
 
 # ── Schema Validation ─────────────────────────────────────────────
 
@@ -148,6 +279,16 @@ tiers:
 """)
         with pytest.raises(ManifestLoadError, match="Schema validation"):
             load_manifest(f)
+
+    def test_invalid_optional_fields_shape_rejected(self, tmp_path: Path) -> None:
+        f = tmp_path / "wardline.overlay.yaml"
+        f.write_text("""\
+overlay_for: "adapters/"
+optional_fields:
+  - "middle_name"
+""")
+        with pytest.raises(ManifestLoadError, match="Schema validation"):
+            load_overlay(f)
 
 
 # ── $id Version Check ─────────────────────────────────────────────

@@ -257,6 +257,38 @@ class TestVerdictEvaluation:
         assert result.exit_code == 0
         assert "1 TP" in result.output
 
+    def test_true_positive_with_boundaries_field(self, tmp_path: Path) -> None:
+        """Specimen boundaries feed ScanContext for boundary-scoped rules."""
+        source = (
+            "def process(data):\n"
+            "    result = validate(data)\n"
+            "    return data\n"
+        )
+        sha = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        specimen = tmp_path / "tp-boundary.yaml"
+        specimen.write_text(
+            f'specimen_id: "tp-wl008-boundary"\n'
+            f'rule: "PY-WL-008"\n'
+            f'taint_state: "EXTERNAL_RAW"\n'
+            f'verdict: "true_positive"\n'
+            f"boundaries:\n"
+            f'  - function: "process"\n'
+            f'    transition: "shape_validation"\n'
+            f'sha256: "{sha}"\n'
+            f"fragment: |\n"
+            f"  def process(data):\n"
+            f"      result = validate(data)\n"
+            f"      return data\n"
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["corpus", "verify", "--corpus-dir", str(tmp_path)],
+        )
+        assert result.exit_code == 0
+        assert "1 TP" in result.output
+
     def test_true_negative_no_rule_fires(
         self, tmp_path: Path
     ) -> None:

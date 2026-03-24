@@ -5,6 +5,9 @@ rule: PY-WL-009
 fragment: "def process(data):\n    if isinstance(data, dict):\n        pass\n    if\
   \ data[\"status\"] == \"active\":\n        pass\n"
 taint_state: UNKNOWN_RAW
+boundaries:
+- function: process
+  transition: semantic_validation
 expected_rules: []
 expected_severity: null
 expected_exceptionability: null

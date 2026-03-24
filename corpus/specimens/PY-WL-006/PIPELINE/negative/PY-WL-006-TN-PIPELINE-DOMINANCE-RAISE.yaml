@@ -1,0 +1,12 @@
+---
+specimen_id: PY-WL-006-TN-PIPELINE-DOMINANCE-RAISE
+description: PY-WL-006 true negative when non-audited path rejects instead of succeeding
+rule: PY-WL-006
+fragment: "def process():\n    if not ok:\n        raise ValueError(\"bad\")\n    audit.emit(\"processed\", data)\n    return result\n"
+taint_state: PIPELINE
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+sha256: a33cfca5bf5e7d9443206d73f6f533cc42a16e1480e09236bd9827c36efb1e3c
+verdict: true_negative

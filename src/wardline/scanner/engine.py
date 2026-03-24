@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 
     from wardline.core.taints import TaintState
     from wardline.core.taints import TaintState as _TS
-    from wardline.manifest.models import BoundaryEntry, WardlineManifest
+    from wardline.manifest.models import BoundaryEntry, OptionalFieldEntry, WardlineManifest
     from wardline.scanner.rules.base import RuleBase
     from wardline.scanner.taint.function_level import TaintSource
 
@@ -72,6 +72,7 @@ class ScanEngine:
         rules: tuple[RuleBase, ...] = (),
         manifest: WardlineManifest | None = None,
         boundaries: tuple[BoundaryEntry, ...] = (),
+        optional_fields: tuple[OptionalFieldEntry, ...] = (),
         analysis_level: int = 1,
     ) -> None:
         self._target_paths = target_paths
@@ -79,6 +80,7 @@ class ScanEngine:
         self._rules = rules
         self._manifest = manifest
         self._boundaries = boundaries
+        self._optional_fields = optional_fields
         self._analysis_level = analysis_level
 
     def scan(self) -> ScanResult:
@@ -195,6 +197,7 @@ class ScanEngine:
             file_path=str(file_path),
             function_level_taint_map=taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
             boundaries=self._boundaries,
+            optional_fields=self._optional_fields,
             variable_taint_map=variable_taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
             analysis_level=self._analysis_level,
             taint_provenance=taint_provenance,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType

@@ -225,7 +225,7 @@ def explain(
 
         # ── Overlay resolution section ────────────────────────────
         overlay_data = _build_overlay_section(
-            file_path_str, root, manifest_model, output_json,
+            tree, qualname, taint_map, file_path_str, root, manifest_model, output_json,
         )
         result["overlay"] = overlay_data
 
@@ -335,13 +335,19 @@ def _build_exception_section(
 
 
 def _build_overlay_section(
+    tree: ast.Module,
+    qualname: str,
+    taint_map: dict[str, object],
     file_path_str: str,
     root: Path,
     manifest_model: object | None,
     output_json: bool,
 ) -> dict[str, Any] | None:
     """Build overlay resolution section for the explain output."""
-    from wardline.manifest.resolve import resolve_boundaries
+    from wardline.manifest.resolve import resolve_boundaries, resolve_optional_fields
+    from wardline.manifest.scope import path_within_scope, scope_specificity
+    from wardline.scanner.context import ScanContext
+    from wardline.scanner.rules.py_wl_001 import RulePyWl001
 
     if manifest_model is None:
         if not output_json:
@@ -351,6 +357,7 @@ def _build_overlay_section(
 
     try:
         boundaries = resolve_boundaries(root, manifest_model)  # type: ignore[arg-type]
+        optional_fields = resolve_optional_fields(root, manifest_model)  # type: ignore[arg-type]
     except Exception:
         if not output_json:
             click.echo()
@@ -361,7 +368,7 @@ def _build_overlay_section(
     resolved_file = str(Path(file_path_str).resolve())
     matching_boundaries = [
         b for b in boundaries
-        if b.overlay_scope and resolved_file.startswith(b.overlay_scope)
+        if b.overlay_scope and path_within_scope(resolved_file, b.overlay_scope)
     ]
 
     if not matching_boundaries:
@@ -371,7 +378,10 @@ def _build_overlay_section(
         return None
 
     # Find the overlay path — derive from scope
-    scope = matching_boundaries[0].overlay_scope
+    scope = max(
+        (b.overlay_scope for b in matching_boundaries),
+        key=scope_specificity,
+    )
     try:
         rel_scope = str(Path(scope).relative_to(root)) + "/"
     except ValueError:
@@ -380,15 +390,33 @@ def _build_overlay_section(
     # Find actual overlay file path
     overlay_file_path = _find_overlay_path(root, rel_scope)
     boundary_transitions = [b.transition for b in matching_boundaries]
-
-    # Determine schema_default governed status — boundaries exist in scope
-    schema_default_governed = len(matching_boundaries) > 0
+    rule = RulePyWl001(file_path=file_path_str)
+    rule.set_context(
+        ScanContext(
+            file_path=file_path_str,
+            function_level_taint_map=taint_map,  # type: ignore[arg-type]
+            boundaries=tuple(boundaries),  # type: ignore[arg-type]
+            optional_fields=tuple(optional_fields),  # type: ignore[arg-type]
+        )
+    )
+    rule.visit(tree)
+    governed_count = 0
+    ungoverned_count = 0
+    for finding in rule.findings:
+        if finding.qualname != qualname:
+            continue
+        if finding.rule_id.value == "PY-WL-001-GOVERNED-DEFAULT":
+            governed_count += 1
+        elif finding.rule_id.value == "PY-WL-001-UNGOVERNED-DEFAULT":
+            ungoverned_count += 1
 
     overlay_info: dict[str, Any] = {
         "path": str(overlay_file_path) if overlay_file_path else rel_scope,
         "scope": rel_scope,
         "boundaries": len(matching_boundaries),
-        "schema_default_governed": schema_default_governed,
+        "schema_default_governed": governed_count > 0,
+        "schema_default_ungoverned": ungoverned_count > 0,
+        "schema_default_calls": governed_count + ungoverned_count,
     }
 
     if not output_json:
@@ -400,7 +428,12 @@ def _build_overlay_section(
             f"  Boundaries declared: {len(matching_boundaries)} "
             f"({', '.join(boundary_transitions)})"
         )
-        governed_str = "governed (boundary match)" if schema_default_governed else "not governed"
+        if governed_count > 0:
+            governed_str = "governed"
+        elif ungoverned_count > 0:
+            governed_str = "ungoverned"
+        else:
+            governed_str = "none detected in target function"
         click.echo(f"  schema_default() status: {governed_str}")
 
     return overlay_info

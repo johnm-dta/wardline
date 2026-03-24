@@ -4,6 +4,9 @@ description: PY-WL-009 true_positive at UNKNOWN_SEM_VALIDATED
 rule: PY-WL-009
 fragment: "def process(data):\n    if data[\"status\"] == \"active\":\n        pass\n"
 taint_state: UNKNOWN_SEM_VALIDATED
+boundaries:
+- function: process
+  transition: semantic_validation
 expected_rules:
 - PY-WL-009
 expected_severity: ERROR

@@ -74,6 +74,19 @@
       "type": "array",
       "items": { "type": "string" },
       "description": "Categorisation tags for the specimen."
+    },
+    "boundaries": {
+      "type": "array",
+      "description": "Optional boundary declarations injected into ScanContext for this specimen.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "function": { "type": "string" },
+          "transition": { "type": "string" }
+        },
+        "required": ["function", "transition"],
+        "additionalProperties": false
+      }
     }
   },
   "required": ["specimen_id", "rule", "fragment", "taint_state", "verdict"],

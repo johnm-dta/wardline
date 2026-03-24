@@ -14,7 +14,7 @@ from wardline.core.severity import Exceptionability, RuleId, Severity
 
 if TYPE_CHECKING:
     from wardline.core.taints import TaintState
-    from wardline.manifest.models import BoundaryEntry
+    from wardline.manifest.models import BoundaryEntry, OptionalFieldEntry
     from wardline.scanner.taint.callgraph_propagation import TaintProvenance
 
 
@@ -80,6 +80,7 @@ class ScanContext:
     # Maps (module_path, qualname) -> TaintState for each function
     function_level_taint_map: MappingProxyType[str, TaintState]
     boundaries: tuple[BoundaryEntry, ...] = ()
+    optional_fields: tuple[OptionalFieldEntry, ...] = ()
     # Level 2: maps qualname -> {variable_name: TaintState}. None when L2 is off.
     variable_taint_map: (
         MappingProxyType[str, MappingProxyType[str, TaintState]] | None

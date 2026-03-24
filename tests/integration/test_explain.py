@@ -178,6 +178,7 @@ def _build_governance_fixture(tmp_path: Path, *, with_overlay: bool = False) -> 
             from wardline.decorators.authority import external_boundary
             from wardline.decorators.validation import validates_shape
             from wardline.decorators.data_access import tier1_read
+            from wardline import schema_default
 
             @external_boundary
             def fetch_data(url: str) -> dict:
@@ -188,6 +189,9 @@ def _build_governance_fixture(tmp_path: Path, *, with_overlay: bool = False) -> 
                 if not isinstance(data, dict):
                     raise ValueError("not a dict")
                 return True
+
+            def governed_default(data: dict) -> str:
+                return schema_default(data.get("key", ""))
 
             @tier1_read
             def get_config() -> dict:
@@ -266,6 +270,14 @@ def _build_governance_fixture(tmp_path: Path, *, with_overlay: bool = False) -> 
                     transition: "shape_validation"
                     from_tier: 4
                     to_tier: 3
+                  - function: "governed_default"
+                    transition: "shape_validation"
+                    from_tier: 4
+                    to_tier: 3
+                optional_fields:
+                  - field: "key"
+                    approved_default: ""
+                    rationale: "Governed default in validation boundary"
             """)
         )
         result["overlay_path"] = overlay_file
@@ -399,6 +411,82 @@ class TestExplainOverlay:
                 str(tmp_path),
                 "--manifest",
                 fixture["manifest_path"],
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Overlay: none" in result.output
+
+    def test_explain_json_reports_exact_schema_default_governance(self, tmp_path: Path) -> None:
+        """Overlay JSON reflects actual schema_default governance, not scope alone."""
+        fixture = _build_governance_fixture(tmp_path, with_overlay=True)
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            [
+                "explain",
+                "governed_default",
+                "--path",
+                str(tmp_path),
+                "--manifest",
+                fixture["manifest_path"],
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["overlay"]["schema_default_governed"] is True
+        assert data["overlay"]["schema_default_ungoverned"] is False
+        assert data["overlay"]["schema_default_calls"] == 1
+
+    def test_explain_does_not_match_sibling_overlay_prefix(self, tmp_path: Path) -> None:
+        src_api = tmp_path / "src" / "api"
+        src_api.mkdir(parents=True)
+        src_apiary = tmp_path / "src" / "apiary"
+        src_apiary.mkdir(parents=True)
+
+        (src_apiary / "service.py").write_text(
+            textwrap.dedent("""\
+                def helper():
+                    return 1
+            """)
+        )
+        (tmp_path / "wardline.yaml").write_text(
+            textwrap.dedent("""\
+                $id: "https://wardline.dev/schemas/0.1/wardline"
+                tiers:
+                  - id: "tier4-external"
+                    tier: 4
+                    description: "Tier 4"
+                module_tiers:
+                  - path: "src/"
+                    default_taint: "EXTERNAL_RAW"
+            """)
+        )
+        (src_api / "wardline.overlay.yaml").write_text(
+            textwrap.dedent("""\
+                $id: "https://wardline.dev/schemas/0.1/overlay.schema.json"
+                overlay_for: "src/api/"
+                boundaries:
+                  - function: "something"
+                    transition: "shape_validation"
+                    from_tier: 4
+                    to_tier: 3
+            """)
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            [
+                "explain",
+                "helper",
+                "--path",
+                str(tmp_path),
+                "--manifest",
+                str(tmp_path / "wardline.yaml"),
             ],
         )
 

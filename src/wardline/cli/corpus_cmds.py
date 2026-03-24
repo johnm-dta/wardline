@@ -21,6 +21,7 @@ from wardline.manifest.loader import make_wardline_loader
 from wardline.scanner.rules import make_rules
 
 if TYPE_CHECKING:
+    from wardline.manifest.models import BoundaryEntry
     from wardline.scanner.context import ScanContext
     from wardline.scanner.rules.base import RuleBase
 
@@ -70,6 +71,8 @@ def _collect_qualnames(
 def _build_specimen_context(
     tree: ast.Module,
     taint_state: str,
+    *,
+    boundaries: tuple[BoundaryEntry, ...] = (),
 ) -> ScanContext:
     """Build a ScanContext that assigns *taint_state* to every function in *tree*.
 
@@ -87,13 +90,49 @@ def _build_specimen_context(
     return ScanContext(
         file_path="<specimen>",
         function_level_taint_map=taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
+        boundaries=boundaries,
     )
+
+
+def _parse_specimen_boundaries(data: dict[str, object]) -> tuple[BoundaryEntry, ...]:
+    """Build boundary declarations from an optional corpus specimen field."""
+    from wardline.manifest.models import BoundaryEntry
+
+    raw = data.get("boundaries", ())
+    if raw in (None, ()):
+        return ()
+    if not isinstance(raw, list):
+        raise ValueError("boundaries must be a list")
+
+    entries: list[BoundaryEntry] = []
+    for idx, item in enumerate(raw, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"boundary #{idx} must be a mapping")
+        function = item.get("function")
+        transition = item.get("transition")
+        overlay_scope = item.get("overlay_scope", "<specimen>")
+        if not isinstance(function, str) or not function:
+            raise ValueError(f"boundary #{idx} missing string function")
+        if not isinstance(transition, str) or not transition:
+            raise ValueError(f"boundary #{idx} missing string transition")
+        if not isinstance(overlay_scope, str):
+            raise ValueError(f"boundary #{idx} has invalid overlay_scope")
+        entries.append(
+            BoundaryEntry(
+                function=function,
+                transition=transition,
+                overlay_scope=overlay_scope,
+            )
+        )
+    return tuple(entries)
 
 
 def _run_rules_on_fragment(
     source: str,
     rules: tuple[RuleBase, ...],
     taint_state: str | None = None,
+    *,
+    boundaries: tuple[BoundaryEntry, ...] = (),
 ) -> set[str]:
     """Run all rules on a source fragment, return set of fired rule IDs.
 
@@ -106,7 +145,7 @@ def _run_rules_on_fragment(
 
     ctx: ScanContext | None = None
     if taint_state is not None:
-        ctx = _build_specimen_context(tree, taint_state)
+        ctx = _build_specimen_context(tree, taint_state, boundaries=boundaries)
 
     fired: set[str] = set()
     for rule in rules:
@@ -142,7 +181,13 @@ def _evaluate_specimen(
 
     raw_taint = data.get("taint_state")
     taint_state = str(raw_taint) if raw_taint is not None else None
-    fired = _run_rules_on_fragment(source, rules, taint_state=taint_state)
+    boundaries = _parse_specimen_boundaries(data)
+    fired = _run_rules_on_fragment(
+        source,
+        rules,
+        taint_state=taint_state,
+        boundaries=boundaries,
+    )
     rule_fired = rule_id in fired
 
     if verdict == "true_positive":

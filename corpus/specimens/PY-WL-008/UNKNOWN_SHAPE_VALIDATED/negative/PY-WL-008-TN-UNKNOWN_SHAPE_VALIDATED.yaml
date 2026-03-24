@@ -5,6 +5,9 @@ rule: PY-WL-008
 fragment: "def process(data):\n    result = validate(data)\n    if not result:\n \
   \       raise ValueError(\"invalid\")\n"
 taint_state: UNKNOWN_SHAPE_VALIDATED
+boundaries:
+- function: process
+  transition: shape_validation
 expected_rules: []
 expected_severity: null
 expected_exceptionability: null

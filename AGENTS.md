@@ -141,6 +141,14 @@ Wardline is a semantic boundary enforcement framework for Python. It defines
 trust tiers for a codebase and statically verifies that data flows respect those
 boundaries — catching trust-boundary violations before they reach production.
 
+### Spec Authority
+
+For spec interpretation, audit reconciliation, and fix-code vs fix-spec decisions,
+the authoritative source of truth is `docs/wardline/wardline-0x-*`. If an older
+design note, superpowers spec, implementation plan, or test fixture conflicts
+with a `wardline-0x` document, follow the `wardline-0x` document and treat the
+other artifact as stale unless the user explicitly says otherwise.
+
 ### Development Setup
 
 ```bash

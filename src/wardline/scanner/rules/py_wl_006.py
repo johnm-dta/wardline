@@ -1,8 +1,8 @@
 """PY-WL-006: Audit-critical writes in broad exception handlers.
 
-Detects code that performs audit-critical writes (logging, database
-recording, audit trail operations) inside broad exception handlers
-(``except Exception``, ``except BaseException``, bare ``except:``).
+Detects code that performs audit-critical writes inside broad exception
+handlers (``except Exception``, ``except BaseException``, bare
+``except:``).
 
 The concern: if the audit write itself raises, the broad handler masks
 the failure — the audit trail silently loses a record and the program
@@ -12,44 +12,54 @@ continues as if everything were fine.
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from wardline.core import matrix
 from wardline.core.severity import RuleId
 from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 _BROAD_NAMES = frozenset({"Exception", "BaseException"})
+_AUDIT_DECORATORS = frozenset({"audit_writer", "audit_critical"})
+_AUDIT_ATTR_PREFIXES = ("audit", "record", "emit")
+_AUDIT_FUNC_NAMES = frozenset({"audit", "record", "emit"})
 
-# Method-name prefixes that indicate audit-critical writes.
-# Matched against ``obj.method(...)`` where method starts with one of these.
-_AUDIT_ATTR_PREFIXES = (
-    "log",       # logger.log, logger.info, logger.error, etc.
-    "debug",     # logger.debug(...)
-    "info",      # logger.info(...)
-    "warning",   # logger.warning(...)
-    "warn",      # logger.warn(...)
-    "error",     # logger.error(...)
-    "critical",  # logger.critical(...)
-    "fatal",     # logger.fatal(...)
-    "exception", # logger.exception(...)
-    "record",    # db.record_failure, audit.record_event
-    "audit",     # audit.audit_event(...)
-    "emit",      # emitter.emit(...)
-    "write",     # writer.write(...)
-    "persist",   # store.persist(...)
-    "save",      # store.save(...)
-    "insert",    # db.insert(...)
-    "store",     # cache.store(...)
-)
 
-# Bare function names that are audit-critical.
-_AUDIT_FUNC_NAMES = frozenset({
-    "log",
-    "audit",
-    "record",
-    "emit",
-    "print",
-})
+@dataclass(frozen=True)
+class _BlockAnalysis:
+    """Local control-flow summary for audit-path analysis."""
+
+    continue_states: frozenset[bool] = frozenset()
+    bypass_nodes: tuple[ast.AST, ...] = field(default_factory=tuple)
+
+
+def _iter_defs_with_qualnames(
+    nodes: list[ast.stmt],
+    prefix: str = "",
+) -> Iterator[tuple[str, ast.FunctionDef | ast.AsyncFunctionDef]]:
+    """Yield dotted qualnames for all nested functions in lexical order."""
+    for node in nodes:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            qualname = f"{prefix}.{node.name}" if prefix else node.name
+            yield qualname, node
+            yield from _iter_defs_with_qualnames(node.body, qualname)
+        elif isinstance(node, ast.ClassDef):
+            class_prefix = f"{prefix}.{node.name}" if prefix else node.name
+            yield from _iter_defs_with_qualnames(node.body, class_prefix)
+
+
+def _decorator_name(decorator: ast.expr) -> str | None:
+    """Return the terminal decorator name for ``@name`` and ``@pkg.name``."""
+    target = decorator.func if isinstance(decorator, ast.Call) else decorator
+    if isinstance(target, ast.Name):
+        return target.id
+    if isinstance(target, ast.Attribute):
+        return target.attr
+    return None
 
 
 def _is_broad_handler(handler: ast.ExceptHandler) -> bool:
@@ -69,15 +79,98 @@ def _is_broad_handler(handler: ast.ExceptHandler) -> bool:
     return False
 
 
-def _is_audit_call(call: ast.Call) -> bool:
-    """Check if a Call node looks like an audit-critical write."""
-    # obj.method(...) — attribute call
+def _call_name(call: ast.Call) -> str | None:
+    """Return the bare or terminal attribute name for a call target."""
+    if isinstance(call.func, ast.Name):
+        return call.func.id
     if isinstance(call.func, ast.Attribute):
-        attr = call.func.attr
-        return any(attr == prefix or attr.startswith(prefix + "_") for prefix in _AUDIT_ATTR_PREFIXES)
-    # bare_func(...) — name call
+        return call.func.attr
+    return None
+
+
+def _receiver_name(node: ast.expr) -> str | None:
+    """Extract a simple receiver name for ``obj.method(...)`` heuristics."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _receiver_name(node.value)
+        return f"{parent}.{node.attr}" if parent else node.attr
+    return None
+
+
+def _looks_audit_scoped(call: ast.Call) -> bool:
+    """Heuristic for obviously audit-shaped sinks, excluding telemetry."""
     if isinstance(call.func, ast.Name):
         return call.func.id in _AUDIT_FUNC_NAMES
+    if isinstance(call.func, ast.Attribute):
+        attr = call.func.attr
+        receiver = _receiver_name(call.func.value) or ""
+        if any(attr == prefix or attr.startswith(prefix + "_") for prefix in _AUDIT_ATTR_PREFIXES):
+            return True
+        receiver_lower = receiver.lower()
+        return "audit" in receiver_lower or "ledger" in receiver_lower
+    return False
+
+
+def _is_audit_call(call: ast.Call, local_audit_names: frozenset[str]) -> bool:
+    """Check if a Call node looks like an audit-critical write."""
+    name = _call_name(call)
+    if name is not None and name in local_audit_names:
+        return True
+    return _looks_audit_scoped(call)
+
+
+def _contains_audit_call(
+    node: ast.AST,
+    local_audit_names: frozenset[str],
+) -> bool:
+    """Return True when *node* contains an audit-shaped call."""
+    return any(
+        isinstance(child, ast.Call) and _is_audit_call(child, local_audit_names)
+        for child in walk_skip_nested_defs(node)
+    )
+
+
+def _has_normal_path_audit(
+    stmts: list[ast.stmt],
+    local_audit_names: frozenset[str],
+) -> bool:
+    """Return True when audit appears on a non-handler path.
+
+    This keeps the dominance pass focused on "success can bypass audit"
+    scenarios instead of double-reporting functions that only audit in
+    exception handlers.
+    """
+    for stmt in stmts:
+        if isinstance(stmt, ast.Try):
+            if _has_normal_path_audit(stmt.body, local_audit_names):
+                return True
+            if _has_normal_path_audit(stmt.orelse, local_audit_names):
+                return True
+            if _has_normal_path_audit(stmt.finalbody, local_audit_names):
+                return True
+            continue
+        if isinstance(stmt, ast.If):
+            if _has_normal_path_audit(stmt.body, local_audit_names):
+                return True
+            if _has_normal_path_audit(stmt.orelse, local_audit_names):
+                return True
+            continue
+        if isinstance(stmt, ast.Match):
+            if any(
+                _has_normal_path_audit(case.body, local_audit_names)
+                for case in stmt.cases
+            ):
+                return True
+            continue
+        if isinstance(stmt, (ast.For, ast.AsyncFor, ast.While)):
+            if _has_normal_path_audit(stmt.body, local_audit_names):
+                return True
+            if _has_normal_path_audit(stmt.orelse, local_audit_names):
+                return True
+            continue
+        if _contains_audit_call(stmt, local_audit_names):
+            return True
     return False
 
 
@@ -93,6 +186,19 @@ class RulePyWl006(RuleBase):
     def __init__(self, *, file_path: str = "") -> None:
         super().__init__()
         self._file_path = file_path
+        self._local_audit_names: frozenset[str] = frozenset()
+
+    def visit_Module(self, node: ast.Module) -> None:
+        """Pre-scan the module for locally declared audit call targets."""
+        local_names: set[str] = set()
+        for qualname, func in _iter_defs_with_qualnames(node.body):
+            if any(
+                _decorator_name(decorator) in _AUDIT_DECORATORS
+                for decorator in func.decorator_list
+            ):
+                local_names.add(qualname.split(".")[-1])
+        self._local_audit_names = frozenset(local_names)
+        self.generic_visit(node)
 
     def visit_function(
         self,
@@ -100,7 +206,7 @@ class RulePyWl006(RuleBase):
         *,
         is_async: bool,
     ) -> None:
-        """Walk function body for broad handlers containing audit writes."""
+        """Check broad-handler masking and local success-path audit bypasses."""
         for child in walk_skip_nested_defs(node):
             if not isinstance(child, ast.ExceptHandler):
                 continue
@@ -108,10 +214,214 @@ class RulePyWl006(RuleBase):
                 continue
             # Walk the handler body for audit-critical calls
             for handler_node in ast.walk(child):
-                if isinstance(handler_node, ast.Call) and _is_audit_call(handler_node):
-                    self._emit_finding(handler_node)
+                if (
+                    isinstance(handler_node, ast.Call)
+                    and _is_audit_call(handler_node, self._local_audit_names)
+                ):
+                    self._emit_finding(
+                        handler_node,
+                        (
+                            "Audit-critical write in broad exception handler — "
+                            "if the write fails, the broad handler masks the failure"
+                        ),
+                    )
 
-    def _emit_finding(self, call: ast.Call) -> None:
+        if not _has_normal_path_audit(node.body, self._local_audit_names):
+            return
+
+        analysis = self._analyze_block(node.body, audited=False)
+        bypass_nodes = list(analysis.bypass_nodes)
+        if False in analysis.continue_states:
+            bypass_nodes.append(node)
+
+        seen: set[tuple[int, int, int | None, int | None]] = set()
+        for bypass_node in bypass_nodes:
+            key = (
+                getattr(bypass_node, "lineno", 0),
+                getattr(bypass_node, "col_offset", 0),
+                getattr(bypass_node, "end_lineno", None),
+                getattr(bypass_node, "end_col_offset", None),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            self._emit_finding(
+                bypass_node,
+                (
+                    "Audit-critical path has a success/fallback branch "
+                    "that can bypass audit"
+                ),
+            )
+
+    def _analyze_block(
+        self,
+        stmts: list[ast.stmt],
+        *,
+        audited: bool,
+    ) -> _BlockAnalysis:
+        """Analyze a statement block for success paths that bypass audit."""
+        continue_states: set[bool] = {audited}
+        bypass_nodes: list[ast.AST] = []
+        for stmt in stmts:
+            next_states: set[bool] = set()
+            for state in continue_states:
+                stmt_analysis = self._analyze_stmt(stmt, audited=state)
+                next_states.update(stmt_analysis.continue_states)
+                bypass_nodes.extend(stmt_analysis.bypass_nodes)
+            continue_states = next_states
+            if not continue_states:
+                break
+        return _BlockAnalysis(
+            continue_states=frozenset(continue_states),
+            bypass_nodes=tuple(bypass_nodes),
+        )
+
+    def _analyze_stmt(
+        self,
+        stmt: ast.stmt,
+        *,
+        audited: bool,
+    ) -> _BlockAnalysis:
+        """Analyze one statement under the given incoming audit state."""
+        if isinstance(stmt, ast.Return):
+            return self._analyze_return(stmt, audited=audited)
+        if isinstance(stmt, ast.Raise):
+            return _BlockAnalysis()
+        if isinstance(stmt, ast.If):
+            return self._analyze_if(stmt, audited=audited)
+        if isinstance(stmt, ast.Try):
+            return self._analyze_try(stmt, audited=audited)
+        if isinstance(stmt, (ast.For, ast.AsyncFor, ast.While)):
+            return self._analyze_loop(stmt, audited=audited)
+        if isinstance(stmt, ast.Match):
+            return self._analyze_match(stmt, audited=audited)
+
+        next_audited = audited or _contains_audit_call(
+            stmt,
+            self._local_audit_names,
+        )
+        return _BlockAnalysis(continue_states=frozenset({next_audited}))
+
+    def _analyze_return(
+        self,
+        stmt: ast.Return,
+        *,
+        audited: bool,
+    ) -> _BlockAnalysis:
+        """Analyze a return as a success exit."""
+        audited_here = audited or (
+            stmt.value is not None
+            and _contains_audit_call(stmt.value, self._local_audit_names)
+        )
+        if audited_here:
+            return _BlockAnalysis()
+        return _BlockAnalysis(bypass_nodes=(stmt,))
+
+    def _analyze_if(
+        self,
+        stmt: ast.If,
+        *,
+        audited: bool,
+    ) -> _BlockAnalysis:
+        """Analyze both branches of an if statement."""
+        body = self._analyze_block(stmt.body, audited=audited)
+        orelse = (
+            self._analyze_block(stmt.orelse, audited=audited)
+            if stmt.orelse
+            else _BlockAnalysis(continue_states=frozenset({audited}))
+        )
+        return _BlockAnalysis(
+            continue_states=body.continue_states | orelse.continue_states,
+            bypass_nodes=body.bypass_nodes + orelse.bypass_nodes,
+        )
+
+    def _analyze_try(
+        self,
+        stmt: ast.Try,
+        *,
+        audited: bool,
+    ) -> _BlockAnalysis:
+        """Analyze try/except/else/finally for local success bypasses."""
+        body = self._analyze_block(stmt.body, audited=audited)
+        normal_states = set(body.continue_states)
+
+        if stmt.orelse:
+            else_states: set[bool] = set()
+            else_bypass_nodes: list[ast.AST] = list(body.bypass_nodes)
+            for state in normal_states:
+                else_analysis = self._analyze_block(stmt.orelse, audited=state)
+                else_states.update(else_analysis.continue_states)
+                else_bypass_nodes.extend(else_analysis.bypass_nodes)
+            normal_states = else_states
+            bypass_nodes: list[ast.AST] = else_bypass_nodes
+        else:
+            bypass_nodes = list(body.bypass_nodes)
+
+        handler_states: set[bool] = set()
+        for handler in stmt.handlers:
+            handler_analysis = self._analyze_block(handler.body, audited=audited)
+            handler_states.update(handler_analysis.continue_states)
+            bypass_nodes.extend(handler_analysis.bypass_nodes)
+
+        combined_states = normal_states | handler_states
+        if stmt.finalbody:
+            final_states: set[bool] = set()
+            for state in combined_states:
+                final_analysis = self._analyze_block(
+                    stmt.finalbody,
+                    audited=state,
+                )
+                final_states.update(final_analysis.continue_states)
+                bypass_nodes.extend(final_analysis.bypass_nodes)
+            combined_states = final_states
+
+        return _BlockAnalysis(
+            continue_states=frozenset(combined_states),
+            bypass_nodes=tuple(bypass_nodes),
+        )
+
+    def _analyze_loop(
+        self,
+        stmt: ast.For | ast.AsyncFor | ast.While,
+        *,
+        audited: bool,
+    ) -> _BlockAnalysis:
+        """Conservative first-pass handling for loops.
+
+        Loops may execute zero times, so the incoming state always remains
+        possible. A single body pass gives us useful local branch coverage
+        without needing loop fixed points in v1.
+        """
+        body = self._analyze_block(stmt.body, audited=audited)
+        orelse = self._analyze_block(stmt.orelse, audited=audited)
+        return _BlockAnalysis(
+            continue_states=(
+                frozenset({audited})
+                | body.continue_states
+                | orelse.continue_states
+            ),
+            bypass_nodes=body.bypass_nodes + orelse.bypass_nodes,
+        )
+
+    def _analyze_match(
+        self,
+        stmt: ast.Match,
+        *,
+        audited: bool,
+    ) -> _BlockAnalysis:
+        """Analyze match/case as a multi-branch conditional."""
+        continue_states: set[bool] = set()
+        bypass_nodes: list[ast.AST] = []
+        for case in stmt.cases:
+            case_analysis = self._analyze_block(case.body, audited=audited)
+            continue_states.update(case_analysis.continue_states)
+            bypass_nodes.extend(case_analysis.bypass_nodes)
+        return _BlockAnalysis(
+            continue_states=frozenset(continue_states),
+            bypass_nodes=tuple(bypass_nodes),
+        )
+
+    def _emit_finding(self, node: ast.AST, message: str) -> None:
         """Emit a PY-WL-006 finding."""
         taint = self._get_function_taint(self._current_qualname)
         cell = matrix.lookup(self.RULE_ID, taint)
@@ -119,14 +429,11 @@ class RulePyWl006(RuleBase):
             Finding(
                 rule_id=RuleId.PY_WL_006,
                 file_path=self._file_path,
-                line=call.lineno,
-                col=call.col_offset,
-                end_line=call.end_lineno,
-                end_col=call.end_col_offset,
-                message=(
-                    "Audit-critical write in broad exception handler — "
-                    "if the write fails, the broad handler masks the failure"
-                ),
+                line=getattr(node, "lineno", 0),
+                col=getattr(node, "col_offset", 0),
+                end_line=getattr(node, "end_lineno", None),
+                end_col=getattr(node, "end_col_offset", None),
+                message=message,
                 severity=cell.severity,
                 exceptionability=cell.exceptionability,
                 taint_state=taint,
