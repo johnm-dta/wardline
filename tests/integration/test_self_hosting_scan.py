@@ -47,7 +47,7 @@ def _config_with_analysis_level(analysis_level: int) -> Path:
     if analysis_level == 1:
         return _CONFIG
     # Create temp copy in repo root so relative paths resolve correctly
-    tmp = tempfile.NamedTemporaryFile(
+    tmp = tempfile.NamedTemporaryFile(  # noqa: SIM115
         mode="w", suffix=".toml", delete=False, prefix="wardline_test_",
         dir=_REPO_ROOT,
     )

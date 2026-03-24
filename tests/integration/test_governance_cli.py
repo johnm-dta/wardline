@@ -6,18 +6,13 @@ End-to-end tests against the frozen governance fixture at
 
 from __future__ import annotations
 
-import json
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 from click.testing import CliRunner
 
 from wardline.cli.main import cli
-
-if TYPE_CHECKING:
-    pass
 
 GOVERNANCE_FIXTURE = (
     Path(__file__).resolve().parent.parent / "fixtures" / "governance"

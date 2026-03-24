@@ -89,7 +89,7 @@ class TestTierRegistry:
             assert name in TIER_REGISTRY
 
     def test_registry_values_are_tier_markers(self) -> None:
-        for name, marker in TIER_REGISTRY.items():
+        for _name, marker in TIER_REGISTRY.items():
             assert isinstance(marker, TierMarker)
 
     @pytest.mark.parametrize(

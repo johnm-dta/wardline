@@ -28,7 +28,7 @@ class TestL3Performance:
 
         # Create temporary config in repo root with analysis_level=3
         # (must be in repo root so relative paths resolve correctly)
-        tmp = tempfile.NamedTemporaryFile(
+        tmp = tempfile.NamedTemporaryFile(  # noqa: SIM115
             mode="w", suffix=".toml", delete=False, prefix="wardline_perf_",
             dir=_REPO_ROOT,
         )

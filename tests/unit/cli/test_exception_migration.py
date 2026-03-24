@@ -6,16 +6,16 @@ Tests preview-drift, migrate, and grant --analysis-level.
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
-import pytest
 from click.testing import CliRunner
 
 from wardline.cli.exception_cmds import exception
 from wardline.core.taints import TaintState
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Helpers

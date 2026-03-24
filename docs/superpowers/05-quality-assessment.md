@@ -277,3 +277,208 @@ The only coupling point is the `ScanContext` dataclass, which is the correct arc
 1. `engine.py:231-244` -- `_find_qualname` suffix-match ambiguity (High)
 2. `py_wl_009.py:90-95` -- Function name/behavior mismatch on attr access (High via PY-WL-009 score, Medium severity)
 3. `variable_level.py:450-473` -- `_handle_try` sequential vs. merge semantics (Medium)
+
+---
+---
+
+# v0.3.0 (Analysis) Quality Assessment
+
+**Assessor:** Architecture Critic
+**Date:** 2026-03-24
+**Scope:** WP 2.1 (L3 Taint -- Call Graph), WP 2.2 (NewType Migration), WP 2.3 (Governance CLI)
+
+---
+
+## Cross-WP Architectural Coherence
+
+**Quality Score:** 4 / 5
+**Critical Issues:** 0
+**High Issues:** 3
+
+The three work packages compose well. L3 taint feeds into the engine cleanly, NewType migration is minimal and correct, and the CLI commands consume taint data without coupling to engine internals. The multi-pass architecture (L1 -> L3 -> L2 -> rules) is sound. The main problems are code duplication in the CLI layer and a type-safety hole in the engine's error path.
+
+---
+
+## WP 2.1 -- L3 Taint (Call Graph)
+
+**Quality Score:** 4 / 5
+**Critical Issues:** 0
+**High Issues:** 1
+
+**Findings:**
+
+1. **Redundant `set()` construction in hot loop** - Medium
+   - **Evidence:** `src/wardline/scanner/taint/callgraph_propagation.py:106` -- `edges.get(func, set()) & set(taint_map)` and again at line 130, 174. Each iteration of the worklist reconstructs `set(taint_map)` from scratch.
+   - **Impact:** O(n) allocation per worklist iteration. On large modules with many functions this is quadratic in aggregate. Not a correctness bug, but a performance ceiling that will bite when wardline scans large codebases.
+   - **Recommendation:** Pre-compute `taint_map_keys = set(taint_map)` once before the SCC loop and reuse it.
+
+2. **`min(worklist)` determinism strategy is O(n) per pop** - Medium
+   - **Evidence:** `src/wardline/scanner/taint/callgraph_propagation.py:169` -- `func = min(worklist)` on a plain set.
+   - **Impact:** Each worklist pop is O(|worklist|) instead of O(log n). Combined with the safety bound of `8 * len(scc)`, worst case is O(n^2) per SCC. For intra-module graphs this is unlikely to matter in practice, but the comment says "deterministic pick" -- a sorted list or `heapq` would be both deterministic and efficient.
+   - **Recommendation:** Use a `SortedList` or maintain a `heapq` if determinism matters. If it does not, just `worklist.pop()` and document that iteration order is arbitrary.
+
+3. **Unresolved call policy diverges from spike spec** - High
+   - **Evidence:** Spike doc `docs/superpowers/specs/2026-03-23-callgraph-approach-spike.md` lines 72-75 state: "Unresolved calls -> edge to implicit UNKNOWN node with UNKNOWN_RAW taint. Conservative: if we can't resolve a call, the caller's taint cannot be better than UNKNOWN_RAW." Implementation at `src/wardline/scanner/taint/callgraph.py:143-167` only increments `unresolved_counts` -- it does NOT create an edge to an UNKNOWN node. The propagation at `callgraph_propagation.py` only considers resolved callees. A function with 10 unresolved calls and 0 resolved calls stays at its L1 taint.
+   - **Impact:** L3 produces over-optimistic taints for functions that call mostly external/dynamic code. The `L3_LOW_RESOLUTION` diagnostic at line 248 partially mitigates this by flagging >70% unresolved, but the taint itself is not degraded. This is a semantic gap between the spec and the implementation.
+   - **Recommendation:** Either (a) implement the spec's UNKNOWN node approach -- add a synthetic callee with UNKNOWN_RAW taint for each unresolved call site -- or (b) update the spike spec to document the current conservative-by-omission strategy and explain why it is acceptable. The current state is a spec-implementation mismatch.
+
+4. **`TRUST_RANK` coverage guard is good** - Strength
+   - **Evidence:** `src/wardline/scanner/taint/callgraph.py:24-25` -- Runtime check that `TRUST_RANK` covers all `TaintState` members. Uses explicit `if` rather than `assert` to survive `-O`. Prevents silent breakage when new taint states are added.
+
+5. **Iterative Tarjan's SCC is correct** - Strength
+   - **Evidence:** `src/wardline/scanner/taint/callgraph_propagation.py:317-387` -- Iterative implementation avoids Python's recursion limit. Sorted iteration over nodes and neighbors ensures deterministic output. The lowlink update on parent pop (line 385) correctly propagates through the work stack.
+
+6. **Post-fixed-point assertions are strong** - Strength
+   - **Evidence:** `src/wardline/scanner/taint/callgraph_propagation.py:217-239` -- Checks that anchored functions did not change and module_default functions did not upgrade. On assertion failure, falls back to L1 taints rather than returning corrupt data. Correct fail-safe behavior.
+
+---
+
+## WP 2.2 -- NewType Migration
+
+**Quality Score:** 5 / 5
+**Critical Issues:** 0
+**High Issues:** 0
+
+**Findings:**
+
+1. **Clean, minimal implementation** - Strength
+   - **Evidence:** `src/wardline/runtime/types.py` -- 118 lines total. Four `NewType` declarations, a frozen `TIER_REGISTRY` for runtime introspection, and a `FailFast` singleton. No unnecessary abstraction. The spike decision to drop the mypy plugin was correct and the implementation reflects that decision precisely.
+
+2. **`TIER_REGISTRY` uses `MappingProxyType`** - Strength
+   - **Evidence:** `src/wardline/runtime/types.py:110` -- Prevents post-construction mutation of the tier-to-marker mapping. Correct for a registry that must be immutable after module load.
+
+3. **`TierMarker` validates range** - Strength
+   - **Evidence:** `src/wardline/runtime/types.py:46-47` -- Constructor rejects values outside 1-4. Combined with `__slots__` and frozen semantics, this is tight.
+
+4. **`ValidatedRecord` protocol is appropriately minimal** - Strength
+   - **Evidence:** `src/wardline/runtime/protocols.py:24-40` -- Two properties, `@runtime_checkable`, no methods. Correct abstraction for a structural protocol.
+
+5. **Registry keyed by string name, not by NewType reference** - Low
+   - **Evidence:** `src/wardline/runtime/types.py:110-115` -- `TIER_REGISTRY` maps `"Tier1"` (string) to `TierMarker(1)`. Since `NewType` is erased at runtime, string keys are the only option. Correct but undocumented -- a future developer might try `TIER_REGISTRY[Tier1]` and get a `KeyError`.
+   - **Recommendation:** Add a one-line comment: `# Keyed by string because NewType is erased at runtime`.
+
+---
+
+## WP 2.3 -- Governance CLI
+
+**Quality Score:** 3 / 5
+**Critical Issues:** 0
+**High Issues:** 2
+
+**Findings:**
+
+1. **`SEVERITY_MAP` / `_COHERENCE_SEVERITY_MAP` duplicated across files** - High
+   - **Evidence:** `src/wardline/cli/coherence_cmd.py:17-26` defines `SEVERITY_MAP`. `src/wardline/cli/regime_cmd.py:19-28` defines `_COHERENCE_SEVERITY_MAP` with identical content.
+   - **Impact:** If a new coherence check is added, the developer must update both files. Divergence causes silent severity misclassification -- `regime verify` and `coherence` could disagree on whether an issue is ERROR or WARNING. For a governance tool, internal inconsistency is a first-order failure mode.
+   - **Recommendation:** Move the severity map to a single canonical location (e.g., `wardline.manifest.coherence.SEVERITY_MAP` or `wardline.cli._helpers`) and import it in both commands.
+
+2. **`_run_coherence_checks` in `regime_cmd.py` duplicates `coherence` command logic** - High
+   - **Evidence:** `src/wardline/cli/regime_cmd.py:45-121` reimplements the exact same 8-check sequence as `src/wardline/cli/coherence_cmd.py:132-167`. Both files import the same 8 check functions and call them in the same order with the same arguments.
+   - **Impact:** Adding a 9th coherence check requires updating two independent call sites. If one is missed, `regime verify` and `coherence` produce different results. This is the kind of duplication that causes governance tools to contradict themselves.
+   - **Recommendation:** Extract `run_all_coherence_checks(manifest_path, scan_path) -> list[CoherenceIssue]` into `wardline.manifest.coherence` or `wardline.cli._helpers`. Both commands call it.
+
+3. **`exception grant` and `exception add` are functionally identical** - Medium
+   - **Evidence:** `src/wardline/cli/exception_cmds.py:74-171` (`add`) and lines 302-399 (`grant`) -- same validation, same entry construction, same writes. The docstring says `grant` "stamps analysis_level" but `add` also stamps `analysis_level` (line 163). There is no functional difference.
+   - **Impact:** ~130 lines of duplicated code. A change to exception validation must be applied in both places.
+   - **Recommendation:** Make `grant` delegate to the same internal function as `add`, or remove one command and alias the other.
+
+4. **`explain_cmd.py` reads baseline using old key `"entries"` instead of `"fingerprints"`** - Medium (Bug)
+   - **Evidence:** `src/wardline/cli/explain_cmd.py:486` -- `baseline_entries = baseline_data.get("entries", [])`. But `fingerprint_cmd.py:169` writes baselines with key `"fingerprints"`, and its `_load_and_validate_baseline` (lines 50-51) normalizes `"entries"` to `"fingerprints"`. The explain command does not use this normalization.
+   - **Impact:** On baselines written by `fingerprint update`, the explain command's fingerprint section will always show "no baseline stored" because it looks for `"entries"` but the file contains `"fingerprints"`. This is a concrete bug.
+   - **Recommendation:** Either reuse `_load_and_validate_baseline` from `fingerprint_cmd.py`, or read `data.get("fingerprints", data.get("entries", []))`.
+
+5. **`_compute_taints` in `exception_cmds.py` duplicates engine taint pipeline** - Medium
+   - **Evidence:** `src/wardline/cli/exception_cmds.py:629-693` reimplements the L1 -> L3 taint pipeline. The engine (`engine.py:167-185`) does the same sequence. The CLI version silently swallows all exceptions (`except Exception: pass` at line 689, `except Exception: continue` at line 675).
+   - **Impact:** Two taint pipelines can produce different results if one is updated and the other is not. The CLI version's broad exception swallowing means taint computation failures are invisible.
+   - **Recommendation:** Extract a `compute_file_taints(tree, file_path, manifest, analysis_level) -> dict[str, TaintState]` function that both the engine and CLI consume.
+
+6. **`_discover_all_annotations` wrapper duplicated in 2 files** - Medium
+   - **Evidence:** `src/wardline/cli/coherence_cmd.py:40-46` and `src/wardline/cli/regime_cmd.py:36-42` define identical `_discover_all_annotations` functions that delegate to `_helpers.discover_all_annotations`.
+   - **Impact:** Maintenance noise.
+   - **Recommendation:** Import `discover_all_annotations` directly from `_helpers` at the call site.
+
+7. **`preview-drift` matches by qualname only, ignoring file path** - Medium
+   - **Evidence:** `src/wardline/cli/exception_cmds.py:431` -- `if qualname not in taint_map`. The exception's `location` is `file_path::qualname`, but `_compute_taints` merges all files into one dict keyed by bare qualname. If two files define `process()` or `__init__()`, the wrong taint is matched.
+   - **Impact:** Drift preview and migration could silently apply the wrong taint to an exception in codebases with common method names.
+   - **Recommendation:** Key the merged taint map by `file_path::qualname` to match the exception location format.
+
+8. **`_helpers.py` is clean and well-bounded** - Strength
+   - **Evidence:** `src/wardline/cli/_helpers.py` -- 33 lines, single function, fault-tolerant.
+
+---
+
+## Engine Multi-Pass Architecture (L1 -> L3 -> L2 -> Rules)
+
+**Quality Score:** 4 / 5
+**Critical Issues:** 0
+**High Issues:** 1
+
+**Findings:**
+
+1. **Pass ordering is sound** - Strength
+   - **Evidence:** `src/wardline/scanner/engine.py:167-206`. L1 runs first (decorator/manifest taint). L3 refines L1 results (needs L1 as input). L2 runs after L3 (variable taints depend on refined function taint). Rules run last with full context. Data flow is acyclic. Each pass's output feeds cleanly into the next.
+
+2. **`_run_callgraph_taint` return type lies on error path** - High
+   - **Evidence:** `src/wardline/scanner/engine.py:319` -- `return taint_map, None  # type: ignore[return-value]`. Declared return type is `tuple[dict[str, TaintState], dict[str, TaintProvenance]]` but error path returns `None` for provenance. The `# type: ignore` defeats the type checker.
+   - **Impact:** If L3 fails, `ScanContext.taint_provenance` receives `None`. Any rule or CLI command that accesses provenance without `None` checking will crash.
+   - **Recommendation:** Change return type to `tuple[dict[str, TaintState], dict[str, TaintProvenance] | None]` and handle `None` explicitly in `ScanContext`.
+
+3. **Duplicate `TaintState` import in engine** - Low
+   - **Evidence:** `src/wardline/scanner/engine.py:38-39` -- `from wardline.core.taints import TaintState` and `from wardline.core.taints import TaintState as _TS` both in `TYPE_CHECKING` block.
+   - **Impact:** No runtime impact. Two names for the same type in one file.
+   - **Recommendation:** Use one name consistently.
+
+4. **Qualname map rebuilt per-pass** - Low
+   - **Evidence:** `src/wardline/scanner/engine.py:222` and `259` -- `_build_qualname_map(tree)` called separately in `_run_variable_taint` and `_run_callgraph_taint`. Deterministic for a given AST.
+   - **Impact:** Minor performance waste (two AST walks instead of one per file).
+   - **Recommendation:** Build qualname map once in `_scan_file` and pass to both methods.
+
+---
+
+## Confidence Assessment
+
+- **WP 2.1 (Call Graph):** HIGH. Read all source files, cross-referenced against spike spec, traced data flow through SCC and propagation logic.
+- **WP 2.2 (NewType):** HIGH. Small surface area, straightforward implementation, spike decision cleanly reflected.
+- **WP 2.3 (Governance CLI):** HIGH. Read all 6 CLI modules, cross-referenced shared data structures, identified concrete duplication and one confirmed bug.
+- **Engine integration:** HIGH. Traced the full L1 -> L3 -> L2 -> rules pipeline through `_scan_file`.
+
+## Risk Assessment
+
+| Risk | Severity | Likelihood | Impact |
+|------|----------|------------|--------|
+| Spec-implementation mismatch on unresolved calls (WP 2.1) | High | Medium | Over-optimistic L3 taints for dynamic call patterns |
+| Coherence logic duplication divergence (WP 2.3) | High | High | Governance tools contradicting each other |
+| `explain` baseline key mismatch bug (WP 2.3) | Medium | High | Fingerprint section always shows "no baseline" on new baselines |
+| Engine provenance `None` on L3 failure (engine) | High | Low | Potential downstream crash in rules consuming provenance |
+| `preview-drift` qualname collision (WP 2.3) | Medium | Medium | Silent wrong taint matched for common method names |
+
+## Information Gaps
+
+1. Did not read `ScanContext` to verify how `taint_provenance=None` is handled downstream. The `type: ignore` suggests it may not be handled.
+2. Did not audit the 8 coherence check functions themselves -- only their invocation from the CLI.
+3. Did not verify that `_compute_taints` in `exception_cmds.py` produces identical results to the engine for the same inputs. The broad `except` clauses suggest divergence is possible.
+4. Did not read `src/wardline/scanner/taint/variable_level.py` for this assessment (it was assessed in the WP 1.6 review above).
+
+## Caveats
+
+1. This assessment covers architecture and code quality. It does not assess test coverage, documentation completeness, or runtime performance under production load.
+2. The "unresolved call policy" finding (WP 2.1, finding 3) depends on interpretation. If the spike spec is aspirational and the implementation is intentionally conservative-by-omission, this drops to Medium. But the spec says "edge to implicit UNKNOWN node" -- that is specific enough to be a contract.
+
+---
+
+## Summary (v0.3.0)
+
+| Component | Score | Critical | High | Medium | Low |
+|-----------|-------|----------|------|--------|-----|
+| WP 2.1 (L3 Taint) | 4/5 | 0 | 1 | 2 | 0 |
+| WP 2.2 (NewType) | 5/5 | 0 | 0 | 0 | 1 |
+| WP 2.3 (Governance CLI) | 3/5 | 0 | 2 | 4 | 0 |
+| Engine Multi-Pass | 4/5 | 0 | 1 | 0 | 2 |
+| **Totals** | | **0** | **4** | **6** | **3** |
+
+**Top priority fixes:**
+1. `callgraph_propagation.py` / `callgraph.py` -- Resolve spec-implementation mismatch on unresolved call taint policy (High)
+2. `regime_cmd.py` / `coherence_cmd.py` -- Deduplicate coherence check invocation and severity maps (High)
+3. `engine.py:319` -- Fix `_run_callgraph_taint` return type to be honest about `None` provenance (High)
+4. `explain_cmd.py:486` -- Fix baseline key lookup from `"entries"` to `"fingerprints"` (Medium, bug)
+5. `exception_cmds.py:431` -- Key taint map by `file_path::qualname` to prevent qualname collisions (Medium)

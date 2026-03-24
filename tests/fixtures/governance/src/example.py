@@ -1,5 +1,5 @@
 # schema_version: 0.1
-from wardline.decorators import external_boundary, validates_shape, tier1_read
+from wardline.decorators import external_boundary, tier1_read, validates_shape
 
 
 @external_boundary

@@ -6,7 +6,7 @@ and fallback callee-boundedness using randomly generated call graphs.
 
 from __future__ import annotations
 
-import string
+from typing import TYPE_CHECKING
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -14,7 +14,9 @@ from hypothesis import strategies as st
 from wardline.core.taints import TaintState
 from wardline.scanner.taint.callgraph import TRUST_RANK
 from wardline.scanner.taint.callgraph_propagation import propagate_callgraph_taints
-from wardline.scanner.taint.function_level import TaintSource
+
+if TYPE_CHECKING:
+    from wardline.scanner.taint.function_level import TaintSource
 
 # ── Strategies ───────────────────────────────────────────────────
 

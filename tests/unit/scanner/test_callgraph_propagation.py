@@ -7,11 +7,9 @@ from unittest.mock import patch
 from wardline.core.taints import TaintState
 from wardline.scanner.taint.callgraph import TRUST_RANK
 from wardline.scanner.taint.callgraph_propagation import (
-    TaintProvenance,
     compute_sccs,
     propagate_callgraph_taints,
 )
-
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -369,7 +367,6 @@ class TestSafetyBound:
 
     def test_safety_bound_emits_finding(self) -> None:
         """Monkeypatch bound to 0 -> convergence bound hit immediately, valid result returned."""
-        import logging
 
         import wardline.scanner.taint.callgraph_propagation as mod
 
