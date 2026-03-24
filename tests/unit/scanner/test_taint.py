@@ -54,14 +54,14 @@ class TestDecoratorTaint:
 
         assert result["validate"] == TaintState.SHAPE_VALIDATED
 
-    def test_validates_semantic_gets_unknown_sem_validated(self) -> None:
+    def test_validates_semantic_gets_pipeline(self) -> None:
         tree = _parse("def check(): pass\n")
         annotations = {
             ("test.py", "check"): [_ann("validates_semantic")],
         }
         result, _sources = assign_function_taints(tree, "test.py", annotations)
 
-        assert result["check"] == TaintState.UNKNOWN_SEM_VALIDATED
+        assert result["check"] == TaintState.PIPELINE
 
     def test_tier1_read_gets_audit_trail(self) -> None:
         tree = _parse("def read_data(): pass\n")
@@ -81,14 +81,14 @@ class TestDecoratorTaint:
 
         assert result["write_log"] == TaintState.AUDIT_TRAIL
 
-    def test_authoritative_construction_gets_pipeline(self) -> None:
+    def test_authoritative_construction_gets_audit_trail(self) -> None:
         tree = _parse("def construct(): pass\n")
         annotations = {
             ("test.py", "construct"): [_ann("authoritative_construction")],
         }
         result, _sources = assign_function_taints(tree, "test.py", annotations)
 
-        assert result["construct"] == TaintState.PIPELINE
+        assert result["construct"] == TaintState.AUDIT_TRAIL
 
     def test_audit_critical_flag_only_gets_fallback(self) -> None:
         """audit_critical is a flag, not a taint source → falls to default."""

@@ -41,11 +41,11 @@ logger = logging.getLogger(__name__)
 DECORATOR_TAINT_MAP: dict[str, TaintState] = {
     "external_boundary": TaintState.EXTERNAL_RAW,
     "validates_shape": TaintState.SHAPE_VALIDATED,
-    "validates_semantic": TaintState.UNKNOWN_SEM_VALIDATED,
-    "validates_external": TaintState.SHAPE_VALIDATED,
+    "validates_semantic": TaintState.PIPELINE,
+    "validates_external": TaintState.PIPELINE,
     "tier1_read": TaintState.AUDIT_TRAIL,
     "audit_writer": TaintState.AUDIT_TRAIL,
-    "authoritative_construction": TaintState.PIPELINE,
+    "authoritative_construction": TaintState.AUDIT_TRAIL,
 }
 
 
