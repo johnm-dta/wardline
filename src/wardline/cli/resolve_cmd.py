@@ -62,9 +62,11 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
     # --- Discover overlays and build per-overlay summary + merged overrides ---
     overlay_file_paths = discover_overlays(root, manifest_model)
 
+    import dataclasses
+
     overlays_discovered: list[dict[str, object]] = []
     all_governance_signals: list[dict[str, str]] = []
-    merged_rule_overrides: tuple[dict[str, object], ...] = ()
+    current_rules = manifest_model.rules
 
     for overlay_path_item in overlay_file_paths:
         try:
@@ -80,8 +82,10 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
             "rule_override_count": len(overlay.rule_overrides),
         })
 
-        resolved = merge(manifest_model, overlay)
-        merged_rule_overrides = resolved.rules.overrides
+        # Chain merges: feed accumulated rules as base so overrides accumulate
+        temp_manifest = dataclasses.replace(manifest_model, rules=current_rules)
+        resolved = merge(temp_manifest, overlay)
+        current_rules = resolved.rules
 
         for signal in resolved.governance_signals:
             all_governance_signals.append({
@@ -89,6 +93,8 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
                 "message": signal.message,
                 "overlay_path": rel_path,
             })
+
+    merged_rule_overrides = current_rules.overrides
 
     # If no overlays, merged overrides come from base only
     if not overlay_file_paths:
@@ -145,7 +151,10 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
                 "restored_tier": b.restored_tier,
                 "provenance": b.provenance,
                 "bounded_context": b.bounded_context,
-                "overlay_scope": b.overlay_scope,
+                "overlay_scope": (
+                    str(Path(b.overlay_scope).relative_to(root))
+                    if b.overlay_scope else ""
+                ),
                 "overlay_path": b.overlay_path,
             }
             for b in boundaries

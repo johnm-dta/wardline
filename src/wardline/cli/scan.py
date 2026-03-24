@@ -314,7 +314,19 @@ def scan(
     resolved_rule_overrides: tuple[dict[str, object], ...] | None = None
 
     if resolved:
-        boundaries, resolved_rule_overrides = _load_resolved(resolved)
+        loaded = _load_resolved(resolved, manifest_path)
+        if loaded is None:
+            sys.exit(EXIT_CONFIG_ERROR)
+        boundaries, resolved_rule_overrides = loaded
+        if resolved_rule_overrides is not None:
+            import dataclasses as _dc
+
+            from wardline.manifest.models import RulesConfig
+
+            manifest_model = _dc.replace(
+                manifest_model,
+                rules=RulesConfig(overrides=resolved_rule_overrides),
+            )
     else:
         from wardline.manifest.resolve import resolve_boundaries
 
@@ -622,32 +634,61 @@ def _load_config(config_arg: str | None) -> ScannerConfig | None | _ConfigError:
 
 def _load_resolved(
     resolved_path: str,
-) -> tuple[tuple[_BoundaryEntry, ...], tuple[dict[str, object], ...] | None]:
-    """Load boundaries and rule overrides from a wardline.resolved.json file."""
+    manifest_path: Path,
+) -> tuple[tuple[_BoundaryEntry, ...], tuple[dict[str, object], ...] | None] | None:
+    """Load boundaries and rule overrides from a wardline.resolved.json file.
+
+    Returns ``None`` on error (after printing a structured error message).
+    """
+    import hashlib
     import json
 
     from wardline.manifest.models import BoundaryEntry
 
-    data = json.loads(Path(resolved_path).read_text(encoding="utf-8"))
+    try:
+        data = json.loads(Path(resolved_path).read_text(encoding="utf-8"))
 
-    boundaries = tuple(
-        BoundaryEntry(
-            function=b["function"],
-            transition=b["transition"],
-            from_tier=b.get("from_tier"),
-            to_tier=b.get("to_tier"),
-            restored_tier=b.get("restored_tier"),
-            provenance=b.get("provenance"),
-            bounded_context=b.get("bounded_context"),
-            overlay_scope=b.get("overlay_scope", ""),
-            overlay_path=b.get("overlay_path", ""),
+        # F6: format_version validation
+        version = data.get("format_version")
+        if version != "0.1":
+            _error(f"unsupported resolved manifest version: {version}")
+            return None
+
+        # F4: manifest_hash verification
+        current_hash = "sha256:" + hashlib.sha256(
+            manifest_path.read_bytes()
+        ).hexdigest()
+        resolved_hash = data.get("manifest_hash", "")
+        if current_hash != resolved_hash:
+            click.echo(
+                "warning: resolved file is stale (manifest changed)", err=True
+            )
+
+        project_root = manifest_path.parent
+
+        boundaries = tuple(
+            BoundaryEntry(
+                function=b["function"],
+                transition=b["transition"],
+                from_tier=b.get("from_tier"),
+                to_tier=b.get("to_tier"),
+                restored_tier=b.get("restored_tier"),
+                provenance=b.get("provenance"),
+                bounded_context=b.get("bounded_context"),
+                overlay_scope=str(
+                    (project_root / b.get("overlay_scope", "")).resolve()
+                ),
+                overlay_path=b.get("overlay_path", ""),
+            )
+            for b in data.get("boundaries", [])
         )
-        for b in data.get("boundaries", [])
-    )
 
-    raw_overrides = data.get("merged_rule_overrides")
-    rule_overrides: tuple[dict[str, object], ...] | None = None
-    if raw_overrides is not None:
-        rule_overrides = tuple(dict(ovr) for ovr in raw_overrides)
+        raw_overrides = data.get("merged_rule_overrides")
+        rule_overrides: tuple[dict[str, object], ...] | None = None
+        if raw_overrides is not None:
+            rule_overrides = tuple(dict(ovr) for ovr in raw_overrides)
 
-    return boundaries, rule_overrides
+        return boundaries, rule_overrides
+    except (json.JSONDecodeError, KeyError, TypeError, OSError) as exc:
+        _error(f"resolved manifest invalid: {exc}")
+        return None
