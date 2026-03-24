@@ -189,10 +189,11 @@ def test_fallback_bounded_by_callees(
         dict[str, int],
     ],
 ) -> None:
-    """Fallback taint <= max_rank(callee_taints) when callees exist.
+    """Fallback taint >= max(max_callee_rank, L1 rank) — floor-clamped.
 
-    Uses default=L1_rank (AUDIT_TRAIL rank, i.e. 0) for empty callee set.
-    The <= here means the result rank is at most the max callee rank.
+    After the floor clamp fix, fallback functions are bounded by both their
+    callees AND their L1 baseline.  The result rank is at least:
+      max(max_callee_rank, L1_rank)
     """
     edges, taint_map, taint_sources, resolved_counts, unresolved_counts = data
     result_map, _, _diags = propagate_callgraph_taints(
@@ -202,14 +203,22 @@ def test_fallback_bounded_by_callees(
         if source != "fallback":
             continue
 
-        # Compute max rank among resolved callees (in taint_map)
+        result_rank = TRUST_RANK[result_map[func]]
+        l1_rank = TRUST_RANK[taint_map[func]]
+
+        # Floor clamp: result must be at least as untrusted as L1
+        assert result_rank >= l1_rank, (
+            f"Fallback function {func} has rank {result_rank} "
+            f"but L1 rank is {l1_rank}"
+        )
+
+        # When callees exist, result must also be at least as untrusted as callees
         callees_in_map = edges.get(func, set()) & set(taint_map)
         if callees_in_map:
             max_callee_rank = max(
                 TRUST_RANK[result_map[c]] for c in callees_in_map
             )
-            result_rank = TRUST_RANK[result_map[func]]
-            assert result_rank <= max_callee_rank, (
+            assert result_rank >= max_callee_rank, (
                 f"Fallback function {func} has rank {result_rank} "
                 f"but max callee rank is {max_callee_rank}"
             )

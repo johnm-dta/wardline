@@ -248,7 +248,7 @@ class ScanEngine:
         taint_sources: dict[str, TaintSource],
         file_path: Path,
         result: ScanResult,
-    ) -> tuple[dict[str, TaintState], dict[str, TaintProvenance]]:
+    ) -> tuple[dict[str, TaintState], dict[str, TaintProvenance] | None]:
         """Run Level 3 call-graph taint propagation.
 
         On success, returns the refined taint map and provenance records.
@@ -316,7 +316,7 @@ class ScanEngine:
                     qualname=None,
                 )
             )
-            return taint_map, None  # type: ignore[return-value]
+            return taint_map, None
 
     @staticmethod
     def _build_qualname_map(tree: ast.Module) -> dict[int, str]:

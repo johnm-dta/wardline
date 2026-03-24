@@ -216,10 +216,15 @@ class TestModuleDefaultBehavior:
 
 
 class TestFallbackBehavior:
-    """Fallback (floating-unconstrained) functions: L3's primary value."""
+    """Fallback (floating-unconstrained) functions: floor-clamped to L1 baseline.
 
-    def test_fallback_refined_upward(self) -> None:
-        """UNKNOWN_RAW calling only AUDIT_TRAIL -> refined to AUDIT_TRAIL."""
+    After fix 1 (floor clamp), L3 cannot promote a fallback function to a
+    MORE trusted state than its L1 baseline.  It can still degrade (make less
+    trusted) when callees are less trusted than the baseline.
+    """
+
+    def test_fallback_floor_clamp_prevents_upgrade(self) -> None:
+        """UNKNOWN_RAW calling only AUDIT_TRAIL -> stays UNKNOWN_RAW (floor clamp)."""
         edges = {"fb_fn": {"audit_fn"}, "audit_fn": set()}
         taint_map = {
             "fb_fn": TaintState.UNKNOWN_RAW,
@@ -229,10 +234,11 @@ class TestFallbackBehavior:
         result, _, _diags = propagate_callgraph_taints(
             edges, taint_map, taint_sources, {"fb_fn": 1, "audit_fn": 0}, {"fb_fn": 0, "audit_fn": 0},
         )
-        assert result["fb_fn"] == TaintState.AUDIT_TRAIL
+        # Floor clamp: max(AUDIT_TRAIL=0, UNKNOWN_RAW=6) = 6 = UNKNOWN_RAW
+        assert result["fb_fn"] == TaintState.UNKNOWN_RAW
 
-    def test_fallback_refined_downward(self) -> None:
-        """UNKNOWN_RAW calling EXTERNAL_RAW -> refined to EXTERNAL_RAW."""
+    def test_fallback_floor_clamp_at_unknown_raw(self) -> None:
+        """UNKNOWN_RAW calling EXTERNAL_RAW -> stays UNKNOWN_RAW (floor clamp)."""
         edges = {"fb_fn": {"ext_fn"}, "ext_fn": set()}
         taint_map = {
             "fb_fn": TaintState.UNKNOWN_RAW,
@@ -242,6 +248,21 @@ class TestFallbackBehavior:
         result, _, _diags = propagate_callgraph_taints(
             edges, taint_map, taint_sources, {"fb_fn": 1, "ext_fn": 0}, {"fb_fn": 0, "ext_fn": 0},
         )
+        # Floor clamp: max(EXTERNAL_RAW=5, UNKNOWN_RAW=6) = 6 = UNKNOWN_RAW
+        assert result["fb_fn"] == TaintState.UNKNOWN_RAW
+
+    def test_fallback_degraded_by_callee(self) -> None:
+        """PIPELINE fallback calling EXTERNAL_RAW -> degraded to EXTERNAL_RAW."""
+        edges = {"fb_fn": {"ext_fn"}, "ext_fn": set()}
+        taint_map = {
+            "fb_fn": TaintState.PIPELINE,
+            "ext_fn": TaintState.EXTERNAL_RAW,
+        }
+        taint_sources = {"fb_fn": "fallback", "ext_fn": "decorator"}
+        result, _, _diags = propagate_callgraph_taints(
+            edges, taint_map, taint_sources, {"fb_fn": 1, "ext_fn": 0}, {"fb_fn": 0, "ext_fn": 0},
+        )
+        # max(EXTERNAL_RAW=5, PIPELINE=1) = 5 = EXTERNAL_RAW
         assert result["fb_fn"] == TaintState.EXTERNAL_RAW
 
 
@@ -263,7 +284,7 @@ class TestMultiHop:
     """Multi-hop chain propagation."""
 
     def test_multi_hop_chain(self) -> None:
-        """A->B->C(@external) -> A and B refined to EXTERNAL_RAW."""
+        """A->B->C(@external) -> A and B stay UNKNOWN_RAW (floor clamp)."""
         edges = {"A": {"B"}, "B": {"C"}, "C": set()}
         taint_map = {
             "A": TaintState.UNKNOWN_RAW,
@@ -275,8 +296,9 @@ class TestMultiHop:
             edges, taint_map, taint_sources,
             {"A": 1, "B": 1, "C": 0}, {"A": 0, "B": 0, "C": 0},
         )
-        assert result["A"] == TaintState.EXTERNAL_RAW
-        assert result["B"] == TaintState.EXTERNAL_RAW
+        # Floor clamp: UNKNOWN_RAW (rank 6) >= EXTERNAL_RAW (rank 5) -> stays
+        assert result["A"] == TaintState.UNKNOWN_RAW
+        assert result["B"] == TaintState.UNKNOWN_RAW
         assert result["C"] == TaintState.EXTERNAL_RAW
 
 
@@ -284,7 +306,7 @@ class TestDiamondPattern:
     """Diamond call pattern."""
 
     def test_diamond_pattern(self) -> None:
-        """A calls B(PIPELINE) and C(EXTERNAL_RAW) -> A gets EXTERNAL_RAW."""
+        """A calls B(PIPELINE) and C(EXTERNAL_RAW) -> A stays UNKNOWN_RAW (floor clamp)."""
         edges = {"A": {"B", "C"}, "B": set(), "C": set()}
         taint_map = {
             "A": TaintState.UNKNOWN_RAW,
@@ -296,14 +318,15 @@ class TestDiamondPattern:
             edges, taint_map, taint_sources,
             {"A": 2, "B": 0, "C": 0}, {"A": 0, "B": 0, "C": 0},
         )
-        assert result["A"] == TaintState.EXTERNAL_RAW
+        # Floor clamp: max(EXTERNAL_RAW=5, UNKNOWN_RAW=6) = 6 = UNKNOWN_RAW
+        assert result["A"] == TaintState.UNKNOWN_RAW
 
 
 class TestCycleConvergence:
     """Cycles must converge."""
 
     def test_cycle_converges(self) -> None:
-        """Mutual recursion terminates."""
+        """Mutual recursion terminates (floor clamp keeps UNKNOWN_RAW)."""
         edges = {"A": {"B"}, "B": {"A", "C"}, "C": set()}
         taint_map = {
             "A": TaintState.UNKNOWN_RAW,
@@ -315,8 +338,9 @@ class TestCycleConvergence:
             edges, taint_map, taint_sources,
             {"A": 1, "B": 2, "C": 0}, {"A": 0, "B": 0, "C": 0},
         )
-        assert result["A"] == TaintState.EXTERNAL_RAW
-        assert result["B"] == TaintState.EXTERNAL_RAW
+        # Floor clamp: UNKNOWN_RAW (rank 6) >= EXTERNAL_RAW (rank 5)
+        assert result["A"] == TaintState.UNKNOWN_RAW
+        assert result["B"] == TaintState.UNKNOWN_RAW
 
     def test_self_recursive_converges(self) -> None:
         """Single function A->A, fallback source -> stable convergence."""
@@ -433,9 +457,10 @@ class TestProvenanceRecords:
 
     def test_provenance_records(self) -> None:
         """Each function has correct provenance source and via_callee."""
+        # Use PIPELINE fallback so A CAN be refined (floor clamp at PIPELINE=rank 1)
         edges = {"A": {"B", "C"}, "B": set(), "C": set()}
         taint_map = {
-            "A": TaintState.UNKNOWN_RAW,
+            "A": TaintState.PIPELINE,
             "B": TaintState.PIPELINE,
             "C": TaintState.EXTERNAL_RAW,
         }
@@ -578,9 +603,10 @@ class TestViaCalleeTieBreaking:
 
     def test_via_callee_tie_breaking(self) -> None:
         """When two callees have the same rank, via_callee is alphabetically first."""
+        # Use PIPELINE fallback so floor clamp allows refinement to EXTERNAL_RAW
         edges = {"A": {"beta", "alpha"}, "alpha": set(), "beta": set()}
         taint_map = {
-            "A": TaintState.UNKNOWN_RAW,
+            "A": TaintState.PIPELINE,
             "alpha": TaintState.EXTERNAL_RAW,
             "beta": TaintState.EXTERNAL_RAW,
         }
@@ -594,9 +620,10 @@ class TestViaCalleeTieBreaking:
 
     def test_via_callee_picks_least_trusted(self) -> None:
         """via_callee records the callee with highest trust rank (least trusted)."""
+        # Use PIPELINE fallback so floor clamp allows refinement
         edges = {"A": {"safe", "dirty"}, "safe": set(), "dirty": set()}
         taint_map = {
-            "A": TaintState.UNKNOWN_RAW,
+            "A": TaintState.PIPELINE,
             "safe": TaintState.AUDIT_TRAIL,
             "dirty": TaintState.EXTERNAL_RAW,
         }
@@ -613,11 +640,11 @@ class TestSafetyBoundNotHit:
 
     def test_safety_bound_not_hit(self) -> None:
         """Normal graph -> iterations < bound (no warning)."""
-        # Simple chain: converges in one pass per SCC
+        # Simple chain with PIPELINE fallbacks so floor clamp allows refinement
         edges = {"A": {"B"}, "B": {"C"}, "C": set()}
         taint_map = {
-            "A": TaintState.UNKNOWN_RAW,
-            "B": TaintState.UNKNOWN_RAW,
+            "A": TaintState.PIPELINE,
+            "B": TaintState.PIPELINE,
             "C": TaintState.EXTERNAL_RAW,
         }
         taint_sources = {"A": "fallback", "B": "fallback", "C": "decorator"}

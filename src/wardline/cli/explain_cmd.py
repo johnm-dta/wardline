@@ -483,7 +483,8 @@ def _build_fingerprint_section(
                 baseline_data = _json.loads(
                     baseline_path.read_text(encoding="utf-8")
                 )
-                baseline_entries = baseline_data.get("entries", [])
+                # Compat: old baselines used "entries", new ones use "fingerprints"
+                baseline_entries = baseline_data.get("fingerprints", baseline_data.get("entries", []))
                 # Find matching entry by qualified_name
                 for be in baseline_entries:
                     if be.get("qualified_name") == qualname:

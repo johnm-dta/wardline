@@ -495,6 +495,25 @@ def migrate(
         old_taint = entry["taint_state"]
         new_taint = taint_map[qualname].value
         if old_taint != new_taint:
+            # Fix 6: UNCONDITIONAL guard — if the new (rule, taint) cell is
+            # UNCONDITIONAL, skip migration for this entry (cannot be excepted).
+            try:
+                new_taint_state = TaintState(new_taint)
+                rule_id = RuleId(entry["rule"])
+                new_cell = matrix.lookup(rule_id, new_taint_state)
+                if new_cell.exceptionability == Exceptionability.UNCONDITIONAL:
+                    migrated.append({
+                        "id": entry["id"],
+                        "location": location,
+                        "old_taint": old_taint,
+                        "new_taint": new_taint,
+                        "skipped": True,
+                        "reason": f"({entry['rule']}, {new_taint}) is UNCONDITIONAL",
+                    })
+                    continue
+            except (ValueError, KeyError):
+                pass  # If lookup fails, proceed with migration
+
             old_level = entry.get("analysis_level", 1)
             entry["migrated_from"] = f"taint_state was {old_taint} at level {old_level}"
             entry["taint_state"] = new_taint

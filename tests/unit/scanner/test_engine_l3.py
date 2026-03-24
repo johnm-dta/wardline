@@ -184,13 +184,14 @@ def caller():
             analysis_level=3,
         )
 
-        # Mock L1 to return known taints: callee=PIPELINE (fallback), caller=UNKNOWN_RAW (fallback)
+        # Mock L1 to return known taints: callee=EXTERNAL_RAW (decorator), caller=PIPELINE (fallback)
+        # With floor clamp, caller (PIPELINE=rank 1) can be degraded to EXTERNAL_RAW (rank 5)
         l1_taint_map = {
-            "callee": TaintState.PIPELINE,
-            "caller": TaintState.UNKNOWN_RAW,
+            "callee": TaintState.EXTERNAL_RAW,
+            "caller": TaintState.PIPELINE,
         }
         l1_sources = {
-            "callee": "fallback",
+            "callee": "decorator",
             "caller": "fallback",
         }
 
@@ -204,12 +205,12 @@ def caller():
         assert result.errors == []
 
         # Check the context: caller should have been refined by L3
-        # (fallback calling PIPELINE callee -> refined to PIPELINE)
+        # (fallback PIPELINE calling EXTERNAL_RAW callee -> degraded to EXTERNAL_RAW)
         assert len(rule.captured_contexts) >= 1
         ctx = rule.captured_contexts[0]
         assert ctx is not None
-        # caller should be refined to PIPELINE (matching its callee)
-        assert ctx.function_level_taint_map.get("caller") == TaintState.PIPELINE
+        # caller should be refined to EXTERNAL_RAW (matching its callee, above floor)
+        assert ctx.function_level_taint_map.get("caller") == TaintState.EXTERNAL_RAW
 
 
 # ── ScanContext field tests ──────────────────────────────────────

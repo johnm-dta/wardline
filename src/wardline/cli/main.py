@@ -20,8 +20,10 @@ from wardline.cli.explain_cmd import explain  # noqa: E402
 from wardline.cli.fingerprint_cmd import fingerprint  # noqa: E402
 from wardline.cli.manifest_cmds import manifest  # noqa: E402
 from wardline.cli.regime_cmd import regime  # noqa: E402
+from wardline.cli.coherence_cmd import coherence  # noqa: E402
 from wardline.cli.scan import scan  # noqa: E402
 
+cli.add_command(coherence)
 cli.add_command(corpus)
 cli.add_command(exception)
 cli.add_command(explain)

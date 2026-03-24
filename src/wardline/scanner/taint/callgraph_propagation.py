@@ -101,9 +101,10 @@ def propagate_callgraph_taints(
 
     # --- 4. SCC decomposition -------------------------------------------------
     # Only include nodes that are in taint_map
+    taint_keys = set(taint_map)
     scc_graph: dict[str, set[str]] = {}
     for func in taint_map:
-        scc_graph[func] = edges.get(func, set()) & set(taint_map)
+        scc_graph[func] = edges.get(func, set()) & taint_keys
 
     sccs = compute_sccs(scc_graph)
 
@@ -116,7 +117,7 @@ def propagate_callgraph_taints(
         if scc <= anchored:
             continue
 
-        safety_bound = _CONVERGENCE_BOUND_FACTOR * len(scc)
+        safety_bound = _CONVERGENCE_BOUND_FACTOR * len(scc) * len(scc)
         iterations = 0
 
         # Phase 1: Compute external influence for each SCC member.
@@ -127,7 +128,7 @@ def propagate_callgraph_taints(
         for f in scc:
             if f in anchored:
                 continue
-            ext_callees = (edges.get(f, set()) & set(taint_map)) - scc
+            ext_callees = (edges.get(f, set()) & taint_keys) - scc
             if ext_callees:
                 has_external_influence.add(f)
                 ext_ranks = [TRUST_RANK[current[c]] for c in ext_callees]
@@ -135,6 +136,13 @@ def propagate_callgraph_taints(
                 if f in floating_down:
                     l1_rank = TRUST_RANK[taint_map[f]]
                     ext_max = max(ext_max, l1_rank)
+                elif f in floating_free:
+                    # Fix 1: floor clamp for floating_free in Phase 1
+                    l1_rank = TRUST_RANK[taint_map[f]]
+                    ext_max = max(ext_max, l1_rank)
+                # Fix 2: unresolved calls pessimistic floor in Phase 1
+                if unresolved_counts.get(f, 0) > 0:
+                    ext_max = max(ext_max, TRUST_RANK[taint_map[f]])
                 ext_taint = rank_to_state[ext_max]
                 if ext_taint != current[f]:
                     current[f] = ext_taint
@@ -171,7 +179,7 @@ def propagate_callgraph_taints(
             iterations += 1
 
             # Gather ALL callee taints (both inside and outside SCC)
-            callee_set = edges.get(func, set()) & set(taint_map)
+            callee_set = edges.get(func, set()) & taint_keys
             if not callee_set:
                 # No resolved callees — stay at current taint
                 continue
@@ -185,10 +193,19 @@ def propagate_callgraph_taints(
                 l1_rank = TRUST_RANK[taint_map[func]]
                 result_rank = max(max_callee_rank, l1_rank)
             elif func in floating_free:
-                result_rank = max_callee_rank
+                # Fix 1: floor clamp — L3 must never make a function MORE
+                # trusted than its L1 baseline.
+                l1_rank = TRUST_RANK[taint_map[func]]
+                result_rank = max(max_callee_rank, l1_rank)
             else:
                 # anchored — skip (shouldn't reach here due to worklist filter)
                 continue
+
+            # Fix 2: unresolved calls pessimistic floor — if this function
+            # has unresolved calls, it cannot be more trusted than its L1
+            # baseline (unresolved calls could go anywhere).
+            if unresolved_counts.get(func, 0) > 0:
+                result_rank = max(result_rank, TRUST_RANK[taint_map[func]])
 
             new_taint = rank_to_state[result_rank]
 
