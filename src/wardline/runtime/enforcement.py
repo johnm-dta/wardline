@@ -16,21 +16,26 @@ Enforcement checks:
   With enforcement enabled, *instances* are also checked at construction.
 - **ValidatedRecord conformance:** Objects passed to tier-typed parameters
   can be checked at runtime via ``check_validated_record(obj)``.
-- **Tier transition auditing:** Tier boundary crossings are logged when
-  enforcement is enabled.
+- **Tier boundary:** Objects can be checked for minimum tier trust level
+  via ``check_tier_boundary(obj, expected_min_tier=N)``.
 """
 
 from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
-# ── Enforcement flag ──────────────────────────────────────────
+# ── Enforcement flag with call-once latch ────────────────────
 
 _enforcement_enabled: bool = os.environ.get("WARDLINE_ENFORCE", "") == "1"
+_first_check_done: bool = False
 
 
 def is_enabled() -> bool:
@@ -39,24 +44,51 @@ def is_enabled() -> bool:
 
 
 def enable() -> None:
-    """Enable runtime enforcement hooks."""
+    """Enable runtime enforcement hooks.
+
+    Idempotent — calling multiple times is safe.
+    """
     global _enforcement_enabled  # noqa: PLW0603
     _enforcement_enabled = True
     logger.info("Wardline runtime enforcement enabled")
 
 
 def disable() -> None:
-    """Disable runtime enforcement hooks."""
+    """Disable runtime enforcement hooks.
+
+    Raises RuntimeError if any check function has already been called
+    (call-once latch). This prevents silently disabling enforcement
+    after it has already been relied upon.
+    """
     global _enforcement_enabled  # noqa: PLW0603
+    if _first_check_done:
+        raise RuntimeError(
+            "Enforcement state cannot be changed after first use"
+        )
     _enforcement_enabled = False
     logger.info("Wardline runtime enforcement disabled")
 
 
-# ── ValidatedRecord checks ────────────────────────────────────
+def _reset_enforcement_state() -> None:
+    """Reset enforcement state to defaults. INTERNAL — for test fixtures only."""
+    global _enforcement_enabled, _first_check_done  # noqa: PLW0603
+    _enforcement_enabled = os.environ.get("WARDLINE_ENFORCE", "") == "1"
+    _first_check_done = False
 
 
-class TierViolationError(TypeError):
+# ── Optional violation callback ──────────────────────────────
+
+on_violation: Callable[..., Any] | None = None
+
+
+# ── TierViolationError ───────────────────────────────────────
+
+
+class TierViolationError(Exception):
     """Raised when a runtime tier check fails.
+
+    Inherits Exception (NOT TypeError) so that broad ``except TypeError``
+    blocks cannot accidentally swallow tier violations.
 
     Attributes:
         obj: The object that failed the check.
@@ -78,23 +110,96 @@ class TierViolationError(TypeError):
         self.actual_tier = actual_tier
 
 
-def check_validated_record(obj: Any) -> None:
-    """Verify *obj* conforms to the ValidatedRecord protocol.
+# ── TierStamped[T] — frozen generic wrapper ──────────────────
 
-    Raises TierViolationError if the object lacks required attributes.
-    No-op when enforcement is disabled.
+
+@dataclass(frozen=True, slots=True)
+class TierStamped[T]:
+    """Frozen wrapper that carries tier metadata for unstampable objects.
+
+    Used when the result of a decorated function cannot have attributes
+    set directly (dicts, primitives, frozen dataclasses, etc.).
+
+    Access the wrapped value via ``.value`` or use ``unstamp()`` to
+    transparently unwrap.
     """
-    if not _enforcement_enabled:
-        return
 
-    from wardline.runtime.protocols import ValidatedRecord
+    value: T
+    _wardline_tier: int
+    _wardline_groups: tuple[int, ...] = ()
+    _wardline_stamped_by: str = ""
 
-    if not isinstance(obj, ValidatedRecord):
-        raise TierViolationError(
-            f"{type(obj).__name__} does not conform to ValidatedRecord protocol "
-            f"(missing _wardline_tier or _wardline_groups)",
-            obj=obj,
+    def __post_init__(self) -> None:
+        if not isinstance(self._wardline_tier, int) or not (1 <= self._wardline_tier <= 4):
+            raise ValueError(
+                f"TierStamped tier must be int 1-4, got {self._wardline_tier!r}"
+            )
+
+
+# ── Stamping functions ───────────────────────────────────────
+
+
+def stamp_tier(
+    obj: Any,
+    tier: int,
+    *,
+    groups: tuple[int, ...] | set[int] | frozenset[int] = (),
+    stamped_by: str = "",
+    overwrite: bool = False,
+) -> None:
+    """Stamp tier metadata directly onto an object.
+
+    Args:
+        obj: The object to stamp.
+        tier: Authority tier level (1-4).
+        groups: Wardline annotation group memberships.
+        stamped_by: Identifier of the stamping decorator/function.
+        overwrite: If False (default), raises ValueError if already stamped.
+
+    Raises:
+        ValueError: If tier is out of range, or object is already stamped
+            and overwrite=False.
+        TypeError: If object is frozen/slotted and cannot accept attributes.
+            A WARNING is logged before raising.
+    """
+    if not isinstance(tier, int) or not (1 <= tier <= 4):
+        raise ValueError(f"tier must be int 1-4, got {tier!r}")
+
+    if not overwrite and hasattr(obj, "_wardline_tier"):
+        raise ValueError(
+            f"Object already has _wardline_tier={obj._wardline_tier}; "
+            f"pass overwrite=True to re-stamp"
         )
+
+    normalized_groups = tuple(sorted(groups))
+
+    try:
+        obj._wardline_tier = tier
+        obj._wardline_groups = normalized_groups
+        obj._wardline_stamped_by = stamped_by
+    except (AttributeError, TypeError) as exc:
+        logger.warning(
+            "Cannot stamp tier on %s (%s): %s",
+            type(obj).__name__,
+            type(exc).__name__,
+            exc,
+        )
+        raise TypeError(
+            f"Cannot set attributes on {type(obj).__name__}: {exc}"
+        ) from exc
+
+
+def unstamp(obj: Any) -> Any:
+    """Unwrap a TierStamped wrapper, returning the inner value.
+
+    If *obj* is not a TierStamped instance, returns it unchanged.
+    """
+    if isinstance(obj, TierStamped):
+        return obj.value
+    return obj
+
+
+# ── Checking functions ───────────────────────────────────────
 
 
 def check_tier_boundary(
@@ -111,26 +216,107 @@ def check_tier_boundary(
     Raises TierViolationError if the tier is insufficiently trusted.
     No-op when enforcement is disabled.
     """
+    global _first_check_done  # noqa: PLW0603
+    _first_check_done = True
+
     if not _enforcement_enabled:
         return
 
     tier = getattr(obj, "_wardline_tier", None)
     if tier is None:
+        ctx = f" (context: {context})" if context else ""
+        msg = f"{type(obj).__name__} has no _wardline_tier attribute{ctx}"
+        logger.warning("Tier boundary violation: %s", msg)
+        _invoke_on_violation(obj, expected_min_tier, None)
         raise TierViolationError(
-            f"{type(obj).__name__} has no _wardline_tier attribute"
-            f"{f' (context: {context})' if context else ''}",
+            msg,
             obj=obj,
             expected_tier=expected_min_tier,
         )
 
-    if not isinstance(tier, int) or tier > expected_min_tier:
+    if not isinstance(tier, int):
+        ctx = f" (context: {context})" if context else ""
+        msg = (
+            f"{type(obj).__name__} has non-int _wardline_tier={tier!r}{ctx}"
+        )
+        logger.warning("Tier boundary violation: %s", msg)
+        _invoke_on_violation(obj, expected_min_tier, None)
         raise TierViolationError(
-            f"{type(obj).__name__} has tier {tier}, expected <={expected_min_tier}"
-            f"{f' (context: {context})' if context else ''}",
+            msg,
             obj=obj,
             expected_tier=expected_min_tier,
-            actual_tier=tier if isinstance(tier, int) else None,
+            actual_tier=None,
         )
+
+    if tier > expected_min_tier:
+        ctx = f" (context: {context})" if context else ""
+        msg = (
+            f"{type(obj).__name__} has tier {tier}, "
+            f"expected <={expected_min_tier}{ctx}"
+        )
+        logger.warning("Tier boundary violation: %s", msg)
+        _invoke_on_violation(obj, expected_min_tier, tier)
+        raise TierViolationError(
+            msg,
+            obj=obj,
+            expected_tier=expected_min_tier,
+            actual_tier=tier,
+        )
+
+
+def _invoke_on_violation(
+    obj: object,
+    expected_tier: int,
+    actual_tier: int | None,
+) -> None:
+    """Call the on_violation callback if set."""
+    if on_violation is not None:
+        on_violation(obj, expected_tier, actual_tier)
+
+
+def check_validated_record(obj: Any) -> None:
+    """Verify *obj* conforms to the ValidatedRecord protocol.
+
+    Post-isinstance validation: checks that ``_wardline_tier`` is int 1-4
+    and ``_wardline_groups`` is tuple or set of ints.
+
+    Raises TierViolationError if the object lacks required attributes or
+    has invalid types. No-op when enforcement is disabled.
+    """
+    global _first_check_done  # noqa: PLW0603
+    _first_check_done = True
+
+    if not _enforcement_enabled:
+        return
+
+    from wardline.runtime.protocols import ValidatedRecord
+
+    if not isinstance(obj, ValidatedRecord):
+        msg = (
+            f"{type(obj).__name__} does not conform to ValidatedRecord protocol "
+            f"(missing _wardline_tier or _wardline_groups)"
+        )
+        logger.warning("ValidatedRecord check failed: %s", msg)
+        raise TierViolationError(msg, obj=obj)
+
+    # Post-isinstance type validation
+    tier = obj._wardline_tier
+    if not isinstance(tier, int) or not (1 <= tier <= 4):
+        msg = (
+            f"{type(obj).__name__}._wardline_tier must be int 1-4, "
+            f"got {tier!r}"
+        )
+        logger.warning("ValidatedRecord check failed: %s", msg)
+        raise TierViolationError(msg, obj=obj)
+
+    groups = obj._wardline_groups
+    if not isinstance(groups, (tuple, set)):
+        msg = (
+            f"{type(obj).__name__}._wardline_groups must be tuple or set, "
+            f"got {type(groups).__name__}"
+        )
+        logger.warning("ValidatedRecord check failed: %s", msg)
+        raise TierViolationError(msg, obj=obj)
 
 
 # ── WardlineBase enforcement extension ────────────────────────
@@ -141,11 +327,13 @@ def check_subclass_tier_consistency(cls: type) -> list[str]:
 
     Returns a list of warning messages (empty if consistent).
     This runs at class definition time regardless of enforcement flag.
+    Reads ``_wardline_tier_source`` and ``_wardline_transition`` from
+    decorated methods, mapping via ``TAINT_TO_TIER``.
     """
-    from wardline.core.registry import REGISTRY
+    from wardline.core.tiers import TAINT_TO_TIER
 
     warnings: list[str] = []
-    tier_groups: dict[int, list[str]] = {}
+    tier_methods: dict[int, list[str]] = {}
 
     for name, value in cls.__dict__.items():
         if name.startswith("_") and not name.startswith("__"):
@@ -157,19 +345,25 @@ def check_subclass_tier_consistency(cls: type) -> list[str]:
         if groups is None:
             continue
 
-        # Find the tier from the decorator's registry entry
-        for group_id in groups:
-            for _entry_name, entry in REGISTRY.items():
-                if entry.group == group_id:
-                    tier = getattr(value, "_wardline_transition_from_tier", None)
-                    if tier is not None:
-                        tier_groups.setdefault(tier, []).append(name)
+        # Derive tier from _wardline_tier_source
+        tier_source = getattr(value, "_wardline_tier_source", None)
+        if tier_source is not None:
+            tier_val = TAINT_TO_TIER.get(tier_source)
+            if tier_val is not None:
+                tier_methods.setdefault(int(tier_val), []).append(name)
 
-    # Check for mixed tiers (methods that span multiple trust levels)
-    if len(tier_groups) > 1:
+        # Derive tier from _wardline_transition (use "to" state = index 1)
+        transition = getattr(value, "_wardline_transition", None)
+        if transition is not None and len(transition) >= 2:
+            to_state = transition[1]
+            tier_val = TAINT_TO_TIER.get(to_state)
+            if tier_val is not None:
+                tier_methods.setdefault(int(tier_val), []).append(name)
+
+    if len(tier_methods) > 1:
         tiers_str = ", ".join(
             f"tier {t}: {', '.join(methods)}"
-            for t, methods in sorted(tier_groups.items())
+            for t, methods in sorted(tier_methods.items())
         )
         warnings.append(
             f"{cls.__name__} has methods spanning multiple tiers: {tiers_str}"
@@ -185,6 +379,9 @@ def enforce_construction(instance: object) -> None:
     Verifies that decorated methods on the instance's class have
     consistent tier annotations.
     """
+    global _first_check_done  # noqa: PLW0603
+    _first_check_done = True
+
     if not _enforcement_enabled:
         return
 
