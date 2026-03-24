@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import ast
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from wardline.core.taints import TaintState
 
@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 
     from wardline.manifest.models import WardlineManifest
     from wardline.scanner.context import WardlineAnnotation
+
+TaintSource = Literal["decorator", "module_default", "fallback"]
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +57,7 @@ def assign_function_taints(
     file_path: Path | str,
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
     manifest: WardlineManifest | None = None,
-) -> dict[str, TaintState]:
+) -> tuple[dict[str, TaintState], dict[str, TaintSource]]:
     """Assign taint states to every function in a parsed module.
 
     Args:
@@ -67,18 +69,23 @@ def assign_function_taints(
             ``UNKNOWN_RAW``.
 
     Returns:
-        Dict mapping qualname → ``TaintState`` for every function
-        (sync and async) in the module.
+        Tuple of (taint_map, taint_sources) where:
+        - taint_map: dict mapping qualname → ``TaintState``
+        - taint_sources: dict mapping qualname → ``TaintSource``
+          indicating which branch assigned the taint ("decorator",
+          "module_default", or "fallback").
     """
     path_str = str(file_path)
     module_default = resolve_module_default(path_str, manifest)
     taint_map: dict[str, TaintState] = {}
+    taint_sources: dict[str, TaintSource] = {}
 
     _walk_and_assign(
-        tree, path_str, annotations, module_default, taint_map, scope=""
+        tree, path_str, annotations, module_default, taint_map, taint_sources,
+        scope="",
     )
 
-    return taint_map
+    return taint_map, taint_sources
 
 
 # ── Internal helpers ─────────────────────────────────────────────
@@ -161,6 +168,7 @@ def _walk_and_assign(
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
     module_default: TaintState | None,
     taint_map: dict[str, TaintState],
+    taint_sources: dict[str, TaintSource],
     scope: str,
 ) -> None:
     """Recursively walk AST nodes, assigning taint to each function."""
@@ -170,19 +178,22 @@ def _walk_and_assign(
 
             # Precedence: decorator > module_tiers > UNKNOWN_RAW
             taint = taint_from_annotations(file_path, qualname, annotations)
-            if taint is None:
-                taint = (
-                    module_default
-                    if module_default is not None
-                    else TaintState.UNKNOWN_RAW
-                )
+            if taint is not None:
+                source: TaintSource = "decorator"
+            elif module_default is not None:
+                taint = module_default
+                source = "module_default"
+            else:
+                taint = TaintState.UNKNOWN_RAW
+                source = "fallback"
 
             taint_map[qualname] = taint
+            taint_sources[qualname] = source
 
             # Recurse into nested functions/methods
             _walk_and_assign(
                 child, file_path, annotations, module_default,
-                taint_map, scope=qualname,
+                taint_map, taint_sources, scope=qualname,
             )
         elif isinstance(child, ast.ClassDef):
             class_scope = (
@@ -190,10 +201,10 @@ def _walk_and_assign(
             )
             _walk_and_assign(
                 child, file_path, annotations, module_default,
-                taint_map, scope=class_scope,
+                taint_map, taint_sources, scope=class_scope,
             )
         else:
             _walk_and_assign(
                 child, file_path, annotations, module_default,
-                taint_map, scope=scope,
+                taint_map, taint_sources, scope=scope,
             )

@@ -160,7 +160,7 @@ class ScanEngine:
         # Pass 1: Discovery + taint assignment (fault-tolerant)
         try:
             annotations = discover_annotations(tree, file_path)
-            taint_map = assign_function_taints(
+            taint_map, taint_sources = assign_function_taints(
                 tree, file_path, annotations, self._manifest
             )
         except Exception as exc:
@@ -168,7 +168,7 @@ class ScanEngine:
             result.errors.append(
                 f"Discovery/taint failed for {file_path}: {exc}"
             )
-            taint_map = {}
+            taint_map, taint_sources = {}, {}
 
         # Pass 1.5: Level 2 variable-level taint (when analysis_level >= 2)
         variable_taint_map: dict[str, dict[str, TaintState]] | None = None
