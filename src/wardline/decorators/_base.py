@@ -12,6 +12,71 @@ from wardline.core.registry import REGISTRY
 logger = logging.getLogger(__name__)
 
 
+def _compute_output_tier(semantic_attrs: dict[str, Any]) -> int | None:
+    """Derive output tier from semantic attrs at construction time.
+
+    Uses _wardline_transition[1] (the "to" state) or _wardline_tier_source,
+    mapped through TAINT_TO_TIER. Returns None for supplementary decorators
+    that have neither attribute.
+    """
+    from wardline.core.tiers import TAINT_TO_TIER
+
+    transition = semantic_attrs.get("_wardline_transition")
+    if transition is not None and len(transition) >= 2:
+        to_state = transition[1]
+        tier = TAINT_TO_TIER.get(to_state)
+        if tier is not None:
+            return int(tier)
+
+    tier_source = semantic_attrs.get("_wardline_tier_source")
+    if tier_source is not None:
+        tier = TAINT_TO_TIER.get(tier_source)
+        if tier is not None:
+            return int(tier)
+
+    return None
+
+
+def _try_stamp_tier(
+    result: Any,
+    output_tier: int,
+    groups: tuple[int, ...],
+    stamped_by: str,
+) -> Any:
+    """Attempt to stamp tier metadata on a result, auto-wrapping if needed.
+
+    Returns the (possibly wrapped) result.
+
+    - Tries setattr on the result directly.
+    - On AttributeError/TypeError (frozen/slotted objects): logs WARNING,
+      returns TierStamped wrapper instead.
+    - On ValueError (pre-stamped result, overwrite=False): silently returns
+      the pre-stamped result (innermost tier wins for stacked decorators).
+    """
+    from wardline.runtime.enforcement import TierStamped, stamp_tier
+
+    try:
+        stamp_tier(
+            result,
+            output_tier,
+            groups=groups,
+            stamped_by=stamped_by,
+            overwrite=False,
+        )
+        return result
+    except ValueError:
+        # Pre-stamped by inner decorator — innermost tier wins
+        return result
+    except TypeError:
+        # stamp_tier already logged WARNING before raising TypeError
+        return TierStamped(
+            value=result,
+            _wardline_tier=output_tier,
+            _wardline_groups=groups,
+            _wardline_stamped_by=stamped_by,
+        )
+
+
 def wardline_decorator(
     group: int,
     name: str,
@@ -48,6 +113,9 @@ def wardline_decorator(
                 f"Allowed: {sorted(entry.attrs.keys())}"
             )
 
+    # Compute output tier at construction time from semantic_attrs
+    output_tier = _compute_output_tier(semantic_attrs)
+
     def decorator(fn: Any) -> Any:
         # Handle staticmethod/classmethod — unwrap before applying.
         # Known limitation: callable() on descriptors that carry _wardline_*
@@ -69,11 +137,23 @@ def wardline_decorator(
         if inspect.iscoroutinefunction(unwrapped):
             @functools.wraps(unwrapped)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                return await unwrapped(*args, **kwargs)
+                result = await unwrapped(*args, **kwargs)
+                if output_tier is not None:
+                    from wardline.runtime.enforcement import is_enabled
+                    if is_enabled() and result is not None:
+                        current_groups = tuple(sorted(getattr(wrapper, "_wardline_groups", set())))
+                        result = _try_stamp_tier(result, output_tier, current_groups, wrapper.__qualname__)
+                return result
         else:
             @functools.wraps(unwrapped)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
-                return unwrapped(*args, **kwargs)
+                result = unwrapped(*args, **kwargs)
+                if output_tier is not None:
+                    from wardline.runtime.enforcement import is_enabled
+                    if is_enabled() and result is not None:
+                        current_groups = tuple(sorted(getattr(wrapper, "_wardline_groups", set())))
+                        result = _try_stamp_tier(result, output_tier, current_groups, wrapper.__qualname__)
+                return result
 
         # CRITICAL: set _wardline_groups AFTER functools.wraps()
         # Copy-on-accumulate: don't mutate inner decorator's set
