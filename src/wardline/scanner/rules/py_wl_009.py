@@ -49,7 +49,7 @@ def _has_shape_check_before(
     - ``"key" in data`` / ``key in data`` comparisons
     - Calls to functions with shape-validation names
     """
-    for node in ast.walk(ast.Module(body=stmts, type_ignores=[])):
+    for node in walk_skip_nested_defs(ast.Module(body=stmts, type_ignores=[])):
         if getattr(node, "lineno", 0) >= stop_line:
             continue
         if isinstance(node, ast.Call):

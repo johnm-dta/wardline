@@ -228,6 +228,29 @@ def outer():
 
         assert len(rule.findings) == 2
 
+    def test_shape_check_in_nested_does_not_suppress_outer(self) -> None:
+        """Regression: shape check inside nested def must not suppress outer finding.
+
+        ast.walk descends into nested scopes, so isinstance() inside inner()
+        at a lower line number was falsely counted as a shape check for
+        outer()'s semantic check.  GH: wardline-09bfd034be
+        """
+        rule = _run_rule_module(
+            """\
+def outer():
+    def inner():
+        isinstance(x, dict)
+
+    if data["amount"] > 100:
+        flag()
+"""
+        )
+
+        # outer() has no shape check in its own scope → must fire
+        assert len(rule.findings) >= 1
+        outer_findings = [f for f in rule.findings if f.line == 5]
+        assert len(outer_findings) == 1
+
 
 # -- Edge: shape validation in method call ---------------------------------
 
