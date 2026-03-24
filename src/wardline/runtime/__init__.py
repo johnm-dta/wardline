@@ -3,9 +3,16 @@
 from wardline.runtime.base import WardlineBase
 from wardline.runtime.descriptors import AuthoritativeAccessError, AuthoritativeField
 from wardline.runtime.enforcement import (
+    TierStamped,
     TierViolationError,
     check_tier_boundary,
     check_validated_record,
+    disable,
+    enable,
+    is_enabled,
+    on_violation,
+    stamp_tier,
+    unstamp,
 )
 from wardline.runtime.protocols import ValidatedRecord
 from wardline.runtime.types import (
@@ -28,9 +35,16 @@ __all__ = [
     "Tier3",
     "Tier4",
     "TierMarker",
+    "TierStamped",
     "TierViolationError",
     "ValidatedRecord",
     "WardlineBase",
     "check_tier_boundary",
     "check_validated_record",
+    "disable",
+    "enable",
+    "is_enabled",
+    "on_violation",
+    "stamp_tier",
+    "unstamp",
 ]

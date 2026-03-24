@@ -27,6 +27,10 @@ class ValidatedRecord(Protocol):
     Any object with these attributes satisfies the protocol — no
     inheritance required. This enables duck-typed tier checking across
     codebases that use wardline decorators.
+
+    Note: ``@property`` in this Protocol is notation only. Plain attributes
+    set via ``setattr`` or dataclass fields (as in ``TierStamped``) satisfy
+    the ``runtime_checkable`` ``isinstance`` check.
     """
 
     @property
