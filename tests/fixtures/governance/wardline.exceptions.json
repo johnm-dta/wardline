@@ -1,0 +1,62 @@
+{
+  "$id": "https://wardline.dev/schemas/0.1/exceptions.schema.json",
+  "exceptions": [
+    {
+      "id": "EXC-001",
+      "rule": "PY-WL-001",
+      "taint_state": "EXTERNAL_RAW",
+      "location": "src/example.py::fetch_data",
+      "exceptionability": "STANDARD",
+      "severity_at_grant": "ERROR",
+      "rationale": "Boundary function handles raw input by design.",
+      "reviewer": "test-reviewer",
+      "expires": "2027-01-01",
+      "provenance": null,
+      "agent_originated": false,
+      "ast_fingerprint": "",
+      "recurrence_count": 0,
+      "governance_path": "standard",
+      "last_refreshed_by": null,
+      "last_refresh_rationale": null,
+      "last_refreshed_at": null
+    },
+    {
+      "id": "EXC-002",
+      "rule": "PY-WL-003",
+      "taint_state": "UNKNOWN_RAW",
+      "location": "src/example.py::check_schema",
+      "exceptionability": "RELAXED",
+      "severity_at_grant": "WARNING",
+      "rationale": "Expedited grant during incident response.",
+      "reviewer": "incident-lead",
+      "expires": "2025-01-01",
+      "provenance": null,
+      "agent_originated": false,
+      "ast_fingerprint": "",
+      "recurrence_count": 0,
+      "governance_path": "expedited",
+      "last_refreshed_by": null,
+      "last_refresh_rationale": null,
+      "last_refreshed_at": null
+    },
+    {
+      "id": "EXC-003",
+      "rule": "PY-WL-005",
+      "taint_state": "PIPELINE",
+      "location": "src/example.py::get_config",
+      "exceptionability": "STANDARD",
+      "severity_at_grant": "WARNING",
+      "rationale": "Agent-generated exception for tier1 read pattern.",
+      "reviewer": "auto-reviewer",
+      "expires": "2027-06-01",
+      "provenance": "agent-scan-2026-02",
+      "agent_originated": true,
+      "ast_fingerprint": "",
+      "recurrence_count": 0,
+      "governance_path": "standard",
+      "last_refreshed_by": null,
+      "last_refresh_rationale": null,
+      "last_refreshed_at": null
+    }
+  ]
+}

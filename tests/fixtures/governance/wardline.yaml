@@ -1,0 +1,29 @@
+# schema_version: 0.1
+# Frozen governance test fixture — minimal but internally consistent.
+$id: "https://wardline.dev/schemas/0.1/wardline"
+
+metadata:
+  organisation: "wardline-test"
+  ratified_by:
+    name: "test-reviewer"
+    role: "security-lead"
+  ratification_date: "2026-03-01"
+  review_interval_days: 180
+
+tiers:
+  - id: "tier1-audit"
+    tier: 1
+    description: "Tier 1 — audit trail data"
+  - id: "tier4-external"
+    tier: 4
+    description: "Tier 4 — external raw input"
+
+module_tiers:
+  - path: "src/"
+    default_taint: "PIPELINE"
+
+delegation:
+  default_authority: "RELAXED"
+
+rules:
+  overrides: []

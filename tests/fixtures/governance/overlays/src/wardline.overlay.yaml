@@ -1,0 +1,10 @@
+# schema_version: 0.1
+$id: "https://wardline.dev/schemas/0.1/overlay.schema.json"
+
+overlay_for: "src/"
+
+boundaries:
+  - function: "fetch_data"
+    transition: "shape_validation"
+    from_tier: 4
+    to_tier: 3
