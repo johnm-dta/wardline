@@ -66,22 +66,7 @@ _RULE_GOVERNANCE_CONTEXT: dict[str, str] = {
 _EXCEPTIONS_FILENAME = "wardline.exceptions.json"
 
 
-@click.group()
-def exception() -> None:
-    """Manage the wardline exception register."""
-
-
-@exception.command()
-@click.option("--rule", required=True, help="Rule ID (e.g., PY-WL-001)")
-@click.option("--location", required=True, help="file_path::qualname")
-@click.option("--taint-state", required=True, help="Taint state (e.g., EXTERNAL_RAW)")
-@click.option("--rationale", required=True, help="Why this exception is granted")
-@click.option("--reviewer", required=True, help="Who approved this exception")
-@click.option("--governance-path", default="standard", type=click.Choice(["standard", "expedited"]))
-@click.option("--expires", default=None, help="Expiry date (ISO 8601, e.g., 2027-03-23)")
-@click.option("--agent-originated", is_flag=True, default=False, help="Mark as agent-originated")
-@click.option("--analysis-level", default=1, type=int, help="Analysis level to stamp on the exception")
-def add(
+def _create_exception(
     rule: str,
     location: str,
     taint_state: str,
@@ -92,7 +77,7 @@ def add(
     agent_originated: bool,
     analysis_level: int,
 ) -> None:
-    """Add a new exception to the register."""
+    """Shared implementation for ``add`` and ``grant`` commands."""
     # Validate rule ID
     try:
         rule_id = RuleId(rule)
@@ -155,7 +140,7 @@ def add(
         "reviewer": reviewer,
         "expires": expires,
         "provenance": "cli",
-        "agent_originated": agent_originated,  # True if --agent-originated, False otherwise
+        "agent_originated": agent_originated,
         "ast_fingerprint": fp,
         "recurrence_count": 0,
         "governance_path": governance_path,
@@ -169,6 +154,46 @@ def add(
     _write_exceptions(exc_path, data)
 
     click.echo(f"Added exception {exc_id} for {rule} at {location} (analysis_level={analysis_level})")
+
+
+@click.group()
+def exception() -> None:
+    """Manage the wardline exception register."""
+
+
+@exception.command()
+@click.option("--rule", required=True, help="Rule ID (e.g., PY-WL-001)")
+@click.option("--location", required=True, help="file_path::qualname")
+@click.option("--taint-state", required=True, help="Taint state (e.g., EXTERNAL_RAW)")
+@click.option("--rationale", required=True, help="Why this exception is granted")
+@click.option("--reviewer", required=True, help="Who approved this exception")
+@click.option("--governance-path", default="standard", type=click.Choice(["standard", "expedited"]))
+@click.option("--expires", default=None, help="Expiry date (ISO 8601, e.g., 2027-03-23)")
+@click.option("--agent-originated", is_flag=True, default=False, help="Mark as agent-originated")
+@click.option("--analysis-level", default=1, type=int, help="Analysis level to stamp on the exception")
+def add(
+    rule: str,
+    location: str,
+    taint_state: str,
+    rationale: str,
+    reviewer: str,
+    governance_path: str,
+    expires: str | None,
+    agent_originated: bool,
+    analysis_level: int,
+) -> None:
+    """Add a new exception to the register."""
+    _create_exception(
+        rule=rule,
+        location=location,
+        taint_state=taint_state,
+        rationale=rationale,
+        reviewer=reviewer,
+        governance_path=governance_path,
+        expires=expires,
+        agent_originated=agent_originated,
+        analysis_level=analysis_level,
+    )
 
 
 @exception.command()
@@ -321,82 +346,17 @@ def grant(
     analysis_level: int,
 ) -> None:
     """Grant a new exception (like 'add', stamps analysis_level)."""
-    # Validate rule ID
-    try:
-        rule_id = RuleId(rule)
-    except ValueError:
-        click.echo(f"Error: invalid rule ID: {rule}", err=True)
-        sys.exit(1)
-
-    # Validate taint state
-    try:
-        taint = TaintState(taint_state)
-    except ValueError:
-        click.echo(f"Error: invalid taint state: {taint_state}", err=True)
-        sys.exit(1)
-
-    # Check not UNCONDITIONAL
-    cell = matrix.lookup(rule_id, taint)
-    if cell.exceptionability == Exceptionability.UNCONDITIONAL:
-        click.echo(
-            f"Error: ({rule}, {taint_state}) is UNCONDITIONAL — cannot be excepted",
-            err=True,
-        )
-        sys.exit(1)
-
-    # Validate location format
-    if "::" not in location:
-        click.echo("Error: --location must be file_path::qualname", err=True)
-        sys.exit(1)
-
-    file_path, qualname = location.split("::", 1)
-
-    # Agent-originated without expires
-    if agent_originated and expires is None:
-        click.echo("Error: agent-originated exceptions require --expires", err=True)
-        sys.exit(1)
-
-    # Validate expires format
-    if expires is not None:
-        try:
-            datetime.date.fromisoformat(expires)
-        except ValueError:
-            click.echo(f"Error: invalid date format: {expires}", err=True)
-            sys.exit(1)
-
-    # Compute fingerprint
-    fp = compute_ast_fingerprint(Path(file_path), qualname)
-    if fp is None:
-        click.echo(f"Error: cannot compute fingerprint for {location}", err=True)
-        sys.exit(1)
-
-    # Build entry
-    exc_id = f"EXC-{uuid.uuid4().hex[:8].upper()}"
-    entry: dict[str, Any] = {
-        "id": exc_id,
-        "rule": rule,
-        "taint_state": taint_state,
-        "location": location,
-        "exceptionability": str(cell.exceptionability),
-        "severity_at_grant": str(cell.severity),
-        "rationale": rationale,
-        "reviewer": reviewer,
-        "expires": expires,
-        "provenance": "cli",
-        "agent_originated": agent_originated,
-        "ast_fingerprint": fp,
-        "recurrence_count": 0,
-        "governance_path": governance_path,
-        "analysis_level": analysis_level,
-    }
-
-    # Load or create exceptions file
-    exc_path = _find_exceptions_file()
-    data = _load_or_create(exc_path)
-    data["exceptions"].append(entry)
-    _write_exceptions(exc_path, data)
-
-    click.echo(f"Added exception {exc_id} for {rule} at {location} (analysis_level={analysis_level})")
+    _create_exception(
+        rule=rule,
+        location=location,
+        taint_state=taint_state,
+        rationale=rationale,
+        reviewer=reviewer,
+        governance_path=governance_path,
+        expires=expires,
+        agent_originated=agent_originated,
+        analysis_level=analysis_level,
+    )
 
 
 @exception.command("preview-drift")

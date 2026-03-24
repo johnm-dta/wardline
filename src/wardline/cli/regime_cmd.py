@@ -13,20 +13,8 @@ from pathlib import Path
 
 import click
 
+from wardline.cli._helpers import COHERENCE_SEVERITY_MAP as _COHERENCE_SEVERITY_MAP
 from wardline.cli.scan import EXIT_CONFIG_ERROR
-
-# Maps coherence issue kinds to severity (reused from coherence_cmd).
-_COHERENCE_SEVERITY_MAP = {
-    "orphaned_annotation": "WARNING",
-    "undeclared_boundary": "WARNING",
-    "tier_distribution": "WARNING",
-    "tier_downgrade": "ERROR",
-    "tier_upgrade_without_evidence": "ERROR",
-    "agent_originated_exception": "WARNING",
-    "expired_exception": "WARNING",
-    "first_scan_perimeter": "WARNING",
-}
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -337,13 +325,20 @@ def _status_json(manifest_m, exception_m, fingerprint_m, rule_m) -> None:
 @click.option(
     "--gate",
     is_flag=True,
-    help="Exit 1 if any ERROR-level checks fail.",
+    help="Exit 1 if any ERROR-level checks fail (combine with --strict to include WARNINGs).",
+)
+@click.option(
+    "--strict",
+    is_flag=True,
+    default=False,
+    help="With --gate, also exit 1 on WARNING-level failures.",
 )
 def verify(
     manifest_file: str,
     scan_path: str,
     output_json: bool,
     gate: bool,
+    strict: bool,
 ) -> None:
     """Run active governance verification checks."""
     import yaml
@@ -606,10 +601,13 @@ def verify(
 
     # --- Gate logic ---
     if gate:
-        has_error_failures = any(
-            not c["passed"] and c["severity"] == "ERROR" for c in checks
+        gate_severities = {"ERROR"}
+        if strict:
+            gate_severities.add("WARNING")
+        has_gate_failures = any(
+            not c["passed"] and c["severity"] in gate_severities for c in checks
         )
-        if has_error_failures:
+        if has_gate_failures:
             sys.exit(1)
 
 

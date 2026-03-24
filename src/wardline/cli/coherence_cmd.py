@@ -12,18 +12,8 @@ from pathlib import Path
 
 import click
 
+from wardline.cli._helpers import COHERENCE_SEVERITY_MAP as SEVERITY_MAP
 from wardline.cli.scan import EXIT_CONFIG_ERROR
-
-SEVERITY_MAP = {
-    "orphaned_annotation": "WARNING",
-    "undeclared_boundary": "WARNING",
-    "tier_distribution": "WARNING",
-    "tier_downgrade": "ERROR",
-    "tier_upgrade_without_evidence": "ERROR",
-    "agent_originated_exception": "WARNING",
-    "expired_exception": "WARNING",
-    "first_scan_perimeter": "WARNING",
-}
 
 CATEGORY_MAP = {
     "tier_downgrade": "policy",

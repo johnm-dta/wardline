@@ -8,6 +8,19 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+# Canonical coherence-issue severity map.  Imported by coherence_cmd and
+# regime_cmd so the classification cannot diverge.
+COHERENCE_SEVERITY_MAP: dict[str, str] = {
+    "orphaned_annotation": "WARNING",
+    "undeclared_boundary": "WARNING",
+    "tier_distribution": "WARNING",
+    "tier_downgrade": "ERROR",
+    "tier_upgrade_without_evidence": "ERROR",
+    "agent_originated_exception": "WARNING",
+    "expired_exception": "WARNING",
+    "first_scan_perimeter": "WARNING",
+}
+
 
 def discover_all_annotations(
     scan_path: Path,
