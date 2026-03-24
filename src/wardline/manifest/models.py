@@ -41,6 +41,8 @@ class ExceptionEntry:
     last_refreshed_by: str | None = None
     last_refresh_rationale: str | None = None
     last_refreshed_at: str | None = None
+    analysis_level: int = 1
+    migrated_from: str | None = None
 
 
 @dataclass(frozen=True)

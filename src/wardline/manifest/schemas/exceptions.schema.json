@@ -90,6 +90,15 @@
             "type": ["string", "null"],
             "format": "date",
             "description": "When the fingerprint was last refreshed (ISO 8601)."
+          },
+          "analysis_level": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Analysis level at which this exception was granted."
+          },
+          "migrated_from": {
+            "type": ["string", "null"],
+            "description": "Previous taint_state before migration (audit trail)."
           }
         },
         "required": [

@@ -351,7 +351,9 @@ def scan(
 
     if exceptions:
         processed, governance_ex = apply_exceptions(
-            result.findings, exceptions, project_root=manifest_path.parent
+            result.findings, exceptions, project_root=manifest_path.parent,
+            analysis_level=analysis_level,
+            taint_map=getattr(result, 'taint_map', None),
         )
         result.findings = processed
         governance_findings.extend(governance_ex)

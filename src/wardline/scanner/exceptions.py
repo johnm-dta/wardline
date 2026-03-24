@@ -41,19 +41,27 @@ def apply_exceptions(
     project_root: Path,
     *,
     now: datetime.date | None = None,
+    analysis_level: int = 1,
+    taint_map: dict[str, object] | None = None,
 ) -> tuple[list[Finding], list[Finding]]:
     """Match findings against exceptions, return (processed, governance).
 
     ``now`` accepts a date for clock injection in tests (defaults to today).
+    ``analysis_level`` enables level-stale detection.
+    ``taint_map`` enables taint-drift detection (qualname -> TaintState).
     """
     if now is None:
         now = datetime.date.today()
 
     # Build index: (rule, taint_state, location) -> [exceptions]
     index: dict[tuple[str, str, str], list[ExceptionEntry]] = {}
+    # Also track exceptions by (rule, location) for drift detection
+    location_index: dict[tuple[str, str], list[ExceptionEntry]] = {}
     for exc in exceptions:
         key = (exc.rule, exc.taint_state, exc.location)
         index.setdefault(key, []).append(exc)
+        loc_key = (exc.rule, exc.location)
+        location_index.setdefault(loc_key, []).append(exc)
 
     # Cache for parsed AST fingerprints: (file_path, qualname) -> fingerprint
     _fp_cache: dict[tuple[str, str], str | None] = {}
@@ -63,6 +71,63 @@ def apply_exceptions(
 
     # Emit governance findings for all exceptions (regardless of matching)
     _emit_register_governance(exceptions, governance, now)
+
+    # Track level-stale exception IDs — stale exceptions do NOT suppress
+    stale_exception_ids: set[str] = set()
+
+    # Level-stale detection: exception analysis_level < active scan level
+    for exc in exceptions:
+        # Skip expired exceptions
+        if exc.expires is not None:
+            try:
+                expiry = datetime.date.fromisoformat(exc.expires)
+                if expiry < now:
+                    continue
+            except ValueError:
+                pass
+
+        if exc.analysis_level < analysis_level:
+            exc_file, exc_qualname = _parse_location(exc.location)
+            governance.append(_governance_finding(
+                RuleId.GOVERNANCE_EXCEPTION_LEVEL_STALE,
+                exc_file,
+                1,
+                f"Exception '{exc.id}' was granted at analysis level "
+                f"{exc.analysis_level} but scan is running at level "
+                f"{analysis_level} — exception is inactive until re-granted",
+                qualname=exc_qualname,
+                exception_id=exc.id,
+                original_rule=exc.rule,
+            ))
+            stale_exception_ids.add(exc.id)
+
+    # Taint-drift detection: exception taint_state vs current effective taint
+    if taint_map is not None:
+        for exc in exceptions:
+            # Skip expired exceptions
+            if exc.expires is not None:
+                try:
+                    expiry = datetime.date.fromisoformat(exc.expires)
+                    if expiry < now:
+                        continue
+                except ValueError:
+                    pass
+
+            exc_file, exc_qualname = _parse_location(exc.location)
+            if exc_qualname is not None and exc_qualname in taint_map:
+                current_taint = str(taint_map[exc_qualname])
+                if exc.taint_state != current_taint:
+                    governance.append(_governance_finding(
+                        RuleId.GOVERNANCE_EXCEPTION_TAINT_DRIFT,
+                        exc_file,
+                        1,
+                        f"Exception '{exc.id}' was granted for taint "
+                        f"{exc.taint_state} but function is now "
+                        f"{current_taint}",
+                        qualname=exc_qualname,
+                        exception_id=exc.id,
+                        original_rule=exc.rule,
+                    ))
 
     for finding in findings:
         if finding.qualname is None:
@@ -106,6 +171,10 @@ def apply_exceptions(
 
         matched = False
         for exc in candidates:
+            # Level-stale exceptions are inactive — skip them
+            if exc.id in stale_exception_ids:
+                continue
+
             # Check expiry
             if exc.expires is not None:
                 try:
