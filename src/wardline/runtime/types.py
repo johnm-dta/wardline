@@ -30,10 +30,11 @@ from wardline.core.tiers import AuthorityTier
 
 
 class TierMarker:
-    """Annotation marker carrying an authority tier level.
+    """Runtime metadata carrier for authority tier levels.
 
-    Used inside ``Annotated`` to attach tier metadata to a type hint
-    without altering the runtime type.
+    Used in ``TIER_REGISTRY`` to map ``NewType`` tier types back to
+    their tier level for runtime introspection (since ``NewType`` is
+    erased at runtime).
 
     Args:
         tier: The authority tier (1-4).

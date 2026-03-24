@@ -2,6 +2,7 @@
 
 from wardline.runtime.base import WardlineBase
 from wardline.runtime.descriptors import AuthoritativeAccessError, AuthoritativeField
+from wardline.runtime.protocols import ValidatedRecord
 from wardline.runtime.types import (
     TIER_REGISTRY,
     FailFast,
@@ -22,5 +23,6 @@ __all__ = [
     "Tier3",
     "Tier4",
     "TierMarker",
+    "ValidatedRecord",
     "WardlineBase",
 ]
