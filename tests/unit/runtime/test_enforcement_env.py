@@ -11,8 +11,6 @@ import os
 import subprocess
 import sys
 
-import pytest
-
 _SCRIPT = (
     "from wardline.runtime.enforcement import is_enabled; print(is_enabled())"
 )

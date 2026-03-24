@@ -460,7 +460,6 @@ class TestValidatedRecordConformance:
 
     def test_decorated_function_satisfies_validated_record(self) -> None:
         """Functions with wardline decorators carry _wardline_tier and _wardline_groups."""
-        from wardline.runtime.protocols import ValidatedRecord
 
         @external_boundary
         def stub() -> None:

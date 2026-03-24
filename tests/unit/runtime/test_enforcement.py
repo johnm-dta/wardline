@@ -187,9 +187,8 @@ class TestStampTier:
             x: int = 1
 
         obj = Slotted()
-        with caplog.at_level(logging.WARNING, logger="wardline.runtime.enforcement"):
-            with pytest.raises(TypeError):
-                stamp_tier(obj, 2)
+        with caplog.at_level(logging.WARNING, logger="wardline.runtime.enforcement"), pytest.raises(TypeError):
+            stamp_tier(obj, 2)
         # The WARNING must have been emitted
         assert any("Cannot stamp tier" in r.message for r in caplog.records)
 
@@ -242,9 +241,8 @@ class TestCheckTierBoundary:
     def test_logs_before_raise(self, caplog: pytest.LogCaptureFixture) -> None:
         enforcement.enable()
         obj = _make_tier_obj(4)
-        with caplog.at_level(logging.WARNING, logger="wardline.runtime.enforcement"):
-            with pytest.raises(TierViolationError):
-                check_tier_boundary(obj, expected_min_tier=1)
+        with caplog.at_level(logging.WARNING, logger="wardline.runtime.enforcement"), pytest.raises(TierViolationError):
+            check_tier_boundary(obj, expected_min_tier=1)
         assert "Tier boundary violation" in caplog.text
 
     def test_calls_on_violation(self) -> None:
@@ -329,9 +327,8 @@ class TestCheckValidatedRecord:
 
     def test_logs_before_raise(self, caplog: pytest.LogCaptureFixture) -> None:
         enforcement.enable()
-        with caplog.at_level(logging.WARNING, logger="wardline.runtime.enforcement"):
-            with pytest.raises(TierViolationError):
-                check_validated_record(object())
+        with caplog.at_level(logging.WARNING, logger="wardline.runtime.enforcement"), pytest.raises(TierViolationError):
+            check_validated_record(object())
         assert "ValidatedRecord check failed" in caplog.text
 
 

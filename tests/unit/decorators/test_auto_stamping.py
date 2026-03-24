@@ -21,7 +21,6 @@ from wardline.runtime.enforcement import (
     _reset_enforcement_state,
     enable,
     is_enabled,
-    unstamp,
 )
 
 

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, get_args
+from typing import TYPE_CHECKING, Annotated, get_args
 
 import pytest
 
@@ -19,6 +18,9 @@ from wardline.runtime.types import (
     TierMarker,
     _FailFastMarker,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestTierMarker:
