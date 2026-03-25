@@ -216,7 +216,7 @@ class RulePyWl006(RuleBase):
         if _AST_TRY_STAR is not None:
             for child in walk_skip_nested_defs(node):
                 if isinstance(child, _AST_TRY_STAR):
-                    for handler in child.handlers:
+                    for handler in child.handlers:  # type: ignore[attr-defined]  # TryStar (3.11) has .handlers
                         trystar_handlers.add(id(handler))
                         self._check_broad_handler_for_audit(handler)
 

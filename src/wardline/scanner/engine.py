@@ -206,7 +206,8 @@ class ScanEngine:
         variable_taint_map: dict[str, dict[str, TaintState]] | None = None
         if self._analysis_level >= 2 and body_taint_map:
             variable_taint_map = self._run_variable_taint(
-                tree, body_taint_map, file_path, result
+                tree, body_taint_map, return_taint_map, taint_sources,
+                file_path, result,
             )
 
         ctx = ScanContext(
@@ -325,6 +326,8 @@ class ScanEngine:
         self,
         tree: ast.Module,
         taint_map: dict[str, TaintState],
+        return_taint_map: dict[str, TaintState],
+        taint_sources: dict[str, TaintSource],
         file_path: Path,
         result: ScanResult,
     ) -> dict[str, dict[str, TaintState]] | None:
@@ -333,6 +336,15 @@ class ScanEngine:
         Returns a dict mapping qualname -> {variable: TaintState}, or None
         on failure.
         """
+        # Build callee resolution map: for decorator-anchored callees, use
+        # the return (OUTPUT) tier taint so that `x = validates_shape(data)`
+        # assigns SHAPE_VALIDATED to x. For non-anchored callees, keep the
+        # L3-refined body taint (which equals return taint at L1, but may
+        # have been demoted by L3 callgraph analysis).
+        callee_taint_map: dict[str, TaintState] = dict(taint_map)
+        for qn, src in taint_sources.items():
+            if src == "decorator" and qn in return_taint_map:
+                callee_taint_map[qn] = return_taint_map[qn]
 
         var_map: dict[str, dict[str, _TS]] = {}
         qualname_map = self._build_qualname_map(tree)
@@ -343,7 +355,7 @@ class ScanEngine:
                     if qualname is not None and qualname in taint_map:
                         func_taint = taint_map[qualname]
                         var_taints = compute_variable_taints(
-                            node, func_taint, taint_map
+                            node, func_taint, callee_taint_map
                         )
                         var_map[qualname] = var_taints
         except Exception as exc:
