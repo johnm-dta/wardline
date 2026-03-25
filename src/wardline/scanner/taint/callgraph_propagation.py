@@ -51,16 +51,18 @@ def propagate_callgraph_taints(
     resolved_counts: dict[str, int],
     unresolved_counts: dict[str, int],
     *,
-    return_taint_map: dict[str, TaintState] | None = None,
+    return_taint_map: dict[str, TaintState],
 ) -> tuple[dict[str, TaintState], dict[str, TaintProvenance], list[tuple[str, str]]]:
     """Run SCC-based fixed-point propagation to refine L1 taints.
 
     Args:
         edges: Forward adjacency ``{caller: {callee, ...}}``.
-        taint_map: L1 taint assignments (copied, not mutated).
+        taint_map: L1 body-evaluation taint assignments (copied, not mutated).
         taint_sources: L1 provenance classification per function.
         resolved_counts: Resolved call-site counts per caller.
         unresolved_counts: Unresolved call-site counts per caller.
+        return_taint_map: L1 return-value taint map. Used to resolve
+            decorator-anchored callee contributions (OUTPUT tier).
 
     Returns:
         Tuple of ``(refined_taint_map, provenance_map, diagnostics)``.
@@ -71,11 +73,6 @@ def propagate_callgraph_taints(
 
     if not taint_map:
         return {}, {}, []
-
-    # Default return_taint_map to taint_map (body taint) if not provided.
-    # This preserves backward compatibility for callers that don't split.
-    if return_taint_map is None:
-        return_taint_map = taint_map
 
     diagnostics: list[tuple[str, str]] = []
 
@@ -140,8 +137,13 @@ def propagate_callgraph_taints(
             ext_callees = (edges.get(f, set()) & taint_keys) - scc
             if ext_callees:
                 has_external_influence.add(f)
+                # For anchored callees, use return_taint (their static output tier).
+                # For non-anchored callees, use current[] (L3-refined body taint).
+                # This is correct because non-anchored functions always have
+                # body_taint == return_taint (enforced by _walk_and_assign in
+                # function_level.py), so current[c] serves as both.
                 ext_ranks = [
-                    TRUST_RANK[return_taint_map[c] if c in anchored else current[c]]
+                    TRUST_RANK[return_taint_map.get(c, current[c]) if c in anchored else current[c]]
                     for c in ext_callees
                 ]
                 ext_max = max(ext_ranks)
@@ -198,7 +200,7 @@ def propagate_callgraph_taints(
 
             # Compute max_rank (least trusted) among callees
             callee_ranks = [
-                TRUST_RANK[return_taint_map[c] if c in anchored else current[c]]
+                TRUST_RANK[return_taint_map.get(c, current[c]) if c in anchored else current[c]]
                 for c in callee_set
             ]
             max_callee_rank = max(callee_ranks, default=TRUST_RANK[TaintState.AUDIT_TRAIL])

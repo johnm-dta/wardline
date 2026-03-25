@@ -60,6 +60,17 @@ RETURN_TAINT: dict[str, TaintState] = {
     "authoritative_construction": TaintState.AUDIT_TRAIL,
 }
 
+# Structural invariant: both maps must cover exactly the same decorators.
+# If a decorator is added to one but not the other, taint assignment will
+# silently produce wrong values (the fallback masks the error).
+if set(BODY_EVAL_TAINT) != set(RETURN_TAINT):
+    _only_body = set(BODY_EVAL_TAINT) - set(RETURN_TAINT)
+    _only_ret = set(RETURN_TAINT) - set(BODY_EVAL_TAINT)
+    raise ValueError(
+        f"BODY_EVAL_TAINT and RETURN_TAINT key sets diverge: "
+        f"only in BODY={_only_body}, only in RETURN={_only_ret}"
+    )
+
 # Backward-compatible alias for explain_cmd.py and other importers.
 DECORATOR_TAINT_MAP = BODY_EVAL_TAINT
 

@@ -362,7 +362,7 @@ class ScanEngine:
         file_path: Path,
         result: ScanResult,
         *,
-        return_taint_map: dict[str, TaintState] | None = None,
+        return_taint_map: dict[str, TaintState],
     ) -> tuple[dict[str, TaintState], dict[str, TaintProvenance] | None]:
         """Run Level 3 call-graph taint propagation.
 
