@@ -1,6 +1,6 @@
 """wardline manifest coherence — cross-reference annotations against manifest.
 
-Runs all 8 coherence checks, formats output (text or JSON), and
+Runs all 11 coherence checks, formats output (text or JSON), and
 optionally gates on ERROR-level issues.
 """
 
@@ -19,8 +19,11 @@ from wardline.cli.scan import EXIT_CONFIG_ERROR
 CATEGORY_MAP = {
     "tier_downgrade": "policy",
     "tier_upgrade_without_evidence": "policy",
+    "tier_topology_inconsistency": "policy",
     "orphaned_annotation": "enforcement",
     "undeclared_boundary": "enforcement",
+    "unmatched_contract": "enforcement",
+    "stale_contract_binding": "enforcement",
     "tier_distribution": "enforcement",
     "agent_originated_exception": "enforcement",
     "expired_exception": "enforcement",
@@ -73,10 +76,13 @@ def coherence(
         check_expired_exceptions,
         check_first_scan_perimeter,
         check_orphaned_annotations,
+        check_stale_contract_bindings,
         check_tier_distribution,
         check_tier_downgrades,
+        check_tier_topology_consistency,
         check_tier_upgrade_without_evidence,
         check_undeclared_boundaries,
+        check_unmatched_contracts,
     )
     from wardline.manifest.exceptions import load_exceptions
     from wardline.manifest.loader import (
@@ -84,7 +90,7 @@ def coherence(
         WardlineYAMLError,
         load_manifest,
     )
-    from wardline.manifest.resolve import resolve_boundaries
+    from wardline.manifest.resolve import resolve_boundaries, resolve_contract_bindings
 
     # --- Load manifest ---
     manifest_path = Path(manifest_file)
@@ -116,11 +122,17 @@ def coherence(
         boundaries = ()
 
     try:
+        contract_bindings = resolve_contract_bindings(manifest_dir, manifest_model)
+    except (GovernanceError, ManifestLoadError, OSError) as exc:
+        click.echo(f"warning: contract binding resolution failed: {exc}", err=True)
+        contract_bindings = ()
+
+    try:
         exceptions = load_exceptions(manifest_dir)
     except ManifestLoadError:
         exceptions = ()
 
-    # --- Run all 8 checks ---
+    # --- Run all 11 checks ---
     all_issues: list[CoherenceIssue] = []
 
     all_issues.extend(
@@ -155,6 +167,17 @@ def coherence(
     )
     all_issues.extend(
         check_first_scan_perimeter(perimeter_baseline_path)
+    )
+    all_issues.extend(
+        check_unmatched_contracts(annotations, boundaries)
+    )
+    all_issues.extend(
+        check_stale_contract_bindings(annotations, contract_bindings)
+    )
+    all_issues.extend(
+        check_tier_topology_consistency(
+            boundaries, manifest_model.tiers, manifest_model.module_tiers
+        )
     )
 
     # --- Format output ---

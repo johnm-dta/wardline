@@ -18,7 +18,12 @@ from wardline.manifest.scope import relative_path_within_scope
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from wardline.manifest.models import BoundaryEntry, OptionalFieldEntry, WardlineManifest
+    from wardline.manifest.models import (
+        BoundaryEntry,
+        ContractBinding,
+        OptionalFieldEntry,
+        WardlineManifest,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -125,3 +130,41 @@ def resolve_optional_fields(
             all_optional_fields.append(scoped)
 
     return tuple(all_optional_fields)
+
+
+def resolve_contract_bindings(
+    root: Path,
+    manifest: WardlineManifest,
+) -> tuple[ContractBinding, ...]:
+    """Discover overlays and return all contract binding declarations.
+
+    Args:
+        root: Manifest directory (root for overlay discovery).
+        manifest: Loaded manifest model.
+
+    Returns:
+        All ``ContractBinding`` entries from discovered overlays.
+    """
+    overlay_paths = discover_overlays(root, manifest)
+
+    all_bindings: list[ContractBinding] = []
+    for overlay_path in overlay_paths:
+        try:
+            overlay = load_overlay(overlay_path)
+        except (ManifestLoadError, OSError) as exc:
+            logger.warning("Failed to load overlay %s: %s", overlay_path, exc)
+            continue
+
+        overlay_dir = str(overlay_path.parent.relative_to(root))
+        if not relative_path_within_scope(
+            overlay_dir,
+            overlay.overlay_for.rstrip("/"),
+        ):
+            raise GovernanceError(
+                f"Overlay at {overlay_path} claims overlay_for='{overlay.overlay_for}' "
+                f"but is located in '{overlay_dir}'"
+            )
+
+        all_bindings.extend(overlay.contract_bindings)
+
+    return tuple(all_bindings)

@@ -12,13 +12,17 @@ from wardline.manifest.coherence import (
     check_expired_exceptions,
     check_first_scan_perimeter,
     check_orphaned_annotations,
+    check_stale_contract_bindings,
     check_tier_distribution,
     check_tier_downgrades,
+    check_tier_topology_consistency,
     check_tier_upgrade_without_evidence,
     check_undeclared_boundaries,
+    check_unmatched_contracts,
 )
 from wardline.manifest.models import (
     BoundaryEntry,
+    ContractBinding,
     ExceptionEntry,
     ModuleTierEntry,
     TierEntry,
@@ -562,3 +566,285 @@ class TestFirstScanPerimeter:
         perimeter_path.write_text("{}")
         issues = check_first_scan_perimeter(perimeter_path)
         assert issues == []
+
+
+# ── Unmatched contract tests ─────────────────────────────────────
+
+
+class TestUnmatchedContracts:
+    """Tests for check_unmatched_contracts."""
+
+    def test_matched_contract_no_issue(self) -> None:
+        """Boundary with bounded_context contracts and matching annotation is clean."""
+        annotations = {
+            ("src/api.py", "handle_request"): [_annot("external_boundary")],
+        }
+        boundaries = (
+            BoundaryEntry(
+                function="handle_request",
+                transition="INGRESS",
+                bounded_context={
+                    "contracts": [
+                        {"name": "UserInput", "data_tier": 3, "direction": "inbound"},
+                    ]
+                },
+            ),
+        )
+        issues = check_unmatched_contracts(annotations, boundaries)
+        assert issues == []
+
+    def test_unmatched_contract_detected(self) -> None:
+        """Boundary with contracts but no code annotation is flagged."""
+        annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
+        boundaries = (
+            BoundaryEntry(
+                function="ghost_handler",
+                transition="INGRESS",
+                bounded_context={
+                    "contracts": [
+                        {"name": "RawPayload", "data_tier": 4, "direction": "inbound"},
+                    ]
+                },
+                overlay_path="overlays/api/wardline.overlay.yaml",
+            ),
+        )
+        issues = check_unmatched_contracts(annotations, boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "unmatched_contract"
+        assert issues[0].function == "ghost_handler"
+        assert "RawPayload" in issues[0].detail
+
+    def test_boundary_without_bounded_context_ignored(self) -> None:
+        """Boundaries without bounded_context are silently skipped."""
+        annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
+        boundaries = (
+            BoundaryEntry(function="handler", transition="INGRESS"),
+        )
+        issues = check_unmatched_contracts(annotations, boundaries)
+        assert issues == []
+
+    def test_empty_contracts_list_ignored(self) -> None:
+        """Boundary with empty contracts list is silently skipped."""
+        annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
+        boundaries = (
+            BoundaryEntry(
+                function="handler",
+                transition="INGRESS",
+                bounded_context={"contracts": []},
+            ),
+        )
+        issues = check_unmatched_contracts(annotations, boundaries)
+        assert issues == []
+
+    def test_multiple_contracts_reported_together(self) -> None:
+        """All contract names appear in the detail message."""
+        annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
+        boundaries = (
+            BoundaryEntry(
+                function="handler",
+                transition="INGRESS",
+                bounded_context={
+                    "contracts": [
+                        {"name": "ContractA", "data_tier": 2, "direction": "inbound"},
+                        {"name": "ContractB", "data_tier": 3, "direction": "outbound"},
+                    ]
+                },
+            ),
+        )
+        issues = check_unmatched_contracts(annotations, boundaries)
+        assert len(issues) == 1
+        assert "ContractA" in issues[0].detail
+        assert "ContractB" in issues[0].detail
+
+    def test_empty_inputs(self) -> None:
+        """No annotations and no boundaries produces no issues."""
+        issues = check_unmatched_contracts({}, ())
+        assert issues == []
+
+
+# ── Stale contract binding tests ─────────────────────────────────
+
+
+class TestStaleContractBindings:
+    """Tests for check_stale_contract_bindings."""
+
+    def test_valid_binding_no_issue(self) -> None:
+        """All bound functions exist in annotations."""
+        annotations = {
+            ("src/api.py", "handle_request"): [_annot("external_boundary")],
+            ("src/validate.py", "validate_input"): [_annot("validates_shape")],
+        }
+        bindings = (
+            ContractBinding(
+                contract="UserInput",
+                functions=("handle_request", "validate_input"),
+            ),
+        )
+        issues = check_stale_contract_bindings(annotations, bindings)
+        assert issues == []
+
+    def test_stale_binding_detected(self) -> None:
+        """Binding referencing non-existent function is flagged."""
+        annotations = {
+            ("src/api.py", "handle_request"): [_annot("external_boundary")],
+        }
+        bindings = (
+            ContractBinding(
+                contract="UserInput",
+                functions=("handle_request", "deleted_function"),
+            ),
+        )
+        issues = check_stale_contract_bindings(annotations, bindings)
+        assert len(issues) == 1
+        assert issues[0].kind == "stale_contract_binding"
+        assert issues[0].function == "deleted_function"
+        assert "UserInput" in issues[0].detail
+
+    def test_multiple_stale_bindings(self) -> None:
+        """Multiple stale functions across bindings are all reported."""
+        annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
+        bindings = (
+            ContractBinding(
+                contract="ContractA",
+                functions=("missing_a",),
+            ),
+            ContractBinding(
+                contract="ContractB",
+                functions=("missing_b",),
+            ),
+        )
+        issues = check_stale_contract_bindings(annotations, bindings)
+        assert len(issues) == 2
+        stale_names = {i.function for i in issues}
+        assert stale_names == {"missing_a", "missing_b"}
+
+    def test_empty_inputs(self) -> None:
+        """No annotations and no bindings produces no issues."""
+        issues = check_stale_contract_bindings({}, ())
+        assert issues == []
+
+    def test_empty_functions_list(self) -> None:
+        """Binding with empty functions list produces no issues."""
+        annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
+        bindings = (
+            ContractBinding(contract="EmptyContract", functions=()),
+        )
+        issues = check_stale_contract_bindings(annotations, bindings)
+        assert issues == []
+
+
+# ── Tier topology consistency tests ──────────────────────────────
+
+
+class TestTierTopologyConsistency:
+    """Tests for check_tier_topology_consistency."""
+
+    def test_valid_topology_no_issue(self) -> None:
+        """Boundary with valid from_tier and to_tier produces no issues."""
+        tiers = (_tier("strict", 1), _tier("moderate", 2), _tier("permissive", 3))
+        module_tiers = (_module_tier("src/api", "permissive"),)
+        boundaries = (
+            BoundaryEntry(
+                function="handler",
+                transition="INGRESS",
+                from_tier=3,
+                to_tier=1,
+                overlay_scope="/project/src/api",
+            ),
+        )
+        issues = check_tier_topology_consistency(boundaries, tiers, module_tiers)
+        assert issues == []
+
+    def test_invalid_from_tier_detected(self) -> None:
+        """Boundary referencing non-existent from_tier is flagged."""
+        tiers = (_tier("strict", 1), _tier("moderate", 2))
+        module_tiers: tuple[ModuleTierEntry, ...] = ()
+        boundaries = (
+            BoundaryEntry(
+                function="handler",
+                transition="INGRESS",
+                from_tier=5,
+                overlay_path="overlays/api/wardline.overlay.yaml",
+            ),
+        )
+        issues = check_tier_topology_consistency(boundaries, tiers, module_tiers)
+        assert len(issues) == 1
+        assert issues[0].kind == "tier_topology_inconsistency"
+        assert "from_tier=5" in issues[0].detail
+        assert "not a valid tier" in issues[0].detail
+
+    def test_invalid_to_tier_detected(self) -> None:
+        """Boundary referencing non-existent to_tier is flagged."""
+        tiers = (_tier("strict", 1), _tier("moderate", 2))
+        module_tiers: tuple[ModuleTierEntry, ...] = ()
+        boundaries = (
+            BoundaryEntry(
+                function="handler",
+                transition="INGRESS",
+                to_tier=99,
+                overlay_path="overlays/api/wardline.overlay.yaml",
+            ),
+        )
+        issues = check_tier_topology_consistency(boundaries, tiers, module_tiers)
+        assert len(issues) == 1
+        assert issues[0].kind == "tier_topology_inconsistency"
+        assert "to_tier=99" in issues[0].detail
+
+    def test_from_tier_module_mismatch_detected(self) -> None:
+        """Boundary from_tier mismatching module tier is flagged."""
+        tiers = (_tier("strict", 1), _tier("permissive", 3))
+        module_tiers = (_module_tier("src/api", "permissive"),)  # tier 3
+        boundaries = (
+            BoundaryEntry(
+                function="handler",
+                transition="INGRESS",
+                from_tier=1,  # claims tier 1 but module is tier 3
+                overlay_scope="/project/src/api",
+                overlay_path="overlays/api/wardline.overlay.yaml",
+            ),
+        )
+        issues = check_tier_topology_consistency(boundaries, tiers, module_tiers)
+        assert len(issues) == 1
+        assert issues[0].kind == "tier_topology_inconsistency"
+        assert "from_tier=1" in issues[0].detail
+        assert "tier 3" in issues[0].detail
+
+    def test_no_tiers_no_issues(self) -> None:
+        """Empty tiers produces no issues."""
+        boundaries = (
+            BoundaryEntry(function="handler", transition="INGRESS", from_tier=1),
+        )
+        issues = check_tier_topology_consistency(boundaries, (), ())
+        assert issues == []
+
+    def test_boundary_without_tier_fields_ignored(self) -> None:
+        """Boundaries without from_tier/to_tier are silently skipped."""
+        tiers = (_tier("strict", 1),)
+        module_tiers: tuple[ModuleTierEntry, ...] = ()
+        boundaries = (
+            BoundaryEntry(function="handler", transition="INGRESS"),
+        )
+        issues = check_tier_topology_consistency(boundaries, tiers, module_tiers)
+        assert issues == []
+
+    def test_empty_inputs(self) -> None:
+        """No boundaries, tiers, or module_tiers produces no issues."""
+        issues = check_tier_topology_consistency((), (), ())
+        assert issues == []
+
+    def test_both_tiers_invalid(self) -> None:
+        """Both from_tier and to_tier invalid produces two issues."""
+        tiers = (_tier("strict", 1),)
+        module_tiers: tuple[ModuleTierEntry, ...] = ()
+        boundaries = (
+            BoundaryEntry(
+                function="handler",
+                transition="INGRESS",
+                from_tier=7,
+                to_tier=8,
+            ),
+        )
+        issues = check_tier_topology_consistency(boundaries, tiers, module_tiers)
+        assert len(issues) == 2
+        kinds = {i.kind for i in issues}
+        assert kinds == {"tier_topology_inconsistency"}

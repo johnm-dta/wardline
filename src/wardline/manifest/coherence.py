@@ -5,6 +5,12 @@ Detects multiple classes of inconsistency:
   matching boundary declaration in any overlay.
 - **Undeclared boundaries**: overlay boundary entries whose function name does
   not appear as a decorated function in code.
+- **Unmatched contracts**: bounded_context contract declarations that don't
+  match any code-level annotation.
+- **Stale contract bindings**: contract_bindings entries pointing to
+  non-existent functions.
+- **Tier-topology consistency**: tier assignments consistent with declared
+  data-flow topology.
 - **Governance anomalies**: tier distribution, tier downgrades, upgrade without
   evidence, agent-originated policy changes, expired exceptions, and first-scan
   perimeter detection.
@@ -23,6 +29,7 @@ if TYPE_CHECKING:
 
     from wardline.manifest.models import (
         BoundaryEntry,
+        ContractBinding,
         ExceptionEntry,
         ModuleTierEntry,
         TierEntry,
@@ -437,3 +444,200 @@ def check_first_scan_perimeter(
             )
         ]
     return []
+
+
+# ── Contract and topology coherence checks ────────────────────────
+
+
+def check_unmatched_contracts(
+    annotations: dict[tuple[str, str], list[WardlineAnnotation]],
+    boundaries: tuple[BoundaryEntry, ...],
+) -> list[CoherenceIssue]:
+    """Find contract declarations in bounded_contexts with no matching annotation.
+
+    For each boundary that declares a ``bounded_context`` with ``contracts``,
+    verify the boundary's function has a matching annotation in code.  A
+    contract declaration without a corresponding code-level annotation
+    indicates a specification/implementation mismatch.
+
+    Args:
+        annotations: Annotation map from ``discover_annotations``, keyed
+            by ``(file_path, qualname)``.
+        boundaries: All boundary entries from loaded overlays.
+
+    Returns:
+        One ``CoherenceIssue`` per unmatched contract (kind
+        ``"unmatched_contract"``).
+    """
+    annotated_functions = frozenset(qualname for _, qualname in annotations)
+    issues: list[CoherenceIssue] = []
+
+    for boundary in boundaries:
+        if boundary.bounded_context is None:
+            continue
+
+        contracts = boundary.bounded_context.get("contracts")
+        if not contracts:
+            continue
+
+        if boundary.function not in annotated_functions:
+            contract_names = ", ".join(
+                c["name"] for c in contracts if isinstance(c, dict) and "name" in c
+            )
+            issues.append(
+                CoherenceIssue(
+                    kind="unmatched_contract",
+                    function=boundary.function,
+                    file_path=boundary.overlay_path,
+                    detail=(
+                        f"Boundary '{boundary.function}' declares contracts "
+                        f"({contract_names}) in bounded_context but has no "
+                        f"matching wardline-decorated function in code."
+                    ),
+                )
+            )
+
+    return issues
+
+
+def check_stale_contract_bindings(
+    annotations: dict[tuple[str, str], list[WardlineAnnotation]],
+    contract_bindings: tuple[ContractBinding, ...],
+) -> list[CoherenceIssue]:
+    """Find contract_bindings entries pointing to non-existent functions.
+
+    For each ``ContractBinding``, verify every function listed in
+    ``functions`` exists as an annotated function in code.
+
+    Args:
+        annotations: Annotation map from ``discover_annotations``, keyed
+            by ``(file_path, qualname)``.
+        contract_bindings: All contract binding entries from loaded overlays.
+
+    Returns:
+        One ``CoherenceIssue`` per stale binding (kind
+        ``"stale_contract_binding"``).
+    """
+    annotated_functions = frozenset(qualname for _, qualname in annotations)
+    issues: list[CoherenceIssue] = []
+
+    for binding in contract_bindings:
+        for func_name in binding.functions:
+            if func_name not in annotated_functions:
+                issues.append(
+                    CoherenceIssue(
+                        kind="stale_contract_binding",
+                        function=func_name,
+                        file_path="",
+                        detail=(
+                            f"Contract binding '{binding.contract}' references "
+                            f"function '{func_name}' which has no wardline-"
+                            f"decorated function in code."
+                        ),
+                    )
+                )
+
+    return issues
+
+
+def check_tier_topology_consistency(
+    boundaries: tuple[BoundaryEntry, ...],
+    tiers: tuple[TierEntry, ...],
+    module_tiers: tuple[ModuleTierEntry, ...],
+) -> list[CoherenceIssue]:
+    """Verify tier assignments are consistent with declared data-flow topology.
+
+    For each boundary that declares ``from_tier`` and/or ``to_tier``,
+    verify the referenced tier numbers actually exist in the manifest's
+    tier definitions.  Also checks that ``from_tier`` corresponds to a
+    module tier assignment that feeds into the boundary's scope.
+
+    Args:
+        boundaries: All boundary entries from loaded overlays.
+        tiers: Tier definitions from the manifest.
+        module_tiers: Module-tier assignments.
+
+    Returns:
+        One ``CoherenceIssue`` per inconsistency (kind
+        ``"tier_topology_inconsistency"``).
+    """
+    if not tiers:
+        return []
+
+    # Build set of valid tier numbers from manifest
+    valid_tier_numbers = frozenset(t.tier for t in tiers)
+
+    # Build a map from tier id to tier number
+    tier_id_to_number: dict[str, int] = {t.id: t.tier for t in tiers}
+
+    # Build a map from module path to tier number
+    module_tier_map: dict[str, int] = {}
+    for mt in module_tiers:
+        tier_num = tier_id_to_number.get(mt.default_taint)
+        if tier_num is not None:
+            module_tier_map[mt.path] = tier_num
+
+    issues: list[CoherenceIssue] = []
+
+    for boundary in boundaries:
+        # Check from_tier references a valid tier number
+        if boundary.from_tier is not None and boundary.from_tier not in valid_tier_numbers:
+            issues.append(
+                CoherenceIssue(
+                    kind="tier_topology_inconsistency",
+                    function=boundary.function,
+                    file_path=boundary.overlay_path,
+                    detail=(
+                        f"Boundary '{boundary.function}' declares from_tier="
+                        f"{boundary.from_tier} which is not a valid tier "
+                        f"number in the manifest (valid: "
+                        f"{sorted(valid_tier_numbers)})."
+                    ),
+                )
+            )
+
+        # Check to_tier references a valid tier number
+        if boundary.to_tier is not None and boundary.to_tier not in valid_tier_numbers:
+            issues.append(
+                CoherenceIssue(
+                    kind="tier_topology_inconsistency",
+                    function=boundary.function,
+                    file_path=boundary.overlay_path,
+                    detail=(
+                        f"Boundary '{boundary.function}' declares to_tier="
+                        f"{boundary.to_tier} which is not a valid tier "
+                        f"number in the manifest (valid: "
+                        f"{sorted(valid_tier_numbers)})."
+                    ),
+                )
+            )
+
+        # Check that from_tier is consistent with the module tier feeding it.
+        # The overlay_scope tells us which module this boundary lives in.
+        if boundary.from_tier is not None and boundary.overlay_scope:
+            for mod_path, mod_tier in module_tier_map.items():
+                # Module path is relative (e.g. "src/wardline/scanner"),
+                # overlay_scope is absolute.  Check if scope ends with
+                # the module path.
+                if (
+                    boundary.overlay_scope.endswith("/" + mod_path)
+                    or boundary.overlay_scope.endswith("/" + mod_path + "/")
+                    or boundary.overlay_scope == mod_path
+                ):
+                    if mod_tier != boundary.from_tier:
+                        issues.append(
+                            CoherenceIssue(
+                                kind="tier_topology_inconsistency",
+                                function=boundary.function,
+                                file_path=boundary.overlay_path,
+                                detail=(
+                                    f"Boundary '{boundary.function}' declares "
+                                    f"from_tier={boundary.from_tier} but the "
+                                    f"containing module '{mod_path}' has "
+                                    f"tier {mod_tier}."
+                                ),
+                            )
+                        )
+                    break  # First match is sufficient
+
+    return issues

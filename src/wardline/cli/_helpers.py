@@ -13,7 +13,10 @@ if TYPE_CHECKING:
 COHERENCE_SEVERITY_MAP: dict[str, str] = {
     "orphaned_annotation": "WARNING",
     "undeclared_boundary": "WARNING",
+    "unmatched_contract": "WARNING",
+    "stale_contract_binding": "WARNING",
     "tier_distribution": "WARNING",
+    "tier_topology_inconsistency": "ERROR",
     "tier_downgrade": "ERROR",
     "tier_upgrade_without_evidence": "ERROR",
     "agent_originated_exception": "WARNING",
