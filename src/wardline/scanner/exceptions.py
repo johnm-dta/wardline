@@ -218,6 +218,20 @@ def apply_exceptions(
                 ))
                 continue
 
+            # Severity drift: severity_at_grant != current finding severity
+            if exc.severity_at_grant != str(finding.severity):
+                governance.append(_governance_finding(
+                    RuleId.GOVERNANCE_EXCEPTION_SEVERITY_DRIFT,
+                    finding.file_path,
+                    finding.line,
+                    f"Exception '{exc.id}' was granted at severity "
+                    f"{exc.severity_at_grant} but finding is now "
+                    f"{finding.severity}",
+                    qualname=finding.qualname,
+                    exception_id=exc.id,
+                    original_rule=exc.rule,
+                ))
+
             # Match! Suppress the finding
             suppressed = replace(
                 finding,

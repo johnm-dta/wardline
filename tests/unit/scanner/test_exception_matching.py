@@ -315,3 +315,69 @@ def test_qualname_none_not_matchable(tmp_path: Path) -> None:
     assert len(processed) == 1
     assert processed[0].severity == Severity.ERROR
     assert processed[0] is finding
+
+
+# ── Test 12: severity drift → GOVERNANCE-EXCEPTION-SEVERITY-DRIFT ────
+
+def test_severity_drift_emits_governance(tmp_path: Path) -> None:
+    """When severity_at_grant differs from finding severity, emit governance."""
+    source = "def my_func():\n    pass\n"
+    fpath = _write_source(tmp_path, "src/app.py", source)
+    fp = compute_ast_fingerprint(Path(fpath), "my_func", project_root=tmp_path)
+    assert fp is not None
+
+    # Finding has WARNING severity, but exception was granted at ERROR
+    finding = _make_finding(file_path=fpath, severity=Severity.WARNING)
+    exc = _make_exception(
+        location="src/app.py::my_func",
+        ast_fingerprint=fp,
+        severity_at_grant="ERROR",
+    )
+
+    processed, governance = apply_exceptions(
+        [finding], (exc,), tmp_path, now=NOW
+    )
+
+    # Finding is still suppressed
+    assert len(processed) == 1
+    assert processed[0].severity == Severity.SUPPRESS
+    assert processed[0].exception_id == "EXC-001"
+
+    # But a severity drift governance finding is emitted
+    drift = [
+        g for g in governance
+        if g.rule_id == RuleId.GOVERNANCE_EXCEPTION_SEVERITY_DRIFT
+    ]
+    assert len(drift) == 1
+    assert "granted at severity ERROR" in drift[0].message
+    assert "finding is now WARNING" in drift[0].message
+
+
+# ── Test 13: no severity drift → no governance finding ────────────────
+
+def test_no_severity_drift_no_governance(tmp_path: Path) -> None:
+    """When severity_at_grant matches finding severity, no drift governance."""
+    source = "def my_func():\n    pass\n"
+    fpath = _write_source(tmp_path, "src/app.py", source)
+    fp = compute_ast_fingerprint(Path(fpath), "my_func", project_root=tmp_path)
+    assert fp is not None
+
+    finding = _make_finding(file_path=fpath, severity=Severity.ERROR)
+    exc = _make_exception(
+        location="src/app.py::my_func",
+        ast_fingerprint=fp,
+        severity_at_grant="ERROR",
+    )
+
+    processed, governance = apply_exceptions(
+        [finding], (exc,), tmp_path, now=NOW
+    )
+
+    assert len(processed) == 1
+    assert processed[0].severity == Severity.SUPPRESS
+
+    drift = [
+        g for g in governance
+        if g.rule_id == RuleId.GOVERNANCE_EXCEPTION_SEVERITY_DRIFT
+    ]
+    assert len(drift) == 0
