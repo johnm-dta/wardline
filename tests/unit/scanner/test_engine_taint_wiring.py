@@ -73,7 +73,7 @@ class TestEngineCallsDiscovery:
             ) as mock_disc,
             patch(
                 "wardline.scanner.engine.assign_function_taints",
-                return_value=({}, {}),
+                return_value=({}, {}, {}),
             ),
         ):
             engine.scan()
@@ -103,7 +103,7 @@ class TestEngineCallsTaintAssignment:
             ),
             patch(
                 "wardline.scanner.engine.assign_function_taints",
-                return_value=({}, {}),
+                return_value=({}, {}, {}),
             ) as mock_taint,
         ):
             engine.scan()
@@ -137,7 +137,7 @@ class TestEngineSetsContext:
             ),
             patch(
                 "wardline.scanner.engine.assign_function_taints",
-                return_value=(taint_map, taint_sources),
+                return_value=(taint_map, taint_map, taint_sources),
             ),
         ):
             engine.scan()
@@ -203,7 +203,7 @@ class TestContextFilePathCorrect:
             ),
             patch(
                 "wardline.scanner.engine.assign_function_taints",
-                return_value=({}, {}),
+                return_value=({}, {}, {}),
             ),
         ):
             engine.scan()

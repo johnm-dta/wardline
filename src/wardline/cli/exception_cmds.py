@@ -648,7 +648,7 @@ def _compute_taints(
 
         try:
             annotations = discover_annotations(tree, file_path)
-            taint_map, taint_sources = assign_function_taints(
+            taint_map, _return_taint_map, taint_sources = assign_function_taints(
                 tree, file_path, annotations, manifest,
             )
         except Exception:

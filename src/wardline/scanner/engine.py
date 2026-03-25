@@ -180,21 +180,23 @@ class ScanEngine:
         # Pass 1: Discovery + taint assignment (fault-tolerant)
         try:
             annotations = discover_annotations(tree, file_path)
-            taint_map, taint_sources = assign_function_taints(
+            body_taint_map, return_taint_map, taint_sources = assign_function_taints(
                 tree, file_path, annotations, self._manifest
             )
+            taint_map = body_taint_map
         except Exception as exc:
             logger.warning("Discovery/taint failed for %s: %s", file_path, exc)
             result.errors.append(
                 f"Discovery/taint failed for {file_path}: {exc}"
             )
-            taint_map, taint_sources = {}, {}
+            taint_map, return_taint_map, taint_sources = {}, {}, {}
 
         # Pass 1.5: Level 3 call-graph taint (when analysis_level >= 3)
         taint_provenance: dict[str, TaintProvenance] | None = None
         if self._analysis_level >= 3 and taint_map:
             taint_map, taint_provenance = self._run_callgraph_taint(
-                tree, taint_map, taint_sources, file_path, result
+                tree, taint_map, taint_sources, file_path, result,
+                return_taint_map=return_taint_map,
             )
 
         # Pass 1.75: Level 2 variable-level taint (when analysis_level >= 2)
@@ -359,6 +361,8 @@ class ScanEngine:
         taint_sources: dict[str, TaintSource],
         file_path: Path,
         result: ScanResult,
+        *,
+        return_taint_map: dict[str, TaintState] | None = None,
     ) -> tuple[dict[str, TaintState], dict[str, TaintProvenance] | None]:
         """Run Level 3 call-graph taint propagation.
 
@@ -372,7 +376,8 @@ class ScanEngine:
                 tree, qualname_map
             )
             refined_map, provenance, l3_diagnostics = propagate_callgraph_taints(
-                edges, taint_map, taint_sources, resolved_counts, unresolved_counts
+                edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
+                return_taint_map=return_taint_map,
             )
             # Convert L3 diagnostics to Finding objects
             _diag_rule_map = {

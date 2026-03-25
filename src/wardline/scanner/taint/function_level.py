@@ -33,20 +33,35 @@ TaintSource = Literal["decorator", "module_default", "fallback"]
 logger = logging.getLogger(__name__)
 
 
-# ── Decorator → TaintState mapping ───────────────────────────────
-
-# Maps canonical decorator names to the taint state they assign.
-# Decorators not in this table (e.g., audit_critical) are flag-only
-# and do not influence taint assignment.
-DECORATOR_TAINT_MAP: dict[str, TaintState] = {
+# ── Decorator → TaintState mappings ──────────────────────────────
+#
+# Body evaluation taint: the taint state rules evaluate at INSIDE
+# the function body. Per spec §A.4.3, validators evaluate at the
+# INPUT tier (the data they receive), not the OUTPUT tier.
+BODY_EVAL_TAINT: dict[str, TaintState] = {
     "external_boundary": TaintState.EXTERNAL_RAW,
-    "validates_shape": TaintState.SHAPE_VALIDATED,
-    "validates_semantic": TaintState.PIPELINE,
-    "validates_external": TaintState.PIPELINE,
+    "validates_shape": TaintState.EXTERNAL_RAW,      # input: T4
+    "validates_semantic": TaintState.SHAPE_VALIDATED,  # input: T3
+    "validates_external": TaintState.EXTERNAL_RAW,     # input: T4
     "tier1_read": TaintState.AUDIT_TRAIL,
     "audit_writer": TaintState.AUDIT_TRAIL,
     "authoritative_construction": TaintState.AUDIT_TRAIL,
 }
+
+# Return value taint: the taint state assigned to the function's
+# return value for propagation to callers. This is the OUTPUT tier.
+RETURN_TAINT: dict[str, TaintState] = {
+    "external_boundary": TaintState.EXTERNAL_RAW,
+    "validates_shape": TaintState.SHAPE_VALIDATED,     # output: T3
+    "validates_semantic": TaintState.PIPELINE,          # output: T2
+    "validates_external": TaintState.PIPELINE,          # output: T2
+    "tier1_read": TaintState.AUDIT_TRAIL,
+    "audit_writer": TaintState.AUDIT_TRAIL,
+    "authoritative_construction": TaintState.AUDIT_TRAIL,
+}
+
+# Backward-compatible alias for explain_cmd.py and other importers.
+DECORATOR_TAINT_MAP = BODY_EVAL_TAINT
 
 
 # ── Public API ───────────────────────────────────────────────────
@@ -57,7 +72,7 @@ def assign_function_taints(
     file_path: Path | str,
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
     manifest: WardlineManifest | None = None,
-) -> tuple[dict[str, TaintState], dict[str, TaintSource]]:
+) -> tuple[dict[str, TaintState], dict[str, TaintState], dict[str, TaintSource]]:
     """Assign taint states to every function in a parsed module.
 
     Args:
@@ -69,23 +84,28 @@ def assign_function_taints(
             ``UNKNOWN_RAW``.
 
     Returns:
-        Tuple of (taint_map, taint_sources) where:
-        - taint_map: dict mapping qualname → ``TaintState``
+        Tuple of (body_taint_map, return_taint_map, taint_sources) where:
+        - body_taint_map: dict mapping qualname → ``TaintState`` for rule
+          evaluation inside function bodies (INPUT tier).
+        - return_taint_map: dict mapping qualname → ``TaintState`` for
+          return value taint propagation (OUTPUT tier).
         - taint_sources: dict mapping qualname → ``TaintSource``
           indicating which branch assigned the taint ("decorator",
           "module_default", or "fallback").
     """
     path_str = str(file_path)
     module_default = resolve_module_default(path_str, manifest)
-    taint_map: dict[str, TaintState] = {}
+    body_taint_map: dict[str, TaintState] = {}
+    return_taint_map: dict[str, TaintState] = {}
     taint_sources: dict[str, TaintSource] = {}
 
     _walk_and_assign(
-        tree, path_str, annotations, module_default, taint_map, taint_sources,
+        tree, path_str, annotations, module_default,
+        body_taint_map, return_taint_map, taint_sources,
         scope="",
     )
 
-    return taint_map, taint_sources
+    return body_taint_map, return_taint_map, taint_sources
 
 
 # ── Internal helpers ─────────────────────────────────────────────
@@ -142,20 +162,27 @@ def taint_from_annotations(
     file_path: str,
     qualname: str,
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
+    taint_map: dict[str, TaintState] | None = None,
 ) -> TaintState | None:
     """Resolve taint from decorator annotations.
 
     If multiple taint-assigning decorators are present, returns the
     first one found. (Multiple taint decorators on a single function
     is unusual and will be flagged by later rules.)
+
+    Args:
+        taint_map: Which decorator→taint mapping to use. Defaults to
+            ``BODY_EVAL_TAINT`` (input tier).
     """
+    if taint_map is None:
+        taint_map = BODY_EVAL_TAINT
     key = (file_path, qualname)
     anns = annotations.get(key)
     if not anns:
         return None
 
     for ann in anns:
-        taint = DECORATOR_TAINT_MAP.get(ann.canonical_name)
+        taint = taint_map.get(ann.canonical_name)
         if taint is not None:
             return taint
 
@@ -167,7 +194,8 @@ def _walk_and_assign(
     file_path: str,
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
     module_default: TaintState | None,
-    taint_map: dict[str, TaintState],
+    body_taint_map: dict[str, TaintState],
+    return_taint_map: dict[str, TaintState],
     taint_sources: dict[str, TaintSource],
     scope: str,
 ) -> None:
@@ -177,23 +205,36 @@ def _walk_and_assign(
             qualname = f"{scope}.{child.name}" if scope else child.name
 
             # Precedence: decorator > module_tiers > UNKNOWN_RAW
-            taint = taint_from_annotations(file_path, qualname, annotations)
-            if taint is not None:
+            body_taint = taint_from_annotations(
+                file_path, qualname, annotations, taint_map=BODY_EVAL_TAINT,
+            )
+            if body_taint is not None:
                 source: TaintSource = "decorator"
+                ret_taint = taint_from_annotations(
+                    file_path, qualname, annotations, taint_map=RETURN_TAINT,
+                )
+                # Fallback: if decorator is in BODY_EVAL_TAINT but not
+                # RETURN_TAINT, use body taint for return too.
+                if ret_taint is None:
+                    ret_taint = body_taint
             elif module_default is not None:
-                taint = module_default
+                body_taint = module_default
+                ret_taint = module_default
                 source = "module_default"
             else:
-                taint = TaintState.UNKNOWN_RAW
+                body_taint = TaintState.UNKNOWN_RAW
+                ret_taint = TaintState.UNKNOWN_RAW
                 source = "fallback"
 
-            taint_map[qualname] = taint
+            body_taint_map[qualname] = body_taint
+            return_taint_map[qualname] = ret_taint
             taint_sources[qualname] = source
 
             # Recurse into nested functions/methods
             _walk_and_assign(
                 child, file_path, annotations, module_default,
-                taint_map, taint_sources, scope=qualname,
+                body_taint_map, return_taint_map, taint_sources,
+                scope=qualname,
             )
         elif isinstance(child, ast.ClassDef):
             class_scope = (
@@ -201,10 +242,12 @@ def _walk_and_assign(
             )
             _walk_and_assign(
                 child, file_path, annotations, module_default,
-                taint_map, taint_sources, scope=class_scope,
+                body_taint_map, return_taint_map, taint_sources,
+                scope=class_scope,
             )
         else:
             _walk_and_assign(
                 child, file_path, annotations, module_default,
-                taint_map, taint_sources, scope=scope,
+                body_taint_map, return_taint_map, taint_sources,
+                scope=scope,
             )
