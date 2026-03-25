@@ -209,6 +209,7 @@ class SarifReport:
     active_exception_count: int = 0
     stale_exception_count: int = 0
     expedited_exception_ratio: float = 0.0
+    governance_profile: str = "lite"
     # WP 2.4: Governance metadata
     control_law: str = "normal"
     analysis_level: int = 1
@@ -267,6 +268,7 @@ class SarifReport:
                    else {}),
                 "wardline.conformanceGaps": [],
                 "wardline.controlLaw": self.control_law,
+                "wardline.governanceProfile": self.governance_profile,
                 "wardline.implementedRules": self._implemented_rules(),
                 **({"wardline.manifestHash": self.manifest_hash}
                    if self.manifest_hash is not None

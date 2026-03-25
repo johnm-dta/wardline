@@ -9,6 +9,11 @@
       "type": "string",
       "description": "Schema version identifier."
     },
+    "governance_profile": {
+      "type": "string",
+      "enum": ["lite", "assurance"],
+      "description": "Declared governance profile for this deployment."
+    },
     "metadata": {
       "type": "object",
       "description": "Organisational and governance metadata.",

@@ -228,6 +228,7 @@ def _build_manifest(data: dict[str, Any]) -> WardlineManifest:
     )
 
     return WardlineManifest(
+        governance_profile=data.get("governance_profile", "lite"),
         tiers=tiers,
         rules=rules,
         delegation=delegation,

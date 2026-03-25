@@ -232,6 +232,8 @@ def refresh(
     updated = 0
     stale = 0
     results: list[dict[str, Any]] = []
+    # File-level AST cache to avoid re-parsing the same file for each qualname
+    _ast_cache: dict[str, ast.Module | None] = {}
 
     for entry in data["exceptions"]:
         if not refresh_all and entry["id"] not in ids:
@@ -267,7 +269,15 @@ def refresh(
             continue
 
         file_path, qualname = location.split("::", 1)
-        new_fp = compute_ast_fingerprint(Path(file_path), qualname)
+        if file_path not in _ast_cache:
+            try:
+                source = Path(file_path).read_text(encoding="utf-8")
+                _ast_cache[file_path] = ast.parse(source, filename=file_path)
+            except (OSError, SyntaxError):
+                _ast_cache[file_path] = None
+        new_fp = compute_ast_fingerprint(
+            Path(file_path), qualname, tree=_ast_cache[file_path],
+        )
 
         if new_fp is None:
             stale += 1
@@ -514,6 +524,8 @@ def review(json_output: bool) -> None:
     recurring: list[str] = []
     total = 0
     expedited = 0
+    # File-level AST cache to avoid re-parsing the same file for each qualname
+    _review_ast_cache: dict[str, ast.Module | None] = {}
 
     for entry in data["exceptions"]:
         total += 1
@@ -524,7 +536,15 @@ def review(json_output: bool) -> None:
         location = entry["location"]
         if "::" in location:
             fp, qn = location.split("::", 1)
-            current = compute_ast_fingerprint(Path(fp), qn)
+            if fp not in _review_ast_cache:
+                try:
+                    source = Path(fp).read_text(encoding="utf-8")
+                    _review_ast_cache[fp] = ast.parse(source, filename=fp)
+                except (OSError, SyntaxError):
+                    _review_ast_cache[fp] = None
+            current = compute_ast_fingerprint(
+                Path(fp), qn, tree=_review_ast_cache[fp],
+            )
             stored = entry.get("ast_fingerprint", "")
             if not stored or current != stored:
                 stale.append(entry["id"])

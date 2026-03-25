@@ -1,0 +1,132 @@
+requirements:
+  - id: WL-FIT-CORE-001
+    title: Canonical taint-state vocabulary
+    statement: >
+      The implementation MUST use the canonical machine-facing taint-state tokens
+      `AUDIT_TRAIL`, `PIPELINE`, `SHAPE_VALIDATED`, `EXTERNAL_RAW`,
+      `UNKNOWN_RAW`, `UNKNOWN_SHAPE_VALIDATED`, `UNKNOWN_SEM_VALIDATED`,
+      and `MIXED_RAW` consistently across code, schemas, and SARIF output.
+    normative_sources:
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.1 Trust classification and validation status"
+    verification:
+      method: static_review_and_unit_tests
+      target_paths:
+        - src/wardline/core/taints.py
+        - src/wardline/scanner/sarif.py
+        - tests/unit/core/test_taints.py
+        - tests/unit/scanner/test_sarif.py
+    fitness_dimensions: [correctness, interoperability]
+    notes: A mismatch here breaks cross-tool conformance and SARIF consumers.
+
+  - id: WL-FIT-CORE-002
+    title: Taint join algebra
+    statement: >
+      The taint join operation MUST be commutative, associative, idempotent, and
+      treat `MIXED_RAW` as the absorbing element.
+    normative_sources:
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.1 Trust classification and validation status"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/core/taints.py
+        - tests/unit/core/test_taints.py
+    fitness_dimensions: [correctness]
+    notes: Fixed-point taint propagation depends on these algebraic guarantees.
+
+  - id: WL-FIT-CORE-003
+    title: Known-plus-unknown merges collapse conservatively
+    statement: >
+      Joining any known classified state with any UNKNOWN state MUST produce
+      `MIXED_RAW`, not a known classified result.
+    normative_sources:
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.1 Trust classification and validation status"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/core/taints.py
+        - tests/unit/core/test_taints.py
+    fitness_dimensions: [correctness, safety]
+    notes: This is a core conservative-safety rule in the spec.
+
+  - id: WL-FIT-CORE-004
+    title: Tier-to-taint mapping is explicit
+    statement: >
+      The implementation MUST expose an unambiguous mapping from the four
+      authority tiers to the corresponding effective taint states used by the
+      scanner and severity logic.
+    normative_sources:
+      - file: docs/spec/wardline-01-04-authority-tier-model.md
+        section: "4.1 Four tiers"
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.1 Trust classification and validation status"
+    verification:
+      method: static_review_and_unit_tests
+      target_paths:
+        - src/wardline/core/tiers.py
+        - src/wardline/core/taints.py
+        - tests/unit/core/test_taint_to_tier.py
+    fitness_dimensions: [correctness]
+    notes: This is the bridge between policy semantics and enforcement mechanics.
+
+  - id: WL-FIT-CORE-005
+    title: Severity matrix is total for implemented rule-state cells
+    statement: >
+      The implementation MUST define severity and exceptionability outcomes for
+      every taint-state cell it claims to enforce for the implemented rules.
+    normative_sources:
+      - file: docs/spec/wardline-01-07-pattern-rules.md
+        section: "7. Pattern rules"
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.2 Conformance criteria"
+    verification:
+      method: static_review_and_unit_tests
+      target_paths:
+        - src/wardline/core/matrix.py
+        - src/wardline/core/severity.py
+        - tests/unit/core/test_matrix.py
+        - tests/unit/scanner/test_matrix_cells.py
+    fitness_dimensions: [correctness, conformance]
+    notes: Use the project’s implemented rule set rather than the whole theoretical framework.
+
+  - id: WL-FIT-CORE-006
+    title: Transition semantics prevent illegal skip-promotions
+    statement: >
+      Any project configuration or boundary declaration that attempts a direct
+      Tier 4 to Tier 1 or Tier 3 to Tier 1 promotion MUST be rejected.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "13.1.2 Overlay schema"
+    verification:
+      method: schema_and_loader_tests
+      target_paths:
+        - src/wardline/manifest/models.py
+        - src/wardline/manifest/loader.py
+        - src/wardline/manifest/schemas/overlay.schema.json
+        - tests/unit/manifest/test_loader.py
+        - tests/unit/manifest/test_schemas.py
+    fitness_dimensions: [safety, conformance]
+    notes: This is a high-signal policy invariant and should be a hard failure.
+
+  - id: WL-FIT-CORE-007
+    title: Restoration claims are evidence-bounded
+    statement: >
+      Restoration boundaries MUST not claim a restored tier that exceeds the
+      evidence declared for structural, semantic, integrity, and institutional
+      provenance.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "13.1.2 Overlay schema"
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4 Annotation vocabulary"
+    verification:
+      method: manifest_and_rule_tests
+      target_paths:
+        - src/wardline/manifest/loader.py
+        - src/wardline/scanner/rules/py_wl_007.py
+        - tests/unit/manifest/test_coherence.py
+        - tests/unit/scanner/test_py_wl_007.py
+    fitness_dimensions: [safety, correctness]
+    notes: Treat this as both a manifest contract and a scanner behavior requirement.

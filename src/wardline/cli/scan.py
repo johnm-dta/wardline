@@ -543,6 +543,7 @@ def scan(
         active_exception_count=active_exception_count,
         stale_exception_count=stale_exception_count,
         expedited_exception_ratio=expedited_exception_ratio,
+        governance_profile=manifest_model.governance_profile,
         analysis_level=analysis_level,
         manifest_hash=manifest_hash,
         scan_timestamp=_utc_timestamp(),

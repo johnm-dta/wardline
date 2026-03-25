@@ -1,0 +1,150 @@
+requirements:
+  - id: WL-FIT-MAN-001
+    title: Root manifest is schema-validated before use
+    statement: >
+      The root `wardline.yaml` MUST be validated against the Wardline JSON Schema
+      before any consuming tool relies on its contents.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "13.1.1 Root manifest schema"
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.2 Conformance criteria"
+    verification:
+      method: schema_and_cli_tests
+      target_paths:
+        - src/wardline/manifest/loader.py
+        - src/wardline/manifest/schemas/wardline.schema.json
+        - tests/unit/manifest/test_schemas.py
+        - tests/unit/cli/test_coherence_cmd.py
+    fitness_dimensions: [governance, conformance]
+    notes: Malformed policy input must be a hard error, not best-effort parsing.
+
+  - id: WL-FIT-MAN-002
+    title: Overlay location and scope are coherent
+    statement: >
+      Every overlay MUST declare `overlay_for`, and the implementation MUST reject
+      overlays whose file location is outside the path they claim to govern.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "13.1.2 Overlay schema"
+    verification:
+      method: loader_and_coherence_tests
+      target_paths:
+        - src/wardline/manifest/discovery.py
+        - src/wardline/manifest/coherence.py
+        - tests/unit/manifest/test_coherence.py
+        - tests/unit/manifest/test_discovery.py
+    fitness_dimensions: [governance, correctness]
+    notes: This blocks path-based policy confusion.
+
+  - id: WL-FIT-MAN-003
+    title: Overlays may narrow but must not widen
+    statement: >
+      Overlay configuration MUST be narrowing-only: it may tighten severity,
+      tighten exceptionability, or add boundaries, but it MUST NOT relax tier
+      assignments or weaken enforcement relative to the governing manifest.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "Merge semantics"
+    verification:
+      method: merge_and_loader_tests
+      target_paths:
+        - src/wardline/manifest/merge.py
+        - src/wardline/manifest/exceptions.py
+        - tests/unit/manifest/test_merge.py
+        - tests/unit/manifest/test_exceptions.py
+    fitness_dimensions: [governance, safety]
+    notes: This should produce a hard error, not an advisory warning.
+
+  - id: WL-FIT-MAN-004
+    title: Tier 2 boundaries declare validation scope
+    statement: >
+      Any boundary claiming Tier 2 semantics, including restoration boundaries
+      with semantic evidence, MUST declare `validation_scope`.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "Validation-scope declarations"
+    verification:
+      method: schema_and_loader_tests
+      target_paths:
+        - src/wardline/manifest/models.py
+        - src/wardline/manifest/loader.py
+        - src/wardline/manifest/schemas/overlay.schema.json
+        - tests/unit/manifest/test_models.py
+        - tests/unit/manifest/test_schemas.py
+    fitness_dimensions: [governance, conformance]
+    notes: The spec uses `validation_scope`; older names should be treated as stale.
+
+  - id: WL-FIT-MAN-005
+    title: Contract identity is stable and name-based
+    statement: >
+      Validation contracts MUST be identified by stable contract name, while
+      function-level bindings are tracked separately as implementation mappings.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "Contract bindings"
+    verification:
+      method: model_and_loader_review
+      target_paths:
+        - src/wardline/manifest/models.py
+        - src/wardline/manifest/loader.py
+        - tests/unit/manifest/test_models.py
+    fitness_dimensions: [governance, maintainability]
+    notes: This supports refactor-safe governance history.
+
+  - id: WL-FIT-MAN-006
+    title: Optional-by-contract defaults are governed
+    statement: >
+      Code-level `schema_default()` usage MUST correspond to overlay-level
+      `optional_fields` declarations that supply the approved default and
+      governance rationale.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "Optional-field declarations"
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4 Annotation vocabulary"
+    verification:
+      method: scanner_rule_tests_and_fixtures
+      target_paths:
+        - src/wardline/decorators/schema.py
+        - src/wardline/scanner/rules/py_wl_001.py
+        - tests/unit/decorators/test_schema.py
+        - tests/unit/scanner/test_py_wl_001.py
+    fitness_dimensions: [governance, safety]
+    notes: This is where policy-backed defaults become assessable instead of ad hoc.
+
+  - id: WL-FIT-MAN-007
+    title: Ratification age is enforceable
+    statement: >
+      Manifest metadata MUST include ratification fields sufficient for the tool
+      to determine whether the policy is overdue for review and emit a
+      governance-level finding when the review interval is exceeded.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "13.1.1 Root manifest schema"
+    verification:
+      method: model_review_and_cli_tests
+      target_paths:
+        - src/wardline/manifest/models.py
+        - src/wardline/cli/manifest_cmds.py
+        - tests/unit/manifest/test_models.py
+    fitness_dimensions: [governance]
+    notes: A manifest review interval is only meaningful if the tool can enforce it.
+
+  - id: WL-FIT-MAN-008
+    title: Governance profile is explicit
+    statement: >
+      A deployment-facing manifest MUST declare whether it operates under the
+      `lite` or `assurance` governance profile, and SARIF output SHOULD carry the
+      same declared profile for assessors.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.2 Governance profiles"
+    verification:
+      method: manifest_schema_review_and_sarif_review
+      target_paths:
+        - src/wardline/manifest/schemas/wardline.schema.json
+        - src/wardline/scanner/sarif.py
+        - tests/unit/scanner/test_sarif.py
+    fitness_dimensions: [governance, conformance]
+    notes: This is a useful fitness discriminator even if the repo is not fully wired for it yet.

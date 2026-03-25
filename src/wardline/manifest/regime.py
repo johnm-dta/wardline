@@ -55,7 +55,6 @@ class FingerprintMetrics:
 class ManifestMetrics:
     """Manifest-level governance metadata."""
 
-    # TODO: read from manifest when field exists
     governance_profile: str = "lite"
     schema_version: str = ""
     analysis_level: int = 1
@@ -205,11 +204,8 @@ def collect_manifest_metrics(manifest_path: Path) -> ManifestMetrics:
         except (ValueError, TypeError):
             pass
 
-    # TODO: read from manifest when field exists
-    governance_profile = "lite"
-
     return ManifestMetrics(
-        governance_profile=governance_profile,
+        governance_profile=manifest.governance_profile,
         schema_version="0.1",
         analysis_level=1,
         ratification_date=ratification_date,

@@ -42,6 +42,7 @@ def compute_ast_fingerprint(
     qualname: str,
     *,
     project_root: Path | None = None,
+    tree: ast.Module | None = None,
 ) -> str | None:
     """Compute 16-char hex fingerprint for a function's AST structure.
 
@@ -53,13 +54,19 @@ def compute_ast_fingerprint(
     engine ``apply_exceptions`` (which works with absolute paths) produce
     identical fingerprints for the same function.
 
+    When *tree* is provided, the pre-parsed AST is used directly instead
+    of re-reading and re-parsing the file.  Callers that need fingerprints
+    for multiple qualnames in the same file should parse once and pass the
+    tree to avoid O(n) re-parses.
+
     Returns None if the file can't be parsed or *qualname* is not found.
     """
-    try:
-        source = file_path.read_text(encoding="utf-8")
-        tree = ast.parse(source, filename=str(file_path))
-    except (OSError, SyntaxError):
-        return None
+    if tree is None:
+        try:
+            source = file_path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(file_path))
+        except (OSError, SyntaxError):
+            return None
 
     func_node = find_function_node(tree, qualname)
     if func_node is None:

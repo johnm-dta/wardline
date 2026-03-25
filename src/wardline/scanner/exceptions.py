@@ -7,6 +7,7 @@ findings for stale, unknown-provenance, recurring, and no-expiry exceptions.
 
 from __future__ import annotations
 
+import ast
 import datetime
 import logging
 from dataclasses import replace
@@ -65,6 +66,8 @@ def apply_exceptions(
 
     # Cache for parsed AST fingerprints: (file_path, qualname) -> fingerprint
     _fp_cache: dict[tuple[str, str], str | None] = {}
+    # Cache for parsed ASTs: absolute file_path -> parsed tree (or None on failure)
+    _ast_cache: dict[str, ast.Module | None] = {}
 
     processed: list[Finding] = []
     governance: list[Finding] = []
@@ -157,12 +160,24 @@ def apply_exceptions(
             continue
 
         # Compute fingerprint once per (file, qualname) — use absolute path
-        # for file reading, project_root for consistent hash with CLI
+        # for file reading, project_root for consistent hash with CLI.
+        # The AST is cached per file to avoid O(n) re-parses when a file
+        # has multiple exception-matched functions.
         fp_key = (rel_path, finding.qualname)
         if fp_key not in _fp_cache:
+            abs_path = finding.file_path
+            if abs_path not in _ast_cache:
+                try:
+                    source = Path(abs_path).read_text(encoding="utf-8")
+                    _ast_cache[abs_path] = ast.parse(
+                        source, filename=abs_path,
+                    )
+                except (OSError, SyntaxError):
+                    _ast_cache[abs_path] = None
             _fp_cache[fp_key] = compute_ast_fingerprint(
-                Path(finding.file_path), finding.qualname,
+                Path(abs_path), finding.qualname,
                 project_root=project_root,
+                tree=_ast_cache[abs_path],
             )
         current_fp = _fp_cache[fp_key]
 

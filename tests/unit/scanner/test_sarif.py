@@ -284,10 +284,21 @@ class TestSarifPropertyBags:
         report = SarifReport(findings=[])
         props = report.to_dict()["runs"][0]["properties"]
         assert "wardline.propertyBagVersion" in props
+        assert "wardline.governanceProfile" in props
         assert "wardline.implementedRules" in props
         assert "wardline.conformanceGaps" in props
         assert "wardline.unknownRawFunctionCount" in props
         assert "wardline.unresolvedDecoratorCount" in props
+
+    def test_governance_profile_defaults_to_lite(self) -> None:
+        report = SarifReport(findings=[])
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.governanceProfile"] == "lite"
+
+    def test_governance_profile_wired(self) -> None:
+        report = SarifReport(findings=[], governance_profile="assurance")
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.governanceProfile"] == "assurance"
 
     def test_unknown_raw_count_defaults_to_zero(self) -> None:
         report = SarifReport(findings=[])

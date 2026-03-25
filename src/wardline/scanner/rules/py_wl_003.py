@@ -13,6 +13,7 @@ structural gate:
 from __future__ import annotations
 
 import ast
+import logging
 from typing import TYPE_CHECKING
 
 from wardline.core import matrix
@@ -20,6 +21,8 @@ from wardline.core.severity import RuleId
 from wardline.manifest.scope import path_within_scope
 from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from wardline.core.taints import TaintState
@@ -58,6 +61,11 @@ class RulePyWl003(RuleBase):
     ) -> None:
         """Walk the function body looking for PY-WL-003 patterns."""
         if self._is_structural_validation_boundary():
+            taint = self._get_function_taint(self._current_qualname)
+            logger.debug(
+                "PY-WL-003 suppressed for %s (taint=%s)",
+                self._current_qualname, taint,
+            )
             return
         taint = self._get_function_taint(self._current_qualname)
         for child in walk_skip_nested_defs(node):

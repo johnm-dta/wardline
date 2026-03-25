@@ -1,0 +1,156 @@
+requirements:
+  - id: WL-FIT-SCAN-001
+    title: Implemented rule set is declared
+    statement: >
+      The scanner MUST declare which canonical rule IDs it implements and must
+      not advertise pseudo-rule or governance-diagnostic IDs as normative rule
+      coverage.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.1 Enforcement profiles"
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.6 Regime composition matrix"
+    verification:
+      method: static_review_and_unit_tests
+      target_paths:
+        - src/wardline/scanner/rules/__init__.py
+        - src/wardline/scanner/sarif.py
+        - tests/unit/scanner/test_rules.py
+        - tests/unit/scanner/test_registry_sync.py
+    fitness_dimensions: [conformance, interoperability]
+    notes: A clear rule inventory is required for honest conformance claims.
+
+  - id: WL-FIT-SCAN-002
+    title: Pattern and structural rules are enforced by tests
+    statement: >
+      The Python scanner MUST have test coverage for each implemented
+      rule-specific behavior it claims as authoritative, including delegated
+      validation and validation-ordering behaviors where implemented.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.2 Conformance criteria"
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4 Annotation vocabulary"
+    verification:
+      method: unit_tests_and_corpus_review
+      target_paths:
+        - src/wardline/scanner/rules
+        - tests/unit/scanner
+        - corpus/specimens
+    fitness_dimensions: [correctness, conformance]
+    notes: Use the project’s declared rule set, not a theoretical future rule set.
+
+  - id: WL-FIT-SCAN-003
+    title: Two-hop taint and delegated validation are assessable
+    statement: >
+      If the scanner claims support for taint-flow tracking or delegated WL-007
+      satisfaction, it MUST test direct flows, two-hop intermediary flows, and
+      convergence behavior explicitly.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.2 Conformance criteria"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/scanner/taint
+        - tests/unit/scanner/test_taint.py
+        - tests/unit/scanner/test_engine_l3.py
+        - tests/unit/scanner/test_delegated_rejection.py
+        - tests/unit/scanner/test_rejection_path_convergence.py
+    fitness_dimensions: [correctness, conformance]
+    notes: This is one of the most important fitness checks for higher-assurance scanning.
+
+  - id: WL-FIT-SCAN-004
+    title: SARIF output is deterministic and Wardline-shaped
+    statement: >
+      SARIF output MUST be valid SARIF v2.1.0, deterministic for equivalent input,
+      and include the Wardline-specific result properties required by the spec.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.2 Conformance criteria"
+      - file: docs/spec/wardline-01-10-verification-properties.md
+        section: "10. Verification properties"
+    verification:
+      method: unit_tests_and_fixture_validation
+      target_paths:
+        - src/wardline/scanner/sarif.py
+        - tests/unit/scanner/test_sarif.py
+        - src/wardline/manifest/schemas/fingerprint.schema.json
+    fitness_dimensions: [interoperability, conformance]
+    notes: Determinism matters for baseline comparison and audit repeatability.
+
+  - id: WL-FIT-SCAN-005
+    title: Tool failures are surfaced without losing scan output
+    statement: >
+      Internal rule or engine failures MUST be reported as tool-level findings or
+      equivalent diagnosable output, and the scan should continue when safe to do so.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.1 Enforcement profiles"
+    verification:
+      method: engine_and_cli_tests
+      target_paths:
+        - src/wardline/scanner/engine.py
+        - src/wardline/scanner/exceptions.py
+        - tests/unit/scanner/test_engine.py
+    fitness_dimensions: [resilience, assessability]
+    notes: A crashed rule with silent data loss is a poor fitness outcome even if the codebase passes lint.
+
+  - id: WL-FIT-SCAN-006
+    title: Corpus exists for claimed coverage
+    statement: >
+      A golden corpus of labeled specimens MUST exist for the scanner behaviors it
+      claims, and corpus verification must be runnable from the repo.
+    normative_sources:
+      - file: docs/spec/wardline-01-10-verification-properties.md
+        section: "10. Verification properties"
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.2 Conformance criteria"
+    verification:
+      method: corpus_and_cli_tests
+      target_paths:
+        - corpus/specimens
+        - src/wardline/cli/corpus_cmds.py
+        - tests/unit/scanner/test_corpus_runner.py
+        - tests/unit/corpus/test_corpus_skeleton.py
+    fitness_dimensions: [conformance, maintainability]
+    notes: Coverage claims without a maintained corpus are weak evidence.
+
+  - id: WL-FIT-SCAN-007
+    title: Self-hosting is measurable
+    statement: >
+      The project MUST provide a repeatable way to assess whether the scanner can
+      scan its own source and report the outcome as a fitness signal.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.2 Conformance criteria"
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.6 Regime composition matrix"
+    verification:
+      method: cli_review_and_tests
+      target_paths:
+        - src/wardline/cli/scan.py
+        - tests/unit/test_wp04_hardening.py
+        - docs/audits
+    fitness_dimensions: [conformance, fitness_signal]
+    notes: This can be satisfied by tests, CI wiring, or a documented audit procedure.
+
+  - id: WL-FIT-SCAN-008
+    title: Regime composition is documented honestly
+    statement: >
+      The Python implementation MUST document which capabilities belong to the
+      scanner, which belong to governance tooling, and which are advisory rather
+      than authoritative.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.4 Enforcement regimes"
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.6 Regime composition matrix"
+    verification:
+      method: documentation_review
+      target_paths:
+        - docs/spec/wardline-02-A-python-binding.md
+        - src/wardline/cli
+        - src/wardline/scanner
+    fitness_dimensions: [conformance, governance]
+    notes: This prevents overstating what the current repo can actually guarantee.

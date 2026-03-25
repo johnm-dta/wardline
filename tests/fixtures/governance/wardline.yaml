@@ -1,6 +1,7 @@
 # schema_version: 0.1
 # Frozen governance test fixture — minimal but internally consistent.
 $id: "https://wardline.dev/schemas/0.1/wardline"
+governance_profile: "lite"
 
 metadata:
   organisation: "wardline-test"

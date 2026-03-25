@@ -68,6 +68,10 @@ class TestWardlineSchema:
         assert "MIXED_RAW" in taint_enum
         assert len(taint_enum) == 8
 
+    def test_governance_profile_enum(self, schema: dict[str, object]) -> None:
+        props = schema["properties"]  # type: ignore[index]
+        assert set(props["governance_profile"]["enum"]) == {"lite", "assurance"}
+
     def test_tier_range(self, schema: dict[str, object]) -> None:
         props = schema["properties"]  # type: ignore[index]
         tier_props = props["tiers"]["items"]["properties"]["tier"]
@@ -76,6 +80,7 @@ class TestWardlineSchema:
 
     def test_valid_manifest_accepted(self, schema: dict[str, object]) -> None:
         doc = {
+            "governance_profile": "lite",
             "metadata": {"organisation": "Test"},
             "tiers": [{"id": "db", "tier": 1}],
             "module_tiers": [
@@ -83,6 +88,13 @@ class TestWardlineSchema:
             ],
         }
         jsonschema.validate(doc, schema)
+
+    def test_invalid_governance_profile_rejected(
+        self, schema: dict[str, object]
+    ) -> None:
+        doc = {"governance_profile": "custom"}
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(doc, schema)
 
     def test_invalid_taint_rejected(self, schema: dict[str, object]) -> None:
         doc = {

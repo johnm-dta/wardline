@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import re
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 from wardline.scanner.fingerprint import compute_ast_fingerprint
 
@@ -64,3 +66,66 @@ class TestComputeAstFingerprint:
         f = tmp_path / "bad.py"
         f.write_text("def broken(\n", encoding="utf-8")
         assert compute_ast_fingerprint(f, "broken") is None
+
+
+class TestPreParsedTreeCache:
+    """compute_ast_fingerprint with pre-parsed tree avoids re-parsing."""
+
+    def test_tree_param_produces_same_result(self, tmp_path: Path) -> None:
+        """Passing a pre-parsed tree gives the same fingerprint as auto-parsing."""
+        f = tmp_path / "mod.py"
+        source = "def foo():\n    return 1\ndef bar():\n    return 2\n"
+        f.write_text(source, encoding="utf-8")
+
+        fp_auto = compute_ast_fingerprint(f, "foo")
+        tree = ast.parse(source, filename=str(f))
+        fp_cached = compute_ast_fingerprint(f, "foo", tree=tree)
+
+        assert fp_auto == fp_cached
+
+    def test_multiple_qualnames_same_tree(self, tmp_path: Path) -> None:
+        """Multiple qualnames from one tree all produce valid fingerprints."""
+        f = tmp_path / "mod.py"
+        source = "def foo():\n    return 1\ndef bar():\n    return 2\n"
+        f.write_text(source, encoding="utf-8")
+
+        tree = ast.parse(source, filename=str(f))
+        fp_foo = compute_ast_fingerprint(f, "foo", tree=tree)
+        fp_bar = compute_ast_fingerprint(f, "bar", tree=tree)
+
+        assert fp_foo is not None
+        assert fp_bar is not None
+        assert fp_foo != fp_bar
+
+    def test_tree_param_skips_file_read(self, tmp_path: Path) -> None:
+        """When tree is provided, the file is never read."""
+        f = tmp_path / "mod.py"
+        source = "def foo():\n    return 1\n"
+        f.write_text(source, encoding="utf-8")
+        tree = ast.parse(source, filename=str(f))
+
+        # Delete the file — if the function tries to read, it'll fail
+        f.unlink()
+
+        fp = compute_ast_fingerprint(f, "foo", tree=tree)
+        assert fp is not None
+        assert len(fp) == 16
+
+    def test_none_tree_falls_back_to_file(self, tmp_path: Path) -> None:
+        """tree=None behaves identically to no tree param."""
+        f = tmp_path / "mod.py"
+        f.write_text("def foo():\n    return 1\n", encoding="utf-8")
+
+        fp_default = compute_ast_fingerprint(f, "foo")
+        fp_none = compute_ast_fingerprint(f, "foo", tree=None)
+
+        assert fp_default == fp_none
+
+    def test_missing_qualname_with_tree(self, tmp_path: Path) -> None:
+        """Unknown qualname returns None even with pre-parsed tree."""
+        f = tmp_path / "mod.py"
+        source = "def foo():\n    pass\n"
+        f.write_text(source, encoding="utf-8")
+        tree = ast.parse(source, filename=str(f))
+
+        assert compute_ast_fingerprint(f, "no_such", tree=tree) is None

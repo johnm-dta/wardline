@@ -177,6 +177,7 @@ class ContractBinding:
 class WardlineManifest:
     """Root manifest — trust topology and governance policy."""
 
+    governance_profile: str = "lite"
     tiers: tuple[TierEntry, ...] = ()
     rules: RulesConfig = field(default_factory=RulesConfig)
     delegation: DelegationConfig = field(default_factory=DelegationConfig)

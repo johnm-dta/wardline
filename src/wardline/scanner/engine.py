@@ -304,6 +304,18 @@ class ScanEngine:
             annotations = {}
             body_taint_map, return_taint_map, taint_sources = {}, {}, {}
 
+        # Taint map hit rate: warn if every function in the file fell back
+        # to UNKNOWN_RAW (no decorator, no module_tiers match).  This catches
+        # misconfigured manifests that silently degrade rule accuracy.
+        if taint_sources and all(
+            src == "fallback" for src in taint_sources.values()
+        ):
+            logger.warning(
+                "Taint map hit rate 0%% for %s "
+                "(%d functions, all fallback to UNKNOWN_RAW)",
+                file_path, len(taint_sources),
+            )
+
         # Pass 1.5: Level 3 call-graph taint (when analysis_level >= 3)
         # L3 refines body_taint_map using callgraph analysis. The refined map
         # is still a body-evaluation map (what rules see inside function bodies),

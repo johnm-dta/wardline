@@ -1,0 +1,140 @@
+requirements:
+  - id: WL-FIT-PY-001
+    title: Core decorator vocabulary is exported
+    statement: >
+      The Python decorator package MUST export the core binding vocabulary needed
+      for authority tiers, validation boundaries, governance-sensitive behaviors,
+      and supplementary contracts that the project claims to support.
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4 Annotation vocabulary"
+    verification:
+      method: static_review_and_unit_tests
+      target_paths:
+        - src/wardline/decorators/__init__.py
+        - tests/unit/decorators/test_decorators.py
+    fitness_dimensions: [correctness, interoperability]
+    notes: This is the public contract surface for the binding.
+
+  - id: WL-FIT-PY-002
+    title: Restoration boundary decorator exists and carries metadata
+    statement: >
+      The Python binding MUST provide `@restoration_boundary(...)` with metadata
+      fields that can represent restored tier and evidence categories required by
+      the spec.
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4 Annotation vocabulary"
+    verification:
+      method: static_review_and_unit_tests
+      target_paths:
+        - src/wardline/decorators
+        - tests/unit/decorators
+        - tests/unit/scanner/test_py_wl_007.py
+    fitness_dimensions: [correctness, conformance]
+    notes: This is currently a particularly high-value fitness check because the spec treats it as part of the core interface contract.
+
+  - id: WL-FIT-PY-003
+    title: Generic trust-boundary decorators support parameterized transitions
+    statement: >
+      The Python binding MUST provide parameterized generic boundary decorators
+      for non-standard tier transitions, including the declared `from_tier` and
+      `to_tier` semantics from the binding spec.
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4 Annotation vocabulary"
+    verification:
+      method: decorator_tests
+      target_paths:
+        - src/wardline/decorators/boundaries.py
+        - tests/unit/decorators/test_boundaries.py
+    fitness_dimensions: [correctness, interoperability]
+    notes: The binding exposes both alias decorators and the generic mechanism.
+
+  - id: WL-FIT-PY-004
+    title: Decorator metadata survives wrapper stacks
+    statement: >
+      Scanner and runtime helpers MUST be able to resolve Wardline metadata
+      through `__wrapped__` chains so that third-party decorators do not hide
+      Wardline annotations.
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4.3 Non-obvious design rationale"
+    verification:
+      method: runtime_and_scanner_tests
+      target_paths:
+        - src/wardline/runtime/base.py
+        - src/wardline/scanner/context.py
+        - tests/unit/runtime/test_base.py
+        - tests/unit/scanner/test_context.py
+    fitness_dimensions: [correctness, robustness]
+    notes: This is a binding-specific interop requirement, not just a convenience.
+
+  - id: WL-FIT-PY-005
+    title: Contradictory combinations are diagnosable
+    statement: >
+      The binding MUST detect and report contradictory or suspicious decorator
+      combinations that it explicitly defines as invalid or questionable.
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4.3 Non-obvious design rationale"
+    verification:
+      method: rule_tests
+      target_paths:
+        - src/wardline/scanner/rules/scn_021.py
+        - tests/unit/scanner/test_scn_021.py
+    fitness_dimensions: [correctness, ergonomics]
+    notes: SCN-021 is binding-specific but critical for authoring safety.
+
+  - id: WL-FIT-PY-006
+    title: Validation ordering is enforced for semantic validators
+    statement: >
+      The binding MUST reject semantic validation paths that do not establish
+      prior structural validation when it claims support for validation-ordering
+      enforcement.
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4 Annotation vocabulary"
+    verification:
+      method: rule_tests
+      target_paths:
+        - src/wardline/scanner/rules/py_wl_009.py
+        - tests/unit/scanner/test_py_wl_009.py
+    fitness_dimensions: [correctness, conformance]
+    notes: This is one of the clearest spec-to-test requirements in the repo.
+
+  - id: WL-FIT-PY-007
+    title: Runtime support complements static enforcement
+    statement: >
+      The binding SHOULD provide runtime structural support for high-assurance
+      paths, including descriptor- or protocol-based enforcement where the
+      project claims those capabilities.
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.5 Type system and runtime enforcement"
+    verification:
+      method: runtime_tests
+      target_paths:
+        - src/wardline/runtime
+        - tests/unit/runtime
+    fitness_dimensions: [defense_in_depth, robustness]
+    notes: This is a fitness enhancer even where the framework treats the section as non-normative.
+
+  - id: WL-FIT-PY-008
+    title: Binding extras beyond Part I are clearly marked
+    statement: >
+      Python-specific rule splits, diagnostics, and supplementary rule IDs MUST
+      be distinguishable from the framework’s language-independent core rules.
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4 Annotation vocabulary"
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.1 Enforcement profiles"
+    verification:
+      method: rule_registry_and_sarif_review
+      target_paths:
+        - src/wardline/scanner/rules/__init__.py
+        - src/wardline/scanner/sarif.py
+        - tests/unit/scanner/test_rules.py
+    fitness_dimensions: [interoperability, conformance]
+    notes: This helps assessors separate spec-core coverage from implementation-specific diagnostics.

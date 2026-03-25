@@ -162,11 +162,13 @@ class TestFingerprintEntry:
 class TestWardlineManifest:
     def test_construction_with_defaults(self) -> None:
         m = WardlineManifest()
+        assert m.governance_profile == "lite"
         assert m.tiers == ()
         assert m.module_tiers == ()
 
     def test_construction_with_data(self) -> None:
         m = WardlineManifest(
+            governance_profile="assurance",
             tiers=(
                 TierEntry(id="db", tier=1, description="Database"),
                 TierEntry(id="api", tier=4, description="External API"),
@@ -180,6 +182,7 @@ class TestWardlineManifest:
                 review_interval_days=180,
             ),
         )
+        assert m.governance_profile == "assurance"
         assert len(m.tiers) == 2
         assert m.tiers[0].tier == 1
         assert m.metadata.organisation == "TestOrg"

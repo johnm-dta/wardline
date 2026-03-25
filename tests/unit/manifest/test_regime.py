@@ -120,6 +120,7 @@ metadata:
     role: "lead"
   ratification_date: "2025-01-01"
   review_interval_days: 90
+governance_profile: "assurance"
 tiers:
   - id: "tier1"
     tier: 1
@@ -135,6 +136,7 @@ rules:
         manifest_path = tmp_path / "wardline.yaml"
         manifest_path.write_text(manifest_content, encoding="utf-8")
         m = collect_manifest_metrics(manifest_path)
+        assert m.governance_profile == "assurance"
         # 2026-03-24 - 2025-01-01 = 448 days, interval 90 → overdue
         assert m.ratification_overdue is True
         assert m.ratification_age_days is not None

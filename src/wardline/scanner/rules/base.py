@@ -11,11 +11,14 @@ statically (mypy).
 from __future__ import annotations
 
 import ast
+import logging
 from abc import ABC, abstractmethod
 from collections import deque
 from typing import TYPE_CHECKING, ClassVar, final
 
 from wardline.core.taints import TaintState
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -105,9 +108,14 @@ class RuleBase(ast.NodeVisitor, ABC):
         """
         if self._context is None:
             return TaintState.UNKNOWN_RAW
-        return self._context.function_level_taint_map.get(
-            qualname, TaintState.UNKNOWN_RAW
-        )
+        taint = self._context.function_level_taint_map.get(qualname)
+        if taint is None:
+            logger.debug(
+                "Taint map miss for qualname %r in %s",
+                qualname, self._file_path,
+            )
+            return TaintState.UNKNOWN_RAW
+        return taint
 
     def _dispatch(
         self, node: ast.FunctionDef | ast.AsyncFunctionDef, *, is_async: bool

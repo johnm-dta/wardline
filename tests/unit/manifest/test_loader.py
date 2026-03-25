@@ -33,6 +33,7 @@ class TestLoadManifest:
     def test_valid_manifest_loads(self, tmp_path: Path) -> None:
         f = tmp_path / "wardline.yaml"
         f.write_text("""\
+governance_profile: "assurance"
 tiers:
   - id: "internal_db"
     tier: 1
@@ -51,6 +52,7 @@ metadata:
 """)
         manifest = load_manifest(f)
         assert isinstance(manifest, WardlineManifest)
+        assert manifest.governance_profile == "assurance"
         assert len(manifest.tiers) == 2
         assert manifest.tiers[0].id == "internal_db"
         assert manifest.tiers[0].tier == 1
@@ -61,6 +63,7 @@ metadata:
         f = tmp_path / "wardline.yaml"
         f.write_text("{}\n")
         manifest = load_manifest(f)
+        assert manifest.governance_profile == "lite"
         assert manifest.tiers == ()
         assert manifest.module_tiers == ()
 
