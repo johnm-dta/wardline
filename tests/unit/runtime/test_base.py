@@ -158,6 +158,18 @@ class TestDecoratedMethodDetection:
         svc = MyService()
         assert hasattr(svc, "_internal")
 
+    def test_unrecognized_wardline_attribute_rejected(self) -> None:
+        """Spoofed _wardline_* attrs on methods fail class creation."""
+        import pytest
+
+        with pytest.raises(ValueError, match="unrecognized wardline attribute"):
+            class MyService(WardlineBase):
+                def ingest(self) -> None:
+                    pass
+
+                ingest._wardline_groups = (1,)  # type: ignore[attr-defined]
+                ingest._wardline_fake = True  # type: ignore[attr-defined]
+
 
 # ── Cooperative MRO ──────────────────────────────────────────────
 

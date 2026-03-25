@@ -224,6 +224,49 @@ class TestParseErrors:
         assert result.files_scanned == 0
         assert result.files_skipped == 2
 
+    def test_utf8_bom_file_is_read(self, tmp_path: Path) -> None:
+        bom_file = tmp_path / "bom.py"
+        bom_file.write_bytes(b"\xef\xbb\xbfdef bom():\n    return 1\n")
+
+        rule = _CountingRule()
+        engine = ScanEngine(target_paths=(tmp_path,), rules=(rule,))
+        result = engine.scan()
+
+        assert result.files_scanned == 1
+        assert result.files_skipped == 0
+        assert len(result.errors) == 0
+        assert {name for name, _ in rule.visited} == {"bom"}
+
+    def test_pep263_encoded_file_is_read(self, tmp_path: Path) -> None:
+        encoded = tmp_path / "latin1.py"
+        encoded.write_bytes(
+            "# -*- coding: latin-1 -*-\n".encode("ascii")
+            + "def cafe():\n    return 'caf\xe9'\n".encode("latin-1")
+        )
+
+        rule = _CountingRule()
+        engine = ScanEngine(target_paths=(tmp_path,), rules=(rule,))
+        result = engine.scan()
+
+        assert result.files_scanned == 1
+        assert result.files_skipped == 0
+        assert len(result.errors) == 0
+        assert {name for name, _ in rule.visited} == {"cafe"}
+
+    def test_invalid_encoding_reports_encoding_error(self, tmp_path: Path) -> None:
+        bad = tmp_path / "bad_encoding.py"
+        bad.write_bytes(
+            b"# -*- coding: ascii -*-\n"
+            b"def broken():\n    return '\xff'\n"
+        )
+
+        engine = ScanEngine(target_paths=(tmp_path,), rules=(_CountingRule(),))
+        result = engine.scan()
+
+        assert result.files_scanned == 0
+        assert result.files_skipped == 1
+        assert any("Encoding error" in e for e in result.errors)
+
 
 # ── Permission errors ────────────────────────────────────────────
 

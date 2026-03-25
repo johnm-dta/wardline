@@ -28,3 +28,10 @@ def test_tier_ordering_and_comparison_operators() -> None:
     assert AuthorityTier.TIER_2 <= AuthorityTier.TIER_2
     assert AuthorityTier.TIER_3 > AuthorityTier.TIER_2
     assert AuthorityTier.TIER_4 >= AuthorityTier.TIER_3
+
+
+def test_is_more_authoritative_than_uses_domain_semantics() -> None:
+    assert AuthorityTier.TIER_1.is_more_authoritative_than(AuthorityTier.TIER_2)
+    assert AuthorityTier.TIER_2.is_more_authoritative_than(AuthorityTier.TIER_4)
+    assert not AuthorityTier.TIER_4.is_more_authoritative_than(AuthorityTier.TIER_1)
+    assert not AuthorityTier.TIER_3.is_more_authoritative_than(AuthorityTier.TIER_3)

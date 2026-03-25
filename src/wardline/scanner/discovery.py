@@ -21,6 +21,7 @@ Three-phase process:
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass
 import logging
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -35,6 +36,15 @@ logger = logging.getLogger(__name__)
 
 # Module prefixes that indicate a wardline import
 _WARDLINE_PREFIXES = ("wardline",)
+
+
+@dataclass(frozen=True)
+class DynamicImportDiagnostic:
+    """Structured warning for dynamic wardline imports."""
+
+    line: int
+    col: int
+    message: str
 
 
 # ── Phase 1: TYPE_CHECKING block detection ───────────────────────
@@ -70,12 +80,17 @@ def _collect_type_checking_lines(tree: ast.Module) -> frozenset[int]:
 
 
 def _is_type_checking_test(node: ast.expr) -> bool:
-    """Check if an expression is ``TYPE_CHECKING`` or ``X.TYPE_CHECKING``."""
+    """Check if an expression is ``TYPE_CHECKING`` or ``typing.TYPE_CHECKING``."""
     # Direct: TYPE_CHECKING
     if isinstance(node, ast.Name) and node.id == "TYPE_CHECKING":
         return True
-    # Qualified: typing.TYPE_CHECKING (or any_alias.TYPE_CHECKING)
-    return isinstance(node, ast.Attribute) and node.attr == "TYPE_CHECKING"
+    # Qualified: typing.TYPE_CHECKING only
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr == "TYPE_CHECKING"
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "typing"
+    )
 
 
 # ── Phase 2: Import table construction ───────────────────────────
@@ -87,14 +102,13 @@ def _build_import_table(
 ) -> dict[str, str]:
     """Build a mapping of local name → canonical decorator name.
 
-    Scans ``import`` and ``from … import`` statements, filtering out
-    any that fall inside TYPE_CHECKING blocks. Cross-references
-    imported names against the registry.
+    Scans top-level ``import`` and ``from … import`` statements and
+    cross-references imported names against the registry.
 
     .. note:: **Level-1 limitation** — only top-level import statements
        are scanned (via ``ast.iter_child_nodes(tree)``). Imports nested
-       inside ``try/except`` blocks, conditional branches (other than
-       ``if TYPE_CHECKING``), function bodies, or class bodies are not
+       inside ``try/except`` blocks, conditional branches including
+       ``if TYPE_CHECKING``, function bodies, or class bodies are not
        discovered. This is intentional for Level 1: deeper import
        tracking requires control-flow analysis (Level 2+).
 
@@ -114,10 +128,9 @@ def _build_import_table(
     has_star_import = False
 
     for node in ast.iter_child_nodes(tree):
-        # Only process top-level imports (or those not in TC blocks)
+        # Only process top-level imports. Nested imports, including those
+        # inside TYPE_CHECKING blocks, are intentionally ignored at L1.
         if not isinstance(node, (ast.Import, ast.ImportFrom)):
-            continue
-        if node.lineno in tc_lines:
             continue
 
         if isinstance(node, ast.ImportFrom):
@@ -194,8 +207,8 @@ def _is_wardline_module(module: str) -> bool:
     return any(module == prefix or module.startswith(f"{prefix}.") for prefix in _WARDLINE_PREFIXES)
 
 
-def _detect_dynamic_imports(tree: ast.Module) -> None:
-    """Scan AST for dynamic wardline imports and log warnings.
+def _detect_dynamic_imports(tree: ast.Module) -> list[DynamicImportDiagnostic]:
+    """Scan AST for dynamic wardline imports and return diagnostics.
 
     Detects two patterns:
     - ``importlib.import_module("wardline...")``
@@ -205,6 +218,7 @@ def _detect_dynamic_imports(tree: ast.Module) -> None:
     (variables, f-strings) are silently skipped — they cannot be
     statically resolved.
     """
+    diagnostics: list[DynamicImportDiagnostic] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -218,11 +232,16 @@ def _detect_dynamic_imports(tree: ast.Module) -> None:
             and isinstance(node.args[0].value, str)
             and _is_wardline_module(node.args[0].value)
         ):
-            logger.warning(
-                "Dynamic import of wardline module via __import__('%s') "
-                "makes decorator tracking unreliable (line %d)",
-                node.args[0].value,
-                node.lineno,
+            diagnostics.append(
+                DynamicImportDiagnostic(
+                    line=node.lineno,
+                    col=node.col_offset,
+                    message=(
+                        "Dynamic import of wardline module via "
+                        f"__import__('{node.args[0].value}') makes decorator "
+                        "tracking unreliable"
+                    ),
+                )
             )
 
         # Pattern: importlib.import_module("wardline...")
@@ -236,13 +255,18 @@ def _detect_dynamic_imports(tree: ast.Module) -> None:
             and isinstance(node.args[0].value, str)
             and _is_wardline_module(node.args[0].value)
         ):
-            logger.warning(
-                "Dynamic import of wardline module via "
-                "importlib.import_module('%s') makes decorator tracking "
-                "unreliable (line %d)",
-                node.args[0].value,
-                node.lineno,
+            diagnostics.append(
+                DynamicImportDiagnostic(
+                    line=node.lineno,
+                    col=node.col_offset,
+                    message=(
+                        "Dynamic import of wardline module via "
+                        f"importlib.import_module('{node.args[0].value}') "
+                        "makes decorator tracking unreliable"
+                    ),
+                )
             )
+    return diagnostics
 
 
 # ── Phase 3: Decorator → annotation mapping ──────────────────────
@@ -275,7 +299,6 @@ def discover_annotations(
     path_str = str(file_path)
     tc_lines = _collect_type_checking_lines(tree)
     import_table = _build_import_table(tree, tc_lines)
-    _detect_dynamic_imports(tree)
     annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
 
     _walk_functions(tree, import_table, path_str, annotations, scope="")

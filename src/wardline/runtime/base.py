@@ -82,9 +82,13 @@ def _validate_decorator_attr(
     """Validate a wardline attribute is from a registered decorator.
 
     Checks that the attribute name appears in at least one registry
-    entry's attrs contract. Silent no-op if unrecognised — registration
-    mismatches are caught at decorator construction time.
+    entry's attrs contract. Raises ValueError if unrecognised so
+    manually spoofed ``_wardline_*`` attributes are not silently accepted.
     """
     for entry in REGISTRY.values():
         if attr_name in entry.attrs:
             return
+    raise ValueError(
+        f"{cls.__name__}.{method_name} has unrecognized wardline attribute "
+        f"{attr_name!r}"
+    )

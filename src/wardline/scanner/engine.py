@@ -18,13 +18,14 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+import tokenize
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner._qualnames import build_qualname_map
 from wardline.scanner.context import Finding, ScanContext, WardlineAnnotation
-from wardline.scanner.discovery import discover_annotations
+from wardline.scanner.discovery import _detect_dynamic_imports, discover_annotations
 from wardline.scanner.import_resolver import build_import_alias_map, resolve_call_fqn
 from wardline.scanner.rejection_path import (
     BUILTIN_KNOWN_VALIDATORS,
@@ -51,6 +52,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _read_python_source(file_path: Path) -> str:
+    """Read Python source with BOM and PEP 263 encoding detection."""
+    try:
+        with tokenize.open(file_path) as handle:
+            return handle.read()
+    except (SyntaxError, UnicodeDecodeError) as exc:
+        raise UnicodeError(str(exc)) from exc
+
+
 @dataclass
 class ScanResult:
     """Aggregated result of a scan run."""
@@ -58,6 +68,7 @@ class ScanResult:
     findings: list[Finding] = field(default_factory=list)
     files_scanned: int = 0
     files_skipped: int = 0
+    files_with_degraded_taint: int = 0
     errors: list[str] = field(default_factory=list)
 
 
@@ -201,10 +212,9 @@ class ScanEngine:
 
     def _is_excluded(self, path: Path) -> bool:
         """Check if a resolved path falls under any exclude path."""
-        resolved = path.resolve()
         for excluded in self._exclude_paths:
             try:
-                resolved.relative_to(excluded)
+                path.relative_to(excluded)
                 return True
             except ValueError:
                 continue
@@ -213,11 +223,16 @@ class ScanEngine:
     def _scan_file(self, file_path: Path, result: ScanResult) -> None:
         """Parse a single file and run all rules against its AST."""
         try:
-            source = file_path.read_text(encoding="utf-8")
+            source = _read_python_source(file_path)
         except PermissionError as exc:
             logger.warning("Permission denied reading %s: %s", file_path, exc)
             result.files_skipped += 1
             result.errors.append(f"Permission denied: {file_path}")
+            return
+        except UnicodeError as exc:
+            logger.warning("Encoding error in %s: %s", file_path, exc)
+            result.files_skipped += 1
+            result.errors.append(f"Encoding error in {file_path}: {exc}")
             return
         except OSError as exc:
             logger.warning("Cannot read %s: %s", file_path, exc)
@@ -235,6 +250,25 @@ class ScanEngine:
 
         result.files_scanned += 1
 
+        for diagnostic in _detect_dynamic_imports(tree):
+            result.findings.append(
+                Finding(
+                    rule_id=RuleId.WARDLINE_DYNAMIC_IMPORT,
+                    file_path=str(file_path),
+                    line=diagnostic.line,
+                    col=diagnostic.col,
+                    end_line=None,
+                    end_col=None,
+                    message=diagnostic.message,
+                    severity=Severity.WARNING,
+                    exceptionability=Exceptionability.UNCONDITIONAL,
+                    taint_state=None,
+                    analysis_level=self._analysis_level,
+                    source_snippet=None,
+                    qualname=None,
+                )
+            )
+
         # Pass 1: Discovery + taint assignment (fault-tolerant)
         try:
             annotations = discover_annotations(tree, file_path)
@@ -242,9 +276,30 @@ class ScanEngine:
                 tree, file_path, annotations, self._manifest
             )
         except Exception as exc:
-            logger.warning("Discovery/taint failed for %s: %s", file_path, exc)
+            logger.error("Discovery/taint failed for %s: %s", file_path, exc)
             result.errors.append(
                 f"Discovery/taint failed for {file_path}: {exc}"
+            )
+            result.files_with_degraded_taint += 1
+            result.findings.append(
+                Finding(
+                    rule_id=RuleId.GOVERNANCE_TAINT_DEGRADED,
+                    file_path=str(file_path),
+                    line=1,
+                    col=0,
+                    end_line=None,
+                    end_col=None,
+                    message=(
+                        "Taint assignment degraded: using empty fallback taint map "
+                        f"after {type(exc).__name__}: {exc}"
+                    ),
+                    severity=Severity.WARNING,
+                    exceptionability=Exceptionability.UNCONDITIONAL,
+                    taint_state=None,
+                    analysis_level=self._analysis_level,
+                    source_snippet=None,
+                    qualname=None,
+                )
             )
             annotations = {}
             body_taint_map, return_taint_map, taint_sources = {}, {}, {}
@@ -328,9 +383,9 @@ class ScanEngine:
                 if module_name is not None:
                     module_file_map[module_name] = str(file_path)
                 try:
-                    source = file_path.read_text(encoding="utf-8")
+                    source = _read_python_source(file_path)
                     tree = ast.parse(source, filename=str(file_path))
-                except (OSError, SyntaxError):
+                except (OSError, SyntaxError, UnicodeError):
                     continue
 
                 for node in ast.walk(tree):

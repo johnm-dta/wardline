@@ -83,6 +83,82 @@ class TestScanProducesSarif:
         assert run["tool"]["driver"]["name"] == "wardline"
         assert "results" in run
 
+    def test_degraded_taint_is_surfaced_in_sarif_properties(
+        self, tmp_path: Path
+    ) -> None:
+        """Pass-1 taint degradation appears in SARIF run properties/results."""
+        from unittest.mock import patch
+
+        from wardline.core.severity import Exceptionability, RuleId, Severity
+        from wardline.scanner.context import Finding
+        from wardline.scanner.engine import ScanResult
+
+        manifest = _minimal_manifest(tmp_path)
+        fake_result = ScanResult(
+            findings=[
+                Finding(
+                    rule_id=RuleId.GOVERNANCE_TAINT_DEGRADED,
+                    file_path=str(tmp_path / "clean.py"),
+                    line=1,
+                    col=0,
+                    end_line=None,
+                    end_col=None,
+                    message="Taint assignment degraded: fallback map used",
+                    severity=Severity.WARNING,
+                    exceptionability=Exceptionability.UNCONDITIONAL,
+                    taint_state=None,
+                    analysis_level=1,
+                    source_snippet=None,
+                ),
+            ],
+            files_scanned=1,
+            files_with_degraded_taint=1,
+        )
+
+        with patch(
+            "wardline.scanner.engine.ScanEngine.scan",
+            return_value=fake_result,
+        ):
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                "scan", str(tmp_path),
+                "--manifest", str(manifest),
+                "--allow-registry-mismatch",
+            ])
+
+        assert result.exit_code == 1
+        sarif = json.loads(result.stdout)
+        run = sarif["runs"][0]
+        assert run["properties"]["wardline.filesWithDegradedTaint"] == 1
+        degraded = [
+            r for r in run["results"]
+            if r["ruleId"] == "GOVERNANCE-TAINT-DEGRADED"
+        ]
+        assert len(degraded) == 1
+
+    def test_dynamic_import_emits_sarif_result(self, tmp_path: Path) -> None:
+        """Dynamic wardline imports are serialized as SARIF diagnostics."""
+        manifest = _minimal_manifest(tmp_path)
+        (tmp_path / "dyn.py").write_text(
+            "import importlib\nmod = importlib.import_module('wardline')\n",
+            encoding="utf-8",
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--allow-registry-mismatch",
+        ])
+
+        assert result.exit_code == 1
+        sarif = json.loads(result.stdout)
+        dynamic_imports = [
+            r for r in sarif["runs"][0]["results"]
+            if r["ruleId"] == "WARDLINE-DYNAMIC-IMPORT"
+        ]
+        assert len(dynamic_imports) == 1
+
     def test_sarif_implemented_rules_matches_loaded(
         self, tmp_path: Path
     ) -> None:

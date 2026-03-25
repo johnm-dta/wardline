@@ -8,8 +8,10 @@ import textwrap
 from typing import TYPE_CHECKING
 
 from wardline.scanner.discovery import (
+    _detect_dynamic_imports,
     _build_import_table,
     _collect_type_checking_lines,
+    _is_type_checking_test,
     _resolve_decorator,
     discover_annotations,
 )
@@ -79,6 +81,15 @@ class TestTypeCheckingDetection:
         """)
         tc_lines = _collect_type_checking_lines(tree)
         assert len(tc_lines) == 0
+
+    def test_arbitrary_alias_type_checking_not_detected(self) -> None:
+        tree = _parse("""\
+            import custom_typing
+            if custom_typing.TYPE_CHECKING:
+                from wardline import external_boundary
+        """)
+        if_node = next(node for node in ast.walk(tree) if isinstance(node, ast.If))
+        assert not _is_type_checking_test(if_node.test)
 
 
 # ── Import table construction ────────────────────────────────────
@@ -160,6 +171,14 @@ class TestImportTable:
 
         assert "external_boundary" not in table
         assert table["audit_critical"] == "audit_critical"
+
+    def test_tc_lines_argument_does_not_affect_top_level_imports(self) -> None:
+        """Top-level import scanning does not depend on tc_lines filtering."""
+        tree = _parse("""\
+            from wardline import external_boundary
+        """)
+        table = _build_import_table(tree, frozenset({1}))
+        assert table["external_boundary"] == "external_boundary"
 
     def test_multiple_decorators_imported(self) -> None:
         """Multiple decorators from one import statement."""
@@ -428,44 +447,37 @@ class TestEdgeCaseWarnings:
 
         assert not any("Star import" in r.message for r in caplog.records)
 
-    def test_dynamic_import_importlib_warns(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """``importlib.import_module("wardline")`` logs a WARNING."""
+    def test_dynamic_import_importlib_returns_diagnostic(self) -> None:
+        """``importlib.import_module("wardline")`` returns a diagnostic."""
         tree = _parse("""\
             import importlib
             mod = importlib.import_module("wardline")
         """)
-        with caplog.at_level(logging.WARNING, logger="wardline.scanner.discovery"):
-            discover_annotations(tree, "test.py")
+        diagnostics = _detect_dynamic_imports(tree)
 
-        assert any("importlib.import_module" in r.message for r in caplog.records)
+        assert len(diagnostics) == 1
+        assert "importlib.import_module" in diagnostics[0].message
 
-    def test_dynamic_import_dunder_warns(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """``__import__("wardline")`` logs a WARNING."""
+    def test_dynamic_import_dunder_returns_diagnostic(self) -> None:
+        """``__import__("wardline")`` returns a diagnostic."""
         tree = _parse("""\
             mod = __import__("wardline")
         """)
-        with caplog.at_level(logging.WARNING, logger="wardline.scanner.discovery"):
-            discover_annotations(tree, "test.py")
+        diagnostics = _detect_dynamic_imports(tree)
 
-        assert any("__import__" in r.message for r in caplog.records)
+        assert len(diagnostics) == 1
+        assert "__import__" in diagnostics[0].message
 
-    def test_dynamic_import_non_wardline_no_warning(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """Dynamic import of non-wardline module does NOT warn."""
+    def test_dynamic_import_non_wardline_returns_no_diagnostic(self) -> None:
+        """Dynamic import of non-wardline module produces no diagnostic."""
         tree = _parse("""\
             import importlib
             mod = importlib.import_module("json")
             other = __import__("os")
         """)
-        with caplog.at_level(logging.WARNING, logger="wardline.scanner.discovery"):
-            discover_annotations(tree, "test.py")
+        diagnostics = _detect_dynamic_imports(tree)
 
-        assert len(caplog.records) == 0
+        assert diagnostics == []
 
     def test_unresolved_decorator_with_star_import_warns(
         self, caplog: pytest.LogCaptureFixture

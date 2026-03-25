@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 from unittest.mock import patch
 
-from wardline.core.severity import RuleId
+from wardline.core.severity import RuleId, Severity
 from wardline.core.taints import TaintState
 from wardline.scanner.engine import ScanEngine
 from wardline.scanner.rules.base import RuleBase
@@ -185,11 +185,42 @@ class TestDiscoveryFailure:
         assert result.files_scanned == 1
         # Error recorded
         assert any("Discovery/taint failed" in e for e in result.errors)
+        assert result.files_with_degraded_taint == 1
+        degraded = [
+            f for f in result.findings
+            if f.rule_id == RuleId.GOVERNANCE_TAINT_DEGRADED
+        ]
+        assert len(degraded) == 1
+        assert degraded[0].severity == Severity.WARNING
         # Rule still ran — context has empty taint map
         assert len(rule.captured_contexts) == 1
         ctx = rule.captured_contexts[0]
         assert ctx is not None
         assert dict(ctx.function_level_taint_map) == {}
+
+
+class TestDynamicImportDiagnostics:
+    """Dynamic wardline imports are surfaced as findings."""
+
+    def test_dynamic_import_emits_finding(self, tmp_path: Path) -> None:
+        _write_py(
+            tmp_path / "dyn.py",
+            "import importlib\nmod = importlib.import_module('wardline')\n",
+        )
+
+        engine = ScanEngine(
+            target_paths=(tmp_path,),
+            rules=(_ContextCapturingRule(),),
+        )
+
+        result = engine.scan()
+
+        dynamic_imports = [
+            f for f in result.findings
+            if f.rule_id == RuleId.WARDLINE_DYNAMIC_IMPORT
+        ]
+        assert len(dynamic_imports) == 1
+        assert dynamic_imports[0].severity == Severity.WARNING
 
 
 # ── TestContextFilePathCorrect ──────────────────────────────────

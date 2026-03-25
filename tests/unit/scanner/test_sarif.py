@@ -103,6 +103,11 @@ class TestSarifResults:
         assert "wardline.exceptionability" in props
         assert "wardline.analysisLevel" in props
 
+    def test_result_property_bag_contains_explicit_taint_state(self) -> None:
+        report = SarifReport(findings=[_make_finding(taint_state="PIPELINE")])
+        result = report.to_dict()["runs"][0]["results"][0]
+        assert result["properties"]["wardline.taintState"] == "PIPELINE"
+
     def test_result_property_bag_defaults_taint_state_when_missing(self) -> None:
         report = SarifReport(findings=[_make_finding(taint_state=None)])
         result = report.to_dict()["runs"][0]["results"][0]
@@ -165,6 +170,17 @@ class TestSarifResults:
         )
         assert region["startColumn"] == 1
         assert region["endColumn"] == 6
+
+    def test_absolute_file_path_is_made_relative_to_base_path(self) -> None:
+        report = SarifReport(
+            findings=[
+                _make_finding(file_path="/repo/src/example.py"),
+            ],
+            base_path="/repo",
+        )
+        result = report.to_dict()["runs"][0]["results"][0]
+        uri = result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+        assert uri == "src/example.py"
 
 
 # ---------------------------------------------------------------------------
@@ -286,6 +302,16 @@ class TestSarifPropertyBags:
         props = report.to_dict()["runs"][0]["properties"]
         assert props["wardline.unknownRawFunctionCount"] == 5
         assert props["wardline.unresolvedDecoratorCount"] == 3
+
+    def test_files_with_degraded_taint_defaults_to_zero(self) -> None:
+        report = SarifReport(findings=[])
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.filesWithDegradedTaint"] == 0
+
+    def test_files_with_degraded_taint_wired(self) -> None:
+        report = SarifReport(findings=[], files_with_degraded_taint=2)
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.filesWithDegradedTaint"] == 2
 
     def test_property_bag_version(self) -> None:
         report = SarifReport(findings=[])

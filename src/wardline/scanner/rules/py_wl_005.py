@@ -81,22 +81,14 @@ class RulePyWl005(RuleBase):
         is_async: bool,
     ) -> None:
         """Walk the function body looking for silent exception handlers."""
-        # Collect handlers from TryStar nodes to avoid double-counting
-        # (TryStar.handlers are ExceptHandler nodes that ast.walk also yields).
         _TryStar = getattr(ast, "TryStar", None)
         trystar_handlers: set[int] = set()
-        if _TryStar is not None:
-            for child in walk_skip_nested_defs(node):
-                if isinstance(child, _TryStar):
-                    for handler in child.handlers:
-                        trystar_handlers.add(id(handler))
-                        self._check_handler(handler)
-
         for child in walk_skip_nested_defs(node):
-            if (
-                isinstance(child, ast.ExceptHandler)
-                and id(child) not in trystar_handlers
-            ):
+            if _TryStar is not None and isinstance(child, _TryStar):
+                for handler in child.handlers:
+                    trystar_handlers.add(id(handler))
+                    self._check_handler(handler)
+            elif isinstance(child, ast.ExceptHandler) and id(child) not in trystar_handlers:
                 self._check_handler(child)
 
     def _check_handler(self, handler: ast.ExceptHandler) -> None:

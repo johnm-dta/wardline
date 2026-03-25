@@ -14,6 +14,14 @@ class AuthorityTier(IntEnum):
     TIER_3 = 3
     TIER_4 = 4
 
+    def is_more_authoritative_than(self, other: "AuthorityTier") -> bool:
+        """Return True when this tier has greater authority than *other*.
+
+        Numeric ordering is counter-intuitive here: lower values represent
+        higher authority, so ``TIER_1`` is more authoritative than ``TIER_4``.
+        """
+        return self.value < other.value
+
 
 TAINT_TO_TIER: MappingProxyType[TaintState, AuthorityTier] = MappingProxyType({
     TaintState.AUDIT_TRAIL: AuthorityTier.TIER_1,

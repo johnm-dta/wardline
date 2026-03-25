@@ -43,6 +43,7 @@ _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
     RuleId.PY_WL_001_GOVERNED_DEFAULT: "Governed default value (diagnostic)",
     RuleId.PY_WL_001_UNGOVERNED_DEFAULT: "Ungoverned schema_default() — no overlay boundary (diagnostic)",
     RuleId.WARDLINE_UNRESOLVED_DECORATOR: "Unresolved decorator (diagnostic)",
+    RuleId.WARDLINE_DYNAMIC_IMPORT: "Dynamic import of wardline module (diagnostic)",
     RuleId.TOOL_ERROR: "Internal tool error",
     RuleId.GOVERNANCE_REGISTRY_MISMATCH_ALLOWED: (
         "Registry mismatch allowed (diagnostic)"
@@ -59,6 +60,7 @@ _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
     RuleId.GOVERNANCE_EXCEPTION_TAINT_DRIFT: "Exception taint state no longer matches function's effective taint",
     RuleId.GOVERNANCE_EXCEPTION_LEVEL_STALE: "Exception granted at lower analysis level than active scan",
     RuleId.GOVERNANCE_EXCEPTION_SEVERITY_DRIFT: "Exception severity_at_grant differs from current finding severity",
+    RuleId.GOVERNANCE_TAINT_DEGRADED: "Taint assignment degraded — file scanned with empty fallback taint map",
     RuleId.GOVERNANCE_CUSTOM_KNOWN_VALIDATOR: "Custom known_validators entry (governance)",
     RuleId.L3_LOW_RESOLUTION: "L3 call-graph taint based on minority of call edges (>70% unresolved)",
     RuleId.L3_CONVERGENCE_BOUND: "L3 propagation hit iteration safety bound — results may be incomplete",
@@ -70,6 +72,7 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
         RuleId.PY_WL_001_GOVERNED_DEFAULT,
         RuleId.PY_WL_001_UNGOVERNED_DEFAULT,
         RuleId.WARDLINE_UNRESOLVED_DECORATOR,
+        RuleId.WARDLINE_DYNAMIC_IMPORT,
         RuleId.TOOL_ERROR,
         RuleId.GOVERNANCE_REGISTRY_MISMATCH_ALLOWED,
         RuleId.GOVERNANCE_RULE_DISABLED,
@@ -82,6 +85,7 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
         RuleId.GOVERNANCE_EXCEPTION_TAINT_DRIFT,
         RuleId.GOVERNANCE_EXCEPTION_LEVEL_STALE,
         RuleId.GOVERNANCE_EXCEPTION_SEVERITY_DRIFT,
+        RuleId.GOVERNANCE_TAINT_DEGRADED,
         RuleId.GOVERNANCE_CUSTOM_KNOWN_VALIDATOR,
         RuleId.L3_LOW_RESOLUTION,
         RuleId.L3_CONVERGENCE_BOUND,
@@ -114,7 +118,25 @@ def _make_region(finding: Finding) -> dict[str, Any]:
     return region
 
 
-def _make_result(finding: Finding) -> dict[str, Any]:
+def _normalize_artifact_uri(file_path: str, base_path: str | None) -> str:
+    """Return a SARIF-friendly artifact URI for *file_path*.
+
+    SARIF consumers expect project-relative URIs when possible. If
+    ``base_path`` is provided and the finding path is under that root,
+    emit a relative POSIX path. Otherwise preserve the original path,
+    normalized to POSIX separators.
+    """
+    path = Path(file_path)
+    if base_path is not None:
+        base = Path(base_path)
+        try:
+            path = path.resolve().relative_to(base.resolve())
+        except ValueError:
+            pass
+    return path.as_posix()
+
+
+def _make_result(finding: Finding, *, base_path: str | None) -> dict[str, Any]:
     """Convert a single Finding to a SARIF result entry."""
     # Mandatory properties (§A.3) — always present, never filtered by _clean_none.
     properties: dict[str, Any] = {
@@ -142,7 +164,11 @@ def _make_result(finding: Finding) -> dict[str, Any]:
         "locations": [
             {
                 "physicalLocation": {
-                    "artifactLocation": {"uri": finding.file_path},
+                    "artifactLocation": {
+                        "uri": _normalize_artifact_uri(
+                            finding.file_path, base_path
+                        )
+                    },
                     "region": _make_region(finding),
                 },
             }
@@ -176,8 +202,10 @@ class SarifReport:
     tool_version: str = "0.1.0"
     verification_mode: bool = False
     implemented_rule_ids: frozenset[RuleId] | None = None
+    base_path: str | None = None
     unknown_raw_count: int = 0
     unresolved_decorator_count: int = 0
+    files_with_degraded_taint: int = 0
     active_exception_count: int = 0
     stale_exception_count: int = 0
     expedited_exception_ratio: float = 0.0
@@ -225,7 +253,10 @@ class SarifReport:
             key=lambda f: (f.file_path, f.line, f.col, str(f.rule_id)),
         )
 
-        results = [_make_result(f) for f in sorted_findings]
+        results = [
+            _make_result(f, base_path=self.base_path)
+            for f in sorted_findings
+        ]
         rules = self._collect_rule_descriptors()
 
         run: dict[str, Any] = {
@@ -249,6 +280,7 @@ class SarifReport:
                 ),
                 "wardline.unknownRawFunctionCount": self.unknown_raw_count,
                 "wardline.unresolvedDecoratorCount": self.unresolved_decorator_count,
+                "wardline.filesWithDegradedTaint": self.files_with_degraded_taint,
                 "wardline.activeExceptionCount": self.active_exception_count,
                 "wardline.staleExceptionCount": self.stale_exception_count,
                 "wardline.expeditedExceptionRatio": round(self.expedited_exception_ratio, 3),
