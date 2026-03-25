@@ -10,9 +10,6 @@ matrix.py data will be caught by these tests.
 
 from __future__ import annotations
 
-import ast
-import textwrap
-
 import pytest
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
@@ -29,7 +26,7 @@ from wardline.scanner.rules.py_wl_007 import RulePyWl007
 from wardline.scanner.rules.py_wl_008 import RulePyWl008
 from wardline.scanner.rules.py_wl_009 import RulePyWl009
 
-from .conftest import parse_function_source, parse_module_source
+from .conftest import parse_function_source
 
 # -- Aliases for readability --
 E = Severity.ERROR
