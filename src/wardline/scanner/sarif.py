@@ -58,6 +58,7 @@ _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
     RuleId.GOVERNANCE_NO_EXPIRY_EXCEPTION: "Exception has no expiry date (governance)",
     RuleId.GOVERNANCE_EXCEPTION_TAINT_DRIFT: "Exception taint state no longer matches function's effective taint",
     RuleId.GOVERNANCE_EXCEPTION_LEVEL_STALE: "Exception granted at lower analysis level than active scan",
+    RuleId.GOVERNANCE_EXCEPTION_SEVERITY_DRIFT: "Exception severity_at_grant differs from current finding severity",
     RuleId.L3_LOW_RESOLUTION: "L3 call-graph taint based on minority of call edges (>70% unresolved)",
     RuleId.L3_CONVERGENCE_BOUND: "L3 propagation hit iteration safety bound — results may be incomplete",
 }
@@ -79,6 +80,7 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
         RuleId.GOVERNANCE_NO_EXPIRY_EXCEPTION,
         RuleId.GOVERNANCE_EXCEPTION_TAINT_DRIFT,
         RuleId.GOVERNANCE_EXCEPTION_LEVEL_STALE,
+        RuleId.GOVERNANCE_EXCEPTION_SEVERITY_DRIFT,
         RuleId.L3_LOW_RESOLUTION,
         RuleId.L3_CONVERGENCE_BOUND,
     }
@@ -178,6 +180,7 @@ class SarifReport:
     stale_exception_count: int = 0
     expedited_exception_ratio: float = 0.0
     # WP 2.4: Governance metadata
+    control_law: str = "normal"
     analysis_level: int = 1
     manifest_hash: str | None = None
     scan_timestamp: str | None = None
@@ -230,6 +233,7 @@ class SarifReport:
                    if not self.verification_mode and self.commit_ref
                    else {}),
                 "wardline.conformanceGaps": [],
+                "wardline.controlLaw": self.control_law,
                 "wardline.implementedRules": self._implemented_rules(),
                 **({"wardline.manifestHash": self.manifest_hash}
                    if self.manifest_hash is not None

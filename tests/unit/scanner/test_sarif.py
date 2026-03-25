@@ -374,9 +374,20 @@ class TestSarifGovernanceMetadata:
         props = report.to_dict()["runs"][0]["properties"]
         assert "wardline.commitRef" not in props
 
+    def test_control_law_defaults_to_normal(self) -> None:
+        report = SarifReport(findings=[])
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.controlLaw"] == "normal"
+
+    def test_control_law_propagated_to_run_properties(self) -> None:
+        report = SarifReport(findings=[], control_law="alternate")
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.controlLaw"] == "alternate"
+
     def test_defaults_all_none_except_analysis_level(self) -> None:
         report = SarifReport(findings=[])
         assert report.analysis_level == 1
+        assert report.control_law == "normal"
         assert report.manifest_hash is None
         assert report.scan_timestamp is None
         assert report.commit_ref is None
