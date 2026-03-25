@@ -93,6 +93,29 @@ class TestWardlineSchema:
         with pytest.raises(jsonschema.ValidationError):
             jsonschema.validate(doc, schema)
 
+    def test_valid_rule_override_accepted(self, schema: dict[str, object]) -> None:
+        doc = {
+            "rules": {
+                "overrides": [
+                    {"id": "PY-WL-001", "severity": "WARNING"}
+                ]
+            }
+        }
+        jsonschema.validate(doc, schema)
+
+    def test_rule_override_unknown_field_rejected(
+        self, schema: dict[str, object]
+    ) -> None:
+        doc = {
+            "rules": {
+                "overrides": [
+                    {"id": "PY-WL-001", "severtiy": "WARNING"}
+                ]
+            }
+        }
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(doc, schema)
+
     def test_additional_properties_rejected(
         self, schema: dict[str, object]
     ) -> None:
@@ -127,6 +150,36 @@ class TestExceptionsSchema:
             "standard",
             "expedited",
         }
+
+
+class TestOverlaySchema:
+    """Overlay schema specifics."""
+
+    @pytest.fixture()
+    def schema(self) -> dict[str, object]:
+        path = SCHEMA_DIR / "overlay.schema.json"
+        return json.loads(path.read_text())  # type: ignore[return-value]
+
+    def test_valid_rule_override_accepted(self, schema: dict[str, object]) -> None:
+        doc = {
+            "overlay_for": "adapters/",
+            "rule_overrides": [
+                {"id": "PY-WL-001", "severity": "WARNING"}
+            ],
+        }
+        jsonschema.validate(doc, schema)
+
+    def test_rule_override_unknown_field_rejected(
+        self, schema: dict[str, object]
+    ) -> None:
+        doc = {
+            "overlay_for": "adapters/",
+            "rule_overrides": [
+                {"id": "PY-WL-001", "severtiy": "WARNING"}
+            ],
+        }
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(doc, schema)
 
 
 class TestCorpusSpecimenSchema:

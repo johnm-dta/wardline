@@ -290,6 +290,30 @@ optional_fields:
         with pytest.raises(ManifestLoadError, match="Schema validation"):
             load_overlay(f)
 
+    def test_invalid_rule_override_shape_rejected(self, tmp_path: Path) -> None:
+        f = tmp_path / "wardline.yaml"
+        f.write_text("""\
+rules:
+  overrides:
+    - id: "PY-WL-001"
+      severtiy: "WARNING"
+""")
+        with pytest.raises(ManifestLoadError, match="Schema validation"):
+            load_manifest(f)
+
+    def test_invalid_overlay_rule_override_shape_rejected(
+        self, tmp_path: Path
+    ) -> None:
+        f = tmp_path / "wardline.overlay.yaml"
+        f.write_text("""\
+overlay_for: "adapters/"
+rule_overrides:
+  - id: "PY-WL-001"
+    severtiy: "WARNING"
+""")
+        with pytest.raises(ManifestLoadError, match="Schema validation"):
+            load_overlay(f)
+
 
 # ── $id Version Check ─────────────────────────────────────────────
 

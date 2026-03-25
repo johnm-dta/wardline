@@ -166,5 +166,5 @@ def _find_all_overlays(root: Path) -> list[Path]:
             d for d in dirnames if d not in _OVERLAY_SKIP_DIRS
         ]
         if OVERLAY_FILENAME in filenames:
-            found.append(Path(dirpath) / OVERLAY_FILENAME)
+            found.append((Path(dirpath) / OVERLAY_FILENAME).resolve())
     return sorted(found)

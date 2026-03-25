@@ -108,6 +108,43 @@ class TestExplainUndeclaredModule:
         assert "UNKNOWN_RAW" in result.output
         assert "module not declared" in result.output.lower()
 
+    def test_schema_invalid_manifest_exits_config_error(
+        self, tmp_path: Path
+    ) -> None:
+        """Schema-invalid manifest should fail instead of being downgraded to a warning."""
+        py_file = tmp_path / "unknown_module.py"
+        py_file.write_text(
+            textwrap.dedent("""\
+                def helper():
+                    pass
+            """)
+        )
+
+        manifest_file = tmp_path / "wardline.yaml"
+        manifest_file.write_text(
+            textwrap.dedent("""\
+                module_tiers:
+                  - path: "src/"
+                    default_taint: "NOT_A_REAL_TAINT"
+            """)
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            [
+                "explain",
+                "helper",
+                "--path",
+                str(tmp_path),
+                "--manifest",
+                str(manifest_file),
+            ],
+        )
+
+        assert result.exit_code == 2
+        assert "error: malformed manifest:" in result.output
+
 
 @pytest.mark.integration
 class TestExplainUnresolvedDecorator:

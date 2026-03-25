@@ -10,6 +10,8 @@ from typing import Any
 
 import click
 
+from wardline.cli.scan import EXIT_CONFIG_ERROR
+
 
 @click.command()
 @click.argument("qualname")
@@ -46,7 +48,11 @@ def explain(
     from wardline.core.matrix import lookup
     from wardline.core.severity import RuleId
     from wardline.manifest.discovery import discover_manifest
-    from wardline.manifest.loader import load_manifest
+    from wardline.manifest.loader import (
+        ManifestLoadError,
+        WardlineYAMLError,
+        load_manifest,
+    )
     from wardline.scanner.discovery import discover_annotations
     from wardline.scanner.sarif import _PSEUDO_RULE_IDS
     from wardline.scanner.taint.function_level import (
@@ -64,7 +70,10 @@ def explain(
     if manifest_path is not None and manifest_path.exists():
         try:
             manifest_model = load_manifest(manifest_path)
-        except Exception as exc:
+        except (WardlineYAMLError, ManifestLoadError) as exc:
+            click.echo(f"error: malformed manifest: {exc}", err=True)
+            sys.exit(EXIT_CONFIG_ERROR)
+        except OSError as exc:
             click.echo(f"warning: could not load manifest: {exc}", err=True)
 
     # Search for the function in Python files

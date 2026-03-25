@@ -9,6 +9,7 @@ import pytest
 
 from wardline.manifest.discovery import (
     GovernanceError,
+    _find_all_overlays,
     discover_manifest,
     discover_overlays,
 )
@@ -219,3 +220,37 @@ class TestDiscoverOverlays:
             discover_overlays(
                 project, manifest, overlay_paths=["nonexistent/"]
             )
+
+
+class TestFindAllOverlays:
+    def test_returns_resolved_paths_for_dotdot_root(
+        self, tmp_path: Path
+    ) -> None:
+        project = tmp_path / "project"
+        nested = project / "src"
+        nested.mkdir(parents=True)
+        overlay = nested / "wardline.overlay.yaml"
+        overlay.write_text('overlay_for: "src/"\n')
+
+        inner = project / "nested"
+        inner.mkdir()
+        root_with_dotdot = inner / ".."
+        overlays = _find_all_overlays(root_with_dotdot)
+
+        assert overlays == [overlay.resolve()]
+
+    def test_returns_resolved_paths_for_symlink_root(
+        self, tmp_path: Path
+    ) -> None:
+        project = tmp_path / "project"
+        nested = project / "src"
+        nested.mkdir(parents=True)
+        overlay = nested / "wardline.overlay.yaml"
+        overlay.write_text('overlay_for: "src/"\n')
+
+        symlink_root = tmp_path / "linked-project"
+        symlink_root.symlink_to(project, target_is_directory=True)
+
+        overlays = _find_all_overlays(symlink_root)
+
+        assert overlays == [overlay.resolve()]

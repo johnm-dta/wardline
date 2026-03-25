@@ -69,7 +69,14 @@ def resolve_boundaries(
         # Tag each boundary with the overlay's ABSOLUTE scope path
         scope = str((root / overlay.overlay_for).resolve())
         rel_overlay = str(overlay_path.relative_to(root))
+        seen_functions: set[str] = set()
         for boundary in resolved.boundaries:
+            if boundary.function in seen_functions:
+                raise GovernanceError(
+                    "Duplicate boundary declaration for function "
+                    f"'{boundary.function}' in overlay '{rel_overlay}'"
+                )
+            seen_functions.add(boundary.function)
             scoped = replace(boundary, overlay_scope=scope, overlay_path=rel_overlay)
             all_boundaries.append(scoped)
 

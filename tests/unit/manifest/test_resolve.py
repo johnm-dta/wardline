@@ -157,3 +157,28 @@ class TestResolveBoundaries:
 
         result = resolve_boundaries(tmp_path, manifest)
         assert len(result) == 1
+
+    def test_duplicate_boundary_functions_within_overlay_rejected(
+        self, tmp_path: Path
+    ) -> None:
+        overlay_dir = tmp_path / "adapters"
+        overlay_dir.mkdir()
+        _write_overlay(
+            overlay_dir / "wardline.overlay.yaml",
+            (
+                '$id: "https://wardline.dev/schemas/0.1/overlay.schema.json"\n'
+                "overlay_for: adapters\n"
+                "boundaries:\n"
+                '  - function: "Client.call"\n'
+                '    transition: "construction"\n'
+                '  - function: "Client.call"\n'
+                '    transition: "semantic_validation"\n'
+            ),
+        )
+        manifest = _minimal_manifest(module_paths=("adapters",))
+
+        with pytest.raises(
+            GovernanceError,
+            match="Duplicate boundary declaration for function 'Client.call'",
+        ):
+            resolve_boundaries(tmp_path, manifest)
