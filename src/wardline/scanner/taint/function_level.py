@@ -173,7 +173,7 @@ def taint_from_annotations(
     file_path: str,
     qualname: str,
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
-    taint_map: dict[str, TaintState] | None = None,
+    decorator_map: dict[str, TaintState] | None = None,
 ) -> TaintState | None:
     """Resolve taint from decorator annotations.
 
@@ -182,18 +182,18 @@ def taint_from_annotations(
     is unusual and will be flagged by later rules.)
 
     Args:
-        taint_map: Which decorator→taint mapping to use. Defaults to
-            ``BODY_EVAL_TAINT`` (input tier).
+        decorator_map: Which decorator-name→taint mapping to use.
+            Defaults to ``BODY_EVAL_TAINT`` (input tier).
     """
-    if taint_map is None:
-        taint_map = BODY_EVAL_TAINT
+    if decorator_map is None:
+        decorator_map = BODY_EVAL_TAINT
     key = (file_path, qualname)
     anns = annotations.get(key)
     if not anns:
         return None
 
     for ann in anns:
-        taint = taint_map.get(ann.canonical_name)
+        taint = decorator_map.get(ann.canonical_name)
         if taint is not None:
             return taint
 
@@ -217,12 +217,12 @@ def _walk_and_assign(
 
             # Precedence: decorator > module_tiers > UNKNOWN_RAW
             body_taint = taint_from_annotations(
-                file_path, qualname, annotations, taint_map=BODY_EVAL_TAINT,
+                file_path, qualname, annotations, decorator_map=BODY_EVAL_TAINT,
             )
             if body_taint is not None:
                 source: TaintSource = "decorator"
                 ret_taint = taint_from_annotations(
-                    file_path, qualname, annotations, taint_map=RETURN_TAINT,
+                    file_path, qualname, annotations, decorator_map=RETURN_TAINT,
                 )
                 # Fallback: if decorator is in BODY_EVAL_TAINT but not
                 # RETURN_TAINT, use body taint for return too.

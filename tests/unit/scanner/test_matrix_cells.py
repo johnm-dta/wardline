@@ -174,11 +174,14 @@ class TestGenericMatrixCells:
         findings = _run_generic(rule_id, taint)
 
         if expected_severity == Su:
-            # SUPPRESS cells: rule may fire with SUPPRESS severity or not fire at all.
-            # When it fires, verify the cell values match.
-            if findings:
-                assert findings[0].severity == expected_severity
-                assert findings[0].exceptionability == expected_exceptionability
+            # SUPPRESS cells: rule MUST still fire with SUPPRESS severity.
+            # A rule that silently stops emitting findings would be a regression.
+            assert len(findings) >= 1, (
+                f"Expected SUPPRESS finding for {rule_id.value} at taint {taint.value}, "
+                f"got 0 findings"
+            )
+            assert findings[0].severity == expected_severity
+            assert findings[0].exceptionability == expected_exceptionability
         else:
             assert len(findings) >= 1, (
                 f"Expected finding for {rule_id.value} at taint {taint.value}"

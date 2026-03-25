@@ -183,32 +183,35 @@ class ScanEngine:
             body_taint_map, return_taint_map, taint_sources = assign_function_taints(
                 tree, file_path, annotations, self._manifest
             )
-            taint_map = body_taint_map
         except Exception as exc:
             logger.warning("Discovery/taint failed for %s: %s", file_path, exc)
             result.errors.append(
                 f"Discovery/taint failed for {file_path}: {exc}"
             )
-            taint_map, return_taint_map, taint_sources = {}, {}, {}
+            body_taint_map, return_taint_map, taint_sources = {}, {}, {}
 
         # Pass 1.5: Level 3 call-graph taint (when analysis_level >= 3)
+        # L3 refines body_taint_map using callgraph analysis. The refined map
+        # is still a body-evaluation map (what rules see inside function bodies),
+        # but non-anchored functions may be demoted based on their callees'
+        # return taints.
         taint_provenance: dict[str, TaintProvenance] | None = None
-        if self._analysis_level >= 3 and taint_map:
-            taint_map, taint_provenance = self._run_callgraph_taint(
-                tree, taint_map, taint_sources, file_path, result,
+        if self._analysis_level >= 3 and body_taint_map:
+            body_taint_map, taint_provenance = self._run_callgraph_taint(
+                tree, body_taint_map, taint_sources, file_path, result,
                 return_taint_map=return_taint_map,
             )
 
         # Pass 1.75: Level 2 variable-level taint (when analysis_level >= 2)
         variable_taint_map: dict[str, dict[str, TaintState]] | None = None
-        if self._analysis_level >= 2 and taint_map:
+        if self._analysis_level >= 2 and body_taint_map:
             variable_taint_map = self._run_variable_taint(
-                tree, taint_map, file_path, result
+                tree, body_taint_map, file_path, result
             )
 
         ctx = ScanContext(
             file_path=str(file_path),
-            function_level_taint_map=taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
+            function_level_taint_map=body_taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
             annotations_map={  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
                 qualname: tuple(found)
                 for (ann_path, qualname), found in annotations.items()

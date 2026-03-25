@@ -161,11 +161,14 @@ def propagate_callgraph_taints(
                 if ext_taint != current[f]:
                     current[f] = ext_taint
                     refined.add(f)
-                    # Record via_callee from external callees
+                    # Record via_callee from external callees.
+                    # Use the same anchored/floating logic as rank computation.
                     best_callee: str | None = None
                     best_rank = -1
                     for c in sorted(ext_callees):
-                        c_rank = TRUST_RANK[current[c]]
+                        c_rank = TRUST_RANK[
+                            return_taint_map.get(c, current[c]) if c in anchored else current[c]
+                        ]
                         if c_rank > best_rank:
                             best_rank = c_rank
                             best_callee = c
@@ -231,11 +234,14 @@ def propagate_callgraph_taints(
                 refined.add(func)
 
                 # Determine via_callee: the callee with highest rank (least trusted).
+                # Use the same anchored/floating logic as rank computation.
                 # Tie-break: alphabetically first qualname.
                 best_callee_wl: str | None = None
                 best_rank_wl = -1
                 for c in sorted(callee_set):  # sorted for tie-breaking
-                    c_rank = TRUST_RANK[current[c]]
+                    c_rank = TRUST_RANK[
+                        return_taint_map.get(c, current[c]) if c in anchored else current[c]
+                    ]
                     if c_rank > best_rank_wl:
                         best_rank_wl = c_rank
                         best_callee_wl = c

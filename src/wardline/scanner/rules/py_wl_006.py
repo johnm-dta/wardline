@@ -28,6 +28,10 @@ _AUDIT_DECORATORS = frozenset({"audit_writer", "audit_critical"})
 _AUDIT_ATTR_PREFIXES = ("audit", "record", "emit")
 _AUDIT_FUNC_NAMES = frozenset({"audit", "record", "emit"})
 
+# Python 3.11 introduced ast.TryStar for except* syntax; Python 3.12 merged
+# it back into ast.Try. Cache at module level to avoid per-function lookup.
+_AST_TRY_STAR: type | None = getattr(ast, "TryStar", None)
+
 
 @dataclass(frozen=True)
 class _BlockAnalysis:
@@ -208,11 +212,10 @@ class RulePyWl006(RuleBase):
     ) -> None:
         """Check broad-handler masking and local success-path audit bypasses."""
         # ── Pass 1: collect TryStar handler IDs and process them ──
-        _TryStar = getattr(ast, "TryStar", None)
         trystar_handlers: set[int] = set()
-        if _TryStar is not None:
+        if _AST_TRY_STAR is not None:
             for child in walk_skip_nested_defs(node):
-                if isinstance(child, _TryStar):
+                if isinstance(child, _AST_TRY_STAR):
                     for handler in child.handlers:
                         trystar_handlers.add(id(handler))
                         self._check_broad_handler_for_audit(handler)
