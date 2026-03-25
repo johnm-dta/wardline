@@ -15,7 +15,8 @@ from wardline.core import matrix
 from wardline.core.severity import RuleId
 from wardline.manifest.scope import path_within_scope
 from wardline.scanner.context import Finding
-from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
+from wardline.scanner.rejection_path import has_rejection_path as _has_rejection_path
+from wardline.scanner.rules.base import RuleBase
 
 _BOUNDARY_TRANSITIONS = frozenset({
     "shape_validation",
@@ -31,34 +32,6 @@ _BOUNDARY_DECORATORS = frozenset({
     "validates_external",
     "restoration_boundary",
 })
-
-
-def _is_negative_guard(expr: ast.expr) -> bool:
-    """Return True for simple guards that indicate rejection on this branch."""
-    if isinstance(expr, ast.UnaryOp) and isinstance(expr.op, ast.Not):
-        return True
-    if isinstance(expr, ast.Compare):
-        return any(
-            isinstance(op, (ast.IsNot, ast.NotEq))
-            or (
-                isinstance(op, (ast.Is, ast.Eq))
-                and isinstance(comparator, ast.Constant)
-                and comparator.value in (False, None)
-            )
-            for op, comparator in zip(expr.ops, expr.comparators, strict=False)
-        )
-    return False
-
-
-def _branch_has_rejection_terminator(stmts: list[ast.stmt]) -> bool:
-    """Return True when the branch contains a terminating rejection action."""
-    for stmt in stmts:
-        for node in ast.walk(stmt):
-            if isinstance(node, ast.Raise):
-                return True
-            if isinstance(node, ast.Return):
-                return True
-    return False
 
 
 def _decorator_name(decorator: ast.expr) -> str | None:
@@ -79,54 +52,6 @@ def _has_direct_boundary_decorator(
         _decorator_name(decorator) in _BOUNDARY_DECORATORS
         for decorator in node.decorator_list
     )
-
-
-def _is_constant_false(expr: ast.expr) -> bool:
-    """Return True for expressions that are trivially always falsy.
-
-    Covers ``False``, ``0``, ``""``, ``b""``, ``None``, ``0.0``, ``0j``.
-    """
-    if not isinstance(expr, ast.Constant):
-        return False
-    return not expr.value and expr.value is not ...
-
-
-def _has_rejection_path(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
-    """Return True when the boundary body contains a structural rejection path.
-
-    A raise inside a trivially unreachable branch (``if False:``, ``if 0:``)
-    is not counted as a rejection path per spec §7.2.
-    """
-    for child in walk_skip_nested_defs(node):
-        if isinstance(child, ast.Raise):
-            if not _is_inside_dead_branch(child, node):
-                return True
-        if not isinstance(child, ast.If):
-            continue
-        if _is_constant_false(child.test):
-            continue
-        if _is_negative_guard(child.test) and _branch_has_rejection_terminator(child.body):
-            return True
-        if child.orelse and _branch_has_rejection_terminator(child.orelse):
-            return True
-    return False
-
-
-def _is_inside_dead_branch(
-    target: ast.AST,
-    root: ast.FunctionDef | ast.AsyncFunctionDef,
-) -> bool:
-    """Return True when *target* is nested inside a constant-false ``if`` body."""
-    for stmt in ast.walk(root):
-        if not isinstance(stmt, ast.If):
-            continue
-        if not _is_constant_false(stmt.test):
-            continue
-        # Check if target is inside this dead branch's body
-        for body_node in ast.walk(stmt):
-            if body_node is target:
-                return True
-    return False
 
 
 class RulePyWl008(RuleBase):
