@@ -15,8 +15,9 @@ from wardline.core import matrix
 from wardline.core.severity import RuleId
 from wardline.manifest.scope import path_within_scope
 from wardline.scanner.context import Finding
+from wardline.scanner.import_resolver import resolve_call_fqn
 from wardline.scanner.rejection_path import has_rejection_path as _has_rejection_path
-from wardline.scanner.rules.base import RuleBase
+from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
 
 _BOUNDARY_TRANSITIONS = frozenset({
     "shape_validation",
@@ -78,7 +79,37 @@ class RulePyWl008(RuleBase):
             return
         if _has_rejection_path(node):
             return
+        if self._has_delegated_rejection(node):
+            return
         self._emit_finding(node)
+
+    def _has_delegated_rejection(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> bool:
+        """Check if the boundary delegates rejection to a function in the index."""
+        if self._context is None or not self._context.rejection_path_index:
+            return False
+        alias_map = dict(self._context.import_alias_map or {})
+        index = self._context.rejection_path_index
+        # Derive module prefix from the module_file_map (reverse lookup)
+        module_prefix = ""
+        if self._context.module_file_map:
+            for mod_name, mod_path in self._context.module_file_map.items():
+                if mod_path == self._context.file_path or mod_path == self._file_path:
+                    module_prefix = mod_name
+                    break
+        local_fqns = frozenset(
+            fqn for fqn in index if fqn.startswith(f"{module_prefix}.")
+        ) if module_prefix else frozenset()
+
+        for child in walk_skip_nested_defs(node):
+            if not isinstance(child, ast.Call):
+                continue
+            fqn = resolve_call_fqn(child, alias_map, local_fqns, module_prefix)
+            if fqn is not None and fqn in index:
+                return True
+        return False
 
     def _is_checked_boundary(
         self,
