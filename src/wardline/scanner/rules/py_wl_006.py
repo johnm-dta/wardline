@@ -207,25 +207,25 @@ class RulePyWl006(RuleBase):
         is_async: bool,
     ) -> None:
         """Check broad-handler masking and local success-path audit bypasses."""
-        for child in walk_skip_nested_defs(node):
-            if not isinstance(child, ast.ExceptHandler):
-                continue
-            if not _is_broad_handler(child):
-                continue
-            # Walk the handler body for audit-critical calls
-            for handler_node in ast.walk(child):
-                if (
-                    isinstance(handler_node, ast.Call)
-                    and _is_audit_call(handler_node, self._local_audit_names)
-                ):
-                    self._emit_finding(
-                        handler_node,
-                        (
-                            "Audit-critical write in broad exception handler — "
-                            "if the write fails, the broad handler masks the failure"
-                        ),
-                    )
+        # ── Pass 1: collect TryStar handler IDs and process them ──
+        _TryStar = getattr(ast, "TryStar", None)
+        trystar_handlers: set[int] = set()
+        if _TryStar is not None:
+            for child in walk_skip_nested_defs(node):
+                if isinstance(child, _TryStar):
+                    for handler in child.handlers:
+                        trystar_handlers.add(id(handler))
+                        self._check_broad_handler_for_audit(handler)
 
+        # ── Pass 2: process non-TryStar handlers ──
+        for child in walk_skip_nested_defs(node):
+            if (
+                isinstance(child, ast.ExceptHandler)
+                and id(child) not in trystar_handlers
+            ):
+                self._check_broad_handler_for_audit(child)
+
+        # ── Dominance analysis ──
         if not _has_normal_path_audit(node.body, self._local_audit_names):
             return
 
@@ -252,6 +252,23 @@ class RulePyWl006(RuleBase):
                     "that can bypass audit"
                 ),
             )
+
+    def _check_broad_handler_for_audit(self, handler: ast.ExceptHandler) -> None:
+        """Check a single broad handler for audit-critical calls."""
+        if not _is_broad_handler(handler):
+            return
+        for handler_node in ast.walk(handler):
+            if (
+                isinstance(handler_node, ast.Call)
+                and _is_audit_call(handler_node, self._local_audit_names)
+            ):
+                self._emit_finding(
+                    handler_node,
+                    (
+                        "Audit-critical write in broad exception handler — "
+                        "if the write fails, the broad handler masks the failure"
+                    ),
+                )
 
     def _analyze_block(
         self,

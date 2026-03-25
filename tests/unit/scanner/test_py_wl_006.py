@@ -270,3 +270,21 @@ def outer():
         )
 
         assert len(rule.findings) == 2
+
+
+class TestTryStarDedup:
+    def test_except_star_broad_audit_call_produces_one_finding(self) -> None:
+        """except* broad handler with audit call must produce exactly 1 finding."""
+        rule = _run_rule(
+            """\
+try:
+    do_work()
+except* Exception as eg:
+    audit.emit(eg)
+""",
+        )
+        masking_findings = [
+            f for f in rule.findings
+            if "broad exception handler" in f.message.lower()
+        ]
+        assert len(masking_findings) == 1
