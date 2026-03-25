@@ -16,6 +16,25 @@ A wardline without governance is an honour system. The governance model defines 
 
     **Review cadence:** Manifest ratification at the interval you declare (recommended: 180 days). Exception re-review at expiry. Graduation readiness when triggers are met (§14.3.3).
 
+**Governance mechanism summary.** The following table maps each governance mechanism to its status under the two governance profiles (§14.3.2). Use this as a quick reference; the subsections below provide full detail.
+
+| Mechanism | Lite | Assurance | Reference |
+|-----------|------|-----------|-----------|
+| Root wardline manifest (`wardline.yaml`) | MUST | MUST | §13.1.1 |
+| CODEOWNERS protection for governance artefacts | MUST | MUST | §9.2 |
+| Exception register with reviewer identity, rationale, expiry | MUST | MUST | §9.1, §13.1.3 |
+| Branch protection (CI gates before merge) | MUST | MUST | §9.2 |
+| Temporal separation (separate change, different actor) | SHOULD (documented alternative permitted) | MUST (no alternatives) | §9.2 |
+| Annotation change tracking | MUST (VCS diff or equivalent) | MUST (full fingerprint baseline) | §9.2 |
+| Full fingerprint baseline (canonical hashing, structured change detection) | Deferred | MUST | §9.2 |
+| Golden corpus | SHOULD (bootstrap: 20–30 specimens) | MUST (full: 126+ specimens) | §10 |
+| Expedited governance ratio | RECOMMENDED | MUST (threshold declared, automated finding) | §9.4 |
+| Exception recurrence tracking | MUST | MUST | §9.4 |
+| Manifest coherence checks | RECOMMENDED | MUST (CI gate) | §9.2 |
+| Governance audit logging | MUST | MUST | §9.2.1 |
+| SIEM export of governance events | — | SHOULD (MUST for ISM-assessed) | §9.2.1 |
+| Agent-authored governance change detection | MUST | MUST | §9.3 |
+
 #### 9.1 Exceptionability classes
 
 Four classes govern how findings may be overridden:
@@ -175,6 +194,8 @@ As annotation coverage grows, coding-level risk falls — annotations constrain 
 | Boundary widening without code | Consumer added to bounded-context but no new function at that path | ERROR — likely declaration manipulation |
 | Annotation volume spike | More than N annotation changes in a single review window (N project-defined) | WARNING |
 | Agent-originated policy change | Any policy artefact change (§9.3.1) authored by an agent | ERROR — requires human ratification (§9.3) |
+| New dependency taint above UNKNOWN_RAW | A `dependency_taint` entry is added with `returns_taint` above UNKNOWN_RAW (e.g., SHAPE_VALIDATED, PIPELINE) for a function not previously declared | WARNING — the reviewer is making a trust claim about code outside the governance perimeter; the rationale should identify the evidence basis (code review, upstream advisory, documentation, or test-verified behaviour) |
+| Dependency taint finding suppression | Adding or modifying a `dependency_taint` entry suppresses more than a project-defined threshold of code-level findings | WARNING — governance-level signal that the declaration may be motivated by finding suppression rather than substantiated trust |
 
 These signals are governance-level findings, not code-level findings. They appear in the SARIF output with `ruleId: "GOVERNANCE"` and are subject to the governance model's own exception mechanism (STANDARD exceptionability — they can be overridden with documented rationale, but they cannot be silently suppressed).
 

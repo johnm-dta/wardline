@@ -74,9 +74,9 @@ B. [Java Language Binding Reference](#part-ii-b-java-language-binding-reference)
 - Wardline Lite practical guide (`wardline-lite.md`) — five review questions for non-specialist code reviewers
 - Implementation design: Wardline for Python (`../2026-03-21-wardline-python-design.md`) — reference implementation work packages and build order
 
-**Planned Companion Documents** (in preparation)
+**Planned Companion Documents** (deferred to post-v1.0)
 
-- Implementer's Guide: Scanner Architecture — detailed guidance for building a Wardline-Core scanner
-- Agent Guidance — constraints and patterns for AI agents working in wardline-annotated codebases
+- Implementer's Guide: Scanner Architecture — detailed guidance for building a Wardline-Core scanner. Content from prior specification drafts is available in version control history.
+- Agent Guidance — constraints and patterns for AI agents working in wardline-annotated codebases. Evolved from prior agent guidance sections; publication deferred until reference implementation reaches production maturity.
 
 ---

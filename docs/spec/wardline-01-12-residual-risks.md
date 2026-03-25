@@ -2,6 +2,24 @@
 
 Fifteen risks are inherent to the wardline model regardless of language, tooling, or governance maturity. They are structural limitations, not implementation defects.
 
+| # | Risk | Primary Compensating Control |
+|---|------|------------------------------|
+| 1 | Declaration correctness — wardline itself could be wrong | Governance model (§9), baseline ratification |
+| 2 | Governance decay — rubber-stamping under deadline pressure | Annotation fingerprint baseline (§9.2) |
+| 3 | Serialisation boundary blindness — static analysis cannot verify bytes on disk | Restoration boundaries (§5.3), institutional trust |
+| 4 | Annotation coverage gaps — unannotated code is invisible | Coverage reporting in fingerprint baseline (§9.2) |
+| 5 | Semantic downgrade — exception translation defeating original intent | Golden corpus specimens, governance review of translation authority |
+| 6 | Expedited governance path normalisation — "time-critical" becomes default | Expedited governance ratio metric (§9.4) |
+| 7 | Implicit-flow taint bypass — control-flow encoding launders taint | Implicit-flow evasion heuristic (§7.6.1), prompted review |
+| 8 | SHOULD-layer verification gap — no independent verification for type/runtime layers | Binding-level corpus extension (tool quality target) |
+| 9 | Adversarial annotation injection — deliberately dishonest declarations | Code review, WL-007, fingerprint baseline (§9.2) |
+| 10 | Contract adequacy — bounded-context declarations may be incomplete | Contract declarations reviewable in fingerprint baseline |
+| 11 | MIXED state coarseness — field-level taint lost on cross-tier composites | `join_product` / MIXED_TRACKED binding extension (§5.1) |
+| 12 | Evasion surface trajectory — models learn to route around syntactic tripwires | Semantic equivalent catalogues, adversarial corpus specimens |
+| 13 | Governance-layer attack surface — manifest poisoning, fatigue exploitation, boundary manipulation | Two-person review, anomaly detection (§9.3.2) |
+| 14 | Third-party library boundary taint — ungoverned code performing tier promotions | `dependency_taint` declarations (§13.1.2), version pinning |
+| 15 | Capacity-driven classification drift — manifest born wrong under capacity pressure | Lite governance profile (§14.3.2), phased adoption |
+
 **1. Declaration correctness.** The wardline itself could be wrong. If the application declares the wrong tier for a data source — classifying external API data as Tier 1, or authoritative audit records as Tier 3 — enforcement is structurally correct but semantically meaningless. The tool faithfully enforces the wrong policy. Pre-generation context projection (§8.5) amplifies the consequences of declaration errors when LLMs are active consumers: a wrong tier declaration causes the LLM to generate code conforming to the wrong policy, and that code passes enforcement because enforcement faithfully implements the poisoned manifest. The accidental defensive patterns that would otherwise serve as symptoms of misclassification — patterns that a human reviewer might notice as anomalous — are eliminated by the projection, because the LLM generates code that is stylistically consistent with the (wrong) declared tier. Compensating control: governance model (§9), baseline ratification with classification confirmation, and independent review of trust-escalation declarations.
 
 **2. Governance decay.** Every governance gate is a human activity. Protected-file review, temporal separation, provenance justification — each requires a human to exercise judgement under deadline pressure. Under sustained pressure, each becomes a candidate for rubber-stamping. The wardline cannot verify the quality of the human judgement that governs it. It can only make the judgement visible and auditable. Compensating control: annotation fingerprint baseline (§9.2), which makes governance erosion detectable even if it cannot prevent it.

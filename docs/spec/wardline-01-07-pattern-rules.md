@@ -64,13 +64,17 @@ This is a **classification decision**, not an exception. An exception says "this
 
 **Mismatch severity.** When a `.get()` uses a default value that differs from the declared approved default for that field, the finding severity is ERROR/UNCONDITIONAL. This is more severe than the undeclared case (ERROR/STANDARD) because the mismatch represents a direct contradiction between the code and the institutional policy — someone has either made an error or is circumventing the declared structural contract.
 
+**Third-party library models.** When an application imports a Pydantic model, dataclass, or equivalent type definition from a third-party library and uses it in a tier-classified flow, the library's schema defaults become governance-relevant under this section. The library maintainer chose those defaults for general-purpose API ergonomics — not for the application's institutional context. The correct response is not to modify the library or to write individual `optional_fields` overlay entries for every field. Instead, the application should either (a) wrap the library model in an application-owned validation boundary that constructs the tier-appropriate representation, treating the library model as a data transfer format rather than a governance artefact, or (b) review the library model's defaults as a batch using the `schema_defaults_reviewed` field in the `dependency_taint` declaration (§13.1.2), which suppresses per-field findings for models whose defaults have been assessed and accepted at the governance level. Option (a) is architecturally preferred — it places the validation boundary within the application's governance perimeter. Option (b) is a governance expedient for cases where wrapping every library model is disproportionate to the risk.
+
 **Governance visibility.** Approved structural-contract default declarations are tracked in the fingerprint baseline (§9.2) as a distinct change category alongside annotation changes. A new optional-field declaration on a security-relevant field — declaring `security_classification` as optional with default `"OFFICIAL"` — is a high-risk classification decision that warrants the same governance scrutiny as a tier-escalation declaration. The fingerprint baseline makes it visible; the governance model ensures it's reviewed.
 
 #### 7.3 Severity matrix
 
-**How to read this matrix.** Each cell encodes severity / exceptionability as a two-letter code. Severity: **E** = Error (wrong in this context), **W** = Warning (suspicious), **Su** = Suppress (expected). Exceptionability: **U** = Unconditional (never overridable — project invariant), **St** = Standard (overridable with documented rationale, reviewer identity, and expiry), **R** = Relaxed (lighter governance burden), **T** = Transparent (corresponds to SUPPRESS cells — the pattern is expected in this context, no governance required; see §9.1). Suppress severity always pairs with Transparent exceptionability (Su/T). Read across a row to see how a single rule varies by context; read down a column to see how a single context treats all rules.
+**How to read this matrix.** Each cell encodes severity / exceptionability as a two-letter code (see key below the next paragraph). Suppress severity always pairs with Transparent exceptionability (Su/T). Read across a row to see how a single rule varies by context; read down a column to see how a single context treats all rules. The exceptionability classes are defined in §9.1.
 
 WL-007 and WL-008 are structural verification rules (not pattern rules) and apply only to declared boundary functions, but are shown in the matrix for completeness. Their severity is unconditional across all contexts because they are framework invariants rather than context-dependent judgements.
+
+**Matrix key.** Severity: **E** = Error (wrong in this context), **W** = Warning (suspicious), **Su** = Suppress (expected). Exceptionability: **U** = Unconditional, **St** = Standard, **R** = Relaxed, **T** = Transparent.
 
 | Rule | Pattern | Audit Trail | Pipeline | Shape Val. | Ext. Raw | Unk. Raw | Unk. Shape V. | Unk. Sem. V. | Mixed Raw |
 |------|---------|---|---|---|---|---|---|---|---|
@@ -82,7 +86,6 @@ WL-007 and WL-008 are structural verification rules (not pattern rules) and appl
 | **WL-006** | Runtime type-checking internal data | E/St | W/R | W/R | Su/T | Su/T | W/R | W/R | W/St |
 | **WL-007** | Validation with no rejection path | E/U | E/U | E/U | E/U | E/U | E/U | E/U | E/U |
 | **WL-008** | Semantic validation without shape validation | E/U | E/U | E/U | E/U | E/U | E/U | E/U | E/U |
-| | **Legend:** E = Error, W = Warning, Su = Suppress / U = Unconditional, St = Standard, R = Relaxed, T = Transparent | | | | | | | | |
 
 **Binding-level matrix deviations.** Language bindings MAY modify individual cells where the target language's type system structurally prevents a violation class. For example, the Java binding (Part II-B §B.4.4) changes WL-002 in SHAPE_VALIDATED from E/U to Su/T for records, because Java records guarantee complete construction. Such deviations must be documented in the binding's matrix with explicit rationale. See §11 (language evaluation criteria) for the general principle governing binding-level deviations.
 

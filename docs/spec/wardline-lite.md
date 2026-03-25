@@ -2,8 +2,6 @@
 
 **What you need to know when you are the only reviewer — and there is no CI pipeline to catch what you miss.**
 
-*This is the practical companion to [Understanding AI Code Risk in Government Systems](gcbd-lite.md) — that document explains the systemic risk; this one shows you what to look for in your code.*
-
 ---
 
 ## 1. You Are Not Doing Anything Wrong
