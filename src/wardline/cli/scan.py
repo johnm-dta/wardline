@@ -353,6 +353,7 @@ def scan(
         boundaries=boundaries,
         optional_fields=optional_fields,  # type: ignore[arg-type]
         analysis_level=analysis_level,
+        max_expansion_rounds=cfg.max_expansion_rounds if cfg is not None else 1,
     )
 
     logger.info("Scanning %d target path(s)...", len(target_paths))

@@ -92,6 +92,7 @@ class ScanEngine:
         optional_fields: tuple[OptionalFieldEntry, ...] = (),
         analysis_level: int = 1,
         known_validators: frozenset[str] | None = None,
+        max_expansion_rounds: int = 1,
     ) -> None:
         self._target_paths = target_paths
         self._exclude_paths = tuple(p.resolve() for p in exclude_paths)
@@ -101,6 +102,7 @@ class ScanEngine:
         self._optional_fields = optional_fields
         self._analysis_level = analysis_level
         self._known_validators = known_validators if known_validators is not None else BUILTIN_KNOWN_VALIDATORS
+        self._max_expansion_rounds = max_expansion_rounds
         self._project_index: ProjectIndex | None = None
 
     def scan(self) -> ScanResult:
