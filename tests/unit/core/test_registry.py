@@ -45,9 +45,51 @@ def test_registry_has_group2_decorator() -> None:
     assert REGISTRY["audit_critical"].group == 2
 
 
+def test_group_10_matches_authoritative_binding() -> None:
+    """Group 10 exports the authoritative failure-mode surface."""
+    group10_names = {
+        "emits_or_explains",
+        "exception_boundary",
+        "fail_closed",
+        "fail_open",
+        "must_propagate",
+        "preserve_cause",
+    }
+    registered = {name for name, entry in REGISTRY.items() if entry.group == 10}
+    assert registered == group10_names
+
+
+def test_groups_7_to_15_match_authoritative_binding() -> None:
+    """Groups 7-15 must match the authoritative Python binding surface."""
+    expected = {
+        7: {"parse_at_init"},
+        8: {"handles_secrets"},
+        9: {"idempotent", "atomic", "compensatable"},
+        10: {
+            "emits_or_explains",
+            "exception_boundary",
+            "fail_closed",
+            "fail_open",
+            "must_propagate",
+            "preserve_cause",
+        },
+        11: {"declassifies", "handles_classified", "handles_pii"},
+        12: {"deterministic", "time_dependent"},
+        13: {"not_reentrant", "ordered_after", "thread_safe"},
+        14: {"privileged_operation", "requires_identity"},
+        15: {"deprecated_by", "feature_gated", "test_only"},
+    }
+
+    for group, names in expected.items():
+        registered = {
+            name for name, entry in REGISTRY.items() if entry.group == group
+        }
+        assert registered == names
+
+
 def test_total_count() -> None:
-    """32 decorators total (Groups 1-14)."""
-    assert len(REGISTRY) == 32
+    """38 decorators total after authoritative Groups 7-15 reconciliation."""
+    assert len(REGISTRY) == 38
 
 
 

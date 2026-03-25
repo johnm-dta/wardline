@@ -29,15 +29,17 @@ _SEVERITY_TO_SARIF_LEVEL: dict[Severity, str] = {
 
 # Short descriptions for each canonical rule ID.
 _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
-    RuleId.PY_WL_001: "Dict key access should use fallback default",
-    RuleId.PY_WL_002: "Missing shape validation on external input",
-    RuleId.PY_WL_003: "Raw external data used without sanitisation",
-    RuleId.PY_WL_004: "Unvalidated decorator argument",
-    RuleId.PY_WL_005: "Unsafe type coercion on tainted data",
-    RuleId.PY_WL_006: "Missing audit trail annotation",
-    RuleId.PY_WL_007: "Pipeline stage ordering violation",
-    RuleId.PY_WL_008: "Taint state escalation without validation",
-    RuleId.PY_WL_009: "Governance registry mismatch",
+    RuleId.PY_WL_001: "Dict key access with fallback default",
+    RuleId.PY_WL_002: "Attribute access with fallback default",
+    RuleId.PY_WL_003: "Existence-checking as structural gate",
+    RuleId.PY_WL_004: "Broad exception handler",
+    RuleId.PY_WL_005: "Silent exception handler",
+    RuleId.PY_WL_006: "Audit-critical write in broad exception handler",
+    RuleId.PY_WL_007: "Runtime type-checking on internal data",
+    RuleId.PY_WL_008: "Validation boundary with no rejection path",
+    RuleId.PY_WL_009: "Semantic validation without prior shape validation",
+    RuleId.SCN_021: "Contradictory or suspicious wardline decorator combination",
+    RuleId.SUP_001: "Supplementary decorator contract violation",
     RuleId.PY_WL_001_GOVERNED_DEFAULT: "Governed default value (diagnostic)",
     RuleId.PY_WL_001_UNGOVERNED_DEFAULT: "Ungoverned schema_default() — no overlay boundary (diagnostic)",
     RuleId.WARDLINE_UNRESOLVED_DECORATOR: "Unresolved decorator (diagnostic)",
@@ -113,8 +115,12 @@ def _make_result(finding: Finding) -> dict[str, Any]:
     properties = _clean_none(
         {
             "wardline.rule": str(finding.rule_id),
+            # Defensive fallback: canonical rules always carry taint, but
+            # keeping the property present avoids fragile downstream handling.
             "wardline.taintState": (
-                str(finding.taint_state) if finding.taint_state else None
+                str(finding.taint_state)
+                if finding.taint_state is not None
+                else "UNKNOWN_RAW"
             ),
             "wardline.severity": str(finding.severity),
             "wardline.exceptionability": str(finding.exceptionability),

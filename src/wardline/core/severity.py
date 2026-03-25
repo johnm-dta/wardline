@@ -44,6 +44,8 @@ class RuleId(StrEnum):
     PY_WL_007 = "PY-WL-007"
     PY_WL_008 = "PY-WL-008"
     PY_WL_009 = "PY-WL-009"
+    SCN_021 = "SCN-021"
+    SUP_001 = "SUP-001"
 
     # Pseudo-rule-IDs (diagnostic signals, not analysis rules)
     PY_WL_001_GOVERNED_DEFAULT = "PY-WL-001-GOVERNED-DEFAULT"

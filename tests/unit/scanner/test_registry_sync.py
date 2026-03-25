@@ -58,6 +58,25 @@ _DECORATOR_MODULES = [
     secrets, sensitivity,
 ]
 
+
+def _rollback_stub(exc: Exception) -> None:
+    del exc
+
+
+_DECORATOR_FACTORIES: dict[str, Any] = {
+    "compensatable": operations.compensatable(rollback=_rollback_stub),
+    "deprecated_by": lifecycle.deprecated_by(
+        date="2026-12-31", replacement="new_api"
+    ),
+    "declassifies": sensitivity.declassifies(
+        from_level="SECRET", to_level="PROTECTED"
+    ),
+    "feature_gated": lifecycle.feature_gated(flag="beta-flag"),
+    "handles_classified": sensitivity.handles_classified(level="PROTECTED"),
+    "handles_pii": sensitivity.handles_pii(fields=["email"]),
+    "ordered_after": concurrency.ordered_after("bootstrap"),
+}
+
 for _mod in _DECORATOR_MODULES:
     for _name in dir(_mod):
         if _name.startswith("_"):
@@ -136,7 +155,7 @@ class TestAttributeLevel:
 
     @pytest.mark.parametrize("name", sorted(REGISTRY.keys()))
     def test_attrs_present_with_correct_types(self, name: str) -> None:
-        dec = _LIBRARY_DECORATORS[name]
+        dec = _DECORATOR_FACTORIES.get(name, _LIBRARY_DECORATORS[name])
         entry = REGISTRY[name]
 
         @dec
@@ -156,7 +175,7 @@ class TestAttributeLevel:
 
     @pytest.mark.parametrize("name", sorted(REGISTRY.keys()))
     def test_wardline_groups_set(self, name: str) -> None:
-        dec = _LIBRARY_DECORATORS[name]
+        dec = _DECORATOR_FACTORIES.get(name, _LIBRARY_DECORATORS[name])
         entry = REGISTRY[name]
 
         @dec
@@ -326,7 +345,7 @@ class TestWrappedChainValidation:
     @pytest.mark.parametrize("name", sorted(REGISTRY.keys()))
     def test_all_decorators_have_wrapped(self, name: str) -> None:
         """Every decorator produces a wrapper with __wrapped__."""
-        dec = _LIBRARY_DECORATORS[name]
+        dec = _DECORATOR_FACTORIES.get(name, _LIBRARY_DECORATORS[name])
 
         @dec
         def stub() -> None:
@@ -473,7 +492,7 @@ class TestValidatedRecordConformance:
     def test_all_decorators_have_wardline_groups(self) -> None:
         """Every registered decorator sets _wardline_groups on the wrapped function."""
         for name in sorted(REGISTRY.keys()):
-            dec = _LIBRARY_DECORATORS[name]
+            dec = _DECORATOR_FACTORIES.get(name, _LIBRARY_DECORATORS[name])
 
             @dec
             def stub() -> None:

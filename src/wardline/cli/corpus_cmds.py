@@ -21,7 +21,7 @@ from wardline.manifest.loader import make_wardline_loader
 from wardline.scanner.rules import make_rules
 
 if TYPE_CHECKING:
-    from wardline.manifest.models import BoundaryEntry
+    from wardline.manifest.models import BoundaryEntry, OptionalFieldEntry
     from wardline.scanner.context import ScanContext
     from wardline.scanner.rules.base import RuleBase
 
@@ -73,6 +73,7 @@ def _build_specimen_context(
     taint_state: str,
     *,
     boundaries: tuple[BoundaryEntry, ...] = (),
+    optional_fields: tuple[OptionalFieldEntry, ...] = (),
 ) -> ScanContext:
     """Build a ScanContext that assigns *taint_state* to every function in *tree*.
 
@@ -91,6 +92,7 @@ def _build_specimen_context(
         file_path="<specimen>",
         function_level_taint_map=taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
         boundaries=boundaries,
+        optional_fields=optional_fields,
     )
 
 
@@ -127,12 +129,50 @@ def _parse_specimen_boundaries(data: dict[str, object]) -> tuple[BoundaryEntry, 
     return tuple(entries)
 
 
+def _parse_specimen_optional_fields(
+    data: dict[str, object],
+) -> tuple[OptionalFieldEntry, ...]:
+    """Build optional-field declarations from an optional corpus specimen field."""
+    from wardline.manifest.models import OptionalFieldEntry
+
+    raw = data.get("optional_fields", ())
+    if raw in (None, ()):
+        return ()
+    if not isinstance(raw, list):
+        raise ValueError("optional_fields must be a list")
+
+    entries: list[OptionalFieldEntry] = []
+    for idx, item in enumerate(raw, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"optional_field #{idx} must be a mapping")
+        field = item.get("field")
+        rationale = item.get("rationale", "corpus specimen declaration")
+        overlay_scope = item.get("overlay_scope", "<specimen>")
+        approved_default = item.get("approved_default")
+        if not isinstance(field, str) or not field:
+            raise ValueError(f"optional_field #{idx} missing string field")
+        if not isinstance(rationale, str):
+            raise ValueError(f"optional_field #{idx} has invalid rationale")
+        if not isinstance(overlay_scope, str):
+            raise ValueError(f"optional_field #{idx} has invalid overlay_scope")
+        entries.append(
+            OptionalFieldEntry(
+                field=field,
+                approved_default=approved_default,
+                rationale=rationale,
+                overlay_scope=overlay_scope,
+            )
+        )
+    return tuple(entries)
+
+
 def _run_rules_on_fragment(
     source: str,
     rules: tuple[RuleBase, ...],
     taint_state: str | None = None,
     *,
     boundaries: tuple[BoundaryEntry, ...] = (),
+    optional_fields: tuple[OptionalFieldEntry, ...] = (),
 ) -> set[str]:
     """Run all rules on a source fragment, return set of fired rule IDs.
 
@@ -145,7 +185,12 @@ def _run_rules_on_fragment(
 
     ctx: ScanContext | None = None
     if taint_state is not None:
-        ctx = _build_specimen_context(tree, taint_state, boundaries=boundaries)
+        ctx = _build_specimen_context(
+            tree,
+            taint_state,
+            boundaries=boundaries,
+            optional_fields=optional_fields,
+        )
 
     fired: set[str] = set()
     for rule in rules:
@@ -182,11 +227,13 @@ def _evaluate_specimen(
     raw_taint = data.get("taint_state")
     taint_state = str(raw_taint) if raw_taint is not None else None
     boundaries = _parse_specimen_boundaries(data)
+    optional_fields = _parse_specimen_optional_fields(data)
     fired = _run_rules_on_fragment(
         source,
         rules,
         taint_state=taint_state,
         boundaries=boundaries,
+        optional_fields=optional_fields,
     )
     rule_fired = rule_id in fired
 

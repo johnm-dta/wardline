@@ -105,8 +105,11 @@ class RulePyWl003(RuleBase):
         taint: TaintState,
     ) -> None:
         """Check a Compare node for ``in`` / ``not in`` operators."""
-        for op in compare.ops:
-            if isinstance(op, (ast.In, ast.NotIn)):
+        for op, comparator in zip(compare.ops, compare.comparators, strict=False):
+            if (
+                isinstance(op, (ast.In, ast.NotIn))
+                and self._looks_like_existence_check(compare.left, comparator)
+            ):
                 self._emit_finding(
                     compare,
                     enclosing_func,
@@ -115,6 +118,92 @@ class RulePyWl003(RuleBase):
                     taint,
                 )
                 return
+
+    def _looks_like_existence_check(
+        self,
+        left: ast.expr,
+        comparator: ast.expr,
+    ) -> bool:
+        """Heuristically distinguish key-presence checks from value membership.
+
+        We still accept mapping-like shapes such as ``key in data`` and
+        ``key in data.keys()``, but suppress obvious value-membership cases
+        like ``x in [1, 2, 3]`` and ``x in values``.
+        """
+        if self._is_obvious_value_membership(comparator):
+            return False
+        if isinstance(comparator, ast.Call):
+            return self._is_mapping_keys_call(comparator)
+        if isinstance(comparator, (ast.Dict, ast.DictComp)):
+            return True
+        if not isinstance(comparator, (ast.Name, ast.Attribute, ast.Subscript)):
+            return False
+        # String/bytes literal LHS is almost always a key-existence check:
+        #   "key" in data  →  existence check (fire)
+        # Variable/attribute LHS against an UPPER_CASE name is almost always
+        # value-membership:
+        #   dto.code not in VALID_CODES  →  value membership (suppress)
+        if self._is_constant_set_name(comparator):
+            return False
+        return True
+
+    @staticmethod
+    def _is_constant_set_name(node: ast.expr) -> bool:
+        """Return True when the node looks like a constant/enum set.
+
+        Heuristic: UPPER_CASE bare names (``VALID_CODES``, ``ALLOWED_TYPES``)
+        are conventionally constant sets used for value-membership checks, not
+        dicts used for key-existence checks.
+        """
+        if isinstance(node, ast.Name):
+            return node.id.isupper()
+        if isinstance(node, ast.Attribute):
+            return node.attr.isupper()
+        return False
+
+    @staticmethod
+    def _is_mapping_keys_call(call: ast.Call) -> bool:
+        """Return True for ``obj.keys()`` calls."""
+        return (
+            isinstance(call.func, ast.Attribute)
+            and call.func.attr == "keys"
+            and not call.args
+            and not call.keywords
+        )
+
+    def _is_obvious_value_membership(self, comparator: ast.expr) -> bool:
+        """Return True for syntax that clearly expresses value membership."""
+        if isinstance(
+            comparator,
+            (
+                ast.List,
+                ast.Tuple,
+                ast.Set,
+                ast.ListComp,
+                ast.SetComp,
+                ast.GeneratorExp,
+                ast.JoinedStr,
+            ),
+        ):
+            return True
+        if isinstance(comparator, ast.Constant) and isinstance(
+            comparator.value, str | bytes
+        ):
+            return True
+        if not isinstance(comparator, ast.Call):
+            return False
+        if isinstance(comparator.func, ast.Name) and comparator.func.id in {
+            "list",
+            "tuple",
+            "set",
+            "frozenset",
+            "sorted",
+        }:
+            return True
+        return (
+            isinstance(comparator.func, ast.Attribute)
+            and comparator.func.attr in {"values", "items", "split"}
+        )
 
     def _check_hasattr(
         self,

@@ -1,0 +1,18 @@
+---
+specimen_id: "PY-WL-004-TP-contextlib-suppress"
+description: "contextlib.suppress(Exception) triggers PY-WL-004"
+rule: "PY-WL-004"
+fragment: |
+  import contextlib
+
+  def process():
+      with contextlib.suppress(Exception):
+          risky()
+taint_state: "EXTERNAL_RAW"
+expected_rules:
+  - "PY-WL-004"
+expected_severity: "ERROR"
+expected_exceptionability: "STANDARD"
+expected_match: true
+verdict: "true_positive"
+sha256: "d0adb009df5cd75fe67034979ae46d37d93c1feda6f1d08f29621aba95f6f909"

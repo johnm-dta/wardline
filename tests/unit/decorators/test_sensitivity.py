@@ -1,101 +1,67 @@
-"""Tests for Group 10 sensitivity decorators."""
+"""Tests for Group 11 sensitivity decorators."""
 
 from __future__ import annotations
 
-from wardline.decorators.sensitivity import financial_data, phi_handler, pii_handler
+from wardline.decorators.sensitivity import (
+    declassifies,
+    handles_classified,
+    handles_pii,
+)
 
 
-class TestPiiHandler:
-    """@pii_handler decorator behaviour."""
+class TestHandlesPii:
+    """@handles_pii decorator behaviour."""
 
-    def test_sets_pii_handler_attr(self) -> None:
-        @pii_handler
+    def test_sets_handles_pii_attrs(self) -> None:
+        @handles_pii(fields=["email", "name"])
         def f() -> int:
             return 1
 
-        assert f._wardline_pii_handler is True  # type: ignore[attr-defined]
+        assert f._wardline_handles_pii is True  # type: ignore[attr-defined]
+        assert f._wardline_pii_fields == ("email", "name")  # type: ignore[attr-defined]
 
-    def test_sets_group_10(self) -> None:
-        @pii_handler
+    def test_sets_group_11(self) -> None:
+        @handles_pii(fields=["email"])
         def f() -> int:
             return 1
 
-        assert 10 in f._wardline_groups  # type: ignore[attr-defined]
-
-    def test_callable(self) -> None:
-        @pii_handler
-        def f() -> int:
-            return 42
-
-        assert f() == 42
-
-    def test_preserves_name(self) -> None:
-        @pii_handler
-        def my_func() -> int:
-            return 1
-
-        assert my_func.__name__ == "my_func"
+        assert 11 in f._wardline_groups  # type: ignore[attr-defined]
 
 
-class TestPhiHandler:
-    """@phi_handler decorator behaviour."""
+class TestHandlesClassified:
+    """@handles_classified decorator behaviour."""
 
-    def test_sets_phi_handler_attr(self) -> None:
-        @phi_handler
+    def test_sets_handles_classified_attrs(self) -> None:
+        @handles_classified(level="PROTECTED")
         def f() -> int:
             return 1
 
-        assert f._wardline_phi_handler is True  # type: ignore[attr-defined]
+        assert f._wardline_handles_classified is True  # type: ignore[attr-defined]
+        assert f._wardline_classification_level == "PROTECTED"  # type: ignore[attr-defined]
 
-    def test_sets_group_10(self) -> None:
-        @phi_handler
+    def test_sets_group_11(self) -> None:
+        @handles_classified(level="PROTECTED")
         def f() -> int:
             return 1
 
-        assert 10 in f._wardline_groups  # type: ignore[attr-defined]
-
-    def test_callable(self) -> None:
-        @phi_handler
-        def f() -> int:
-            return 42
-
-        assert f() == 42
-
-    def test_preserves_name(self) -> None:
-        @phi_handler
-        def my_func() -> int:
-            return 1
-
-        assert my_func.__name__ == "my_func"
+        assert 11 in f._wardline_groups  # type: ignore[attr-defined]
 
 
-class TestFinancialData:
-    """@financial_data decorator behaviour."""
+class TestDeclassifies:
+    """@declassifies decorator behaviour."""
 
-    def test_sets_financial_data_attr(self) -> None:
-        @financial_data
+    def test_sets_declassifies_attrs(self) -> None:
+        @declassifies(from_level="SECRET", to_level="PROTECTED")
         def f() -> int:
             return 1
 
-        assert f._wardline_financial_data is True  # type: ignore[attr-defined]
+        assert f._wardline_declassifies is True  # type: ignore[attr-defined]
+        assert f._wardline_from_level == "SECRET"  # type: ignore[attr-defined]
+        assert f._wardline_to_level == "PROTECTED"  # type: ignore[attr-defined]
 
-    def test_sets_group_10(self) -> None:
-        @financial_data
+    def test_sets_group_11(self) -> None:
+        @declassifies(from_level="SECRET", to_level="PROTECTED")
         def f() -> int:
             return 1
 
-        assert 10 in f._wardline_groups  # type: ignore[attr-defined]
-
-    def test_callable(self) -> None:
-        @financial_data
-        def f() -> int:
-            return 42
-
-        assert f() == 42
-
-    def test_preserves_name(self) -> None:
-        @financial_data
-        def my_func() -> int:
-            return 1
-
-        assert my_func.__name__ == "my_func"
+        assert 11 in f._wardline_groups  # type: ignore[attr-defined]

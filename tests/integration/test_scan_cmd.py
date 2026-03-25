@@ -96,10 +96,12 @@ class TestScanProducesSarif:
         ])
         sarif = json.loads(result.stdout)
         implemented = sarif["runs"][0]["properties"]["wardline.implementedRules"]
-        # 9 rules loaded (PY-WL-001 through PY-WL-009)
+        # 11 rules loaded (PY-WL-001 through PY-WL-009 plus SCN-021 and SUP-001)
         assert "PY-WL-001" in implemented
         assert "PY-WL-009" in implemented
-        assert len(implemented) == 9
+        assert "SCN-021" in implemented
+        assert "SUP-001" in implemented
+        assert len(implemented) == 11
 
     def test_sarif_findings_present_for_fixture(self) -> None:
         """Scanning fixture project produces SARIF results."""

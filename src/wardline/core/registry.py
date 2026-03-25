@@ -103,30 +103,87 @@ REGISTRY: MappingProxyType[str, RegistryEntry] = MappingProxyType({
     # --- Group 6: Boundaries ---
     "trust_boundary": _bool_entry("trust_boundary", 6),
     "tier_transition": _bool_entry("tier_transition", 6),
-    # --- Group 7: Safety ---
-    "fail_safe": _bool_entry("fail_safe", 7),
-    "fail_secure": _bool_entry("fail_secure", 7),
-    "graceful_degradation": _bool_entry("graceful_degradation", 7),
+    # --- Group 7: Template Safety ---
+    "parse_at_init": _bool_entry("parse_at_init", 7),
     # --- Group 8: Secrets ---
     "handles_secrets": _bool_entry("handles_secrets", 8),
-    "redacts_output": _bool_entry("redacts_output", 8),
     # --- Group 9: Operations ---
     "idempotent": _bool_entry("idempotent", 9),
-    "retry_safe": _bool_entry("retry_safe", 9),
-    # --- Group 10: Sensitivity ---
-    "pii_handler": _bool_entry("pii_handler", 10),
-    "phi_handler": _bool_entry("phi_handler", 10),
-    "financial_data": _bool_entry("financial_data", 10),
-    # --- Group 11: Determinism ---
-    "deterministic": _bool_entry("deterministic", 11),
-    "nondeterministic": _bool_entry("nondeterministic", 11),
-    # --- Group 12: Concurrency ---
-    "thread_safe": _bool_entry("thread_safe", 12),
-    "process_safe": _bool_entry("process_safe", 12),
-    # --- Group 13: Access ---
-    "requires_auth": _bool_entry("requires_auth", 13),
-    "requires_role": _bool_entry("requires_role", 13),
-    # --- Group 14: Lifecycle ---
-    "deprecated_boundary": _bool_entry("deprecated_boundary", 14),
-    "experimental": _bool_entry("experimental", 14),
+    "atomic": _bool_entry("atomic", 9),
+    "compensatable": RegistryEntry(
+        canonical_name="compensatable",
+        group=9,
+        attrs={  # type: ignore[arg-type]  # __post_init__ converts
+            "_wardline_compensatable": bool,
+            "_wardline_rollback": object,
+        },
+    ),
+    # --- Group 10: Failure Mode ---
+    "fail_closed": _bool_entry("fail_closed", 10),
+    "fail_open": _bool_entry("fail_open", 10),
+    "emits_or_explains": _bool_entry("emits_or_explains", 10),
+    "exception_boundary": _bool_entry("exception_boundary", 10),
+    "must_propagate": _bool_entry("must_propagate", 10),
+    "preserve_cause": _bool_entry("preserve_cause", 10),
+    # --- Group 11: Data Sensitivity ---
+    "handles_pii": RegistryEntry(
+        canonical_name="handles_pii",
+        group=11,
+        attrs={  # type: ignore[arg-type]  # __post_init__ converts
+            "_wardline_handles_pii": bool,
+            "_wardline_pii_fields": tuple,
+        },
+    ),
+    "handles_classified": RegistryEntry(
+        canonical_name="handles_classified",
+        group=11,
+        attrs={  # type: ignore[arg-type]  # __post_init__ converts
+            "_wardline_handles_classified": bool,
+            "_wardline_classification_level": str,
+        },
+    ),
+    "declassifies": RegistryEntry(
+        canonical_name="declassifies",
+        group=11,
+        attrs={  # type: ignore[arg-type]  # __post_init__ converts
+            "_wardline_declassifies": bool,
+            "_wardline_from_level": str,
+            "_wardline_to_level": str,
+        },
+    ),
+    # --- Group 12: Determinism ---
+    "deterministic": _bool_entry("deterministic", 12),
+    "time_dependent": _bool_entry("time_dependent", 12),
+    # --- Group 13: Concurrency ---
+    "thread_safe": _bool_entry("thread_safe", 13),
+    "ordered_after": RegistryEntry(
+        canonical_name="ordered_after",
+        group=13,
+        attrs={  # type: ignore[arg-type]  # __post_init__ converts
+            "_wardline_ordered_after": str,
+        },
+    ),
+    "not_reentrant": _bool_entry("not_reentrant", 13),
+    # --- Group 14: Access ---
+    "requires_identity": _bool_entry("requires_identity", 14),
+    "privileged_operation": _bool_entry("privileged_operation", 14),
+    # --- Group 15: Lifecycle ---
+    "test_only": _bool_entry("test_only", 15),
+    "deprecated_by": RegistryEntry(
+        canonical_name="deprecated_by",
+        group=15,
+        attrs={  # type: ignore[arg-type]  # __post_init__ converts
+            "_wardline_deprecated_by": bool,
+            "_wardline_deprecation_date": str,
+            "_wardline_replacement": str,
+        },
+    ),
+    "feature_gated": RegistryEntry(
+        canonical_name="feature_gated",
+        group=15,
+        attrs={  # type: ignore[arg-type]  # __post_init__ converts
+            "_wardline_feature_gated": bool,
+            "_wardline_feature_flag": str,
+        },
+    ),
 })

@@ -1,0 +1,23 @@
+---
+specimen_id: "PY-WL-001-TN-schema-default-governed"
+description: "schema_default() governed by declared optional field and boundary is suppressed"
+rule: "PY-WL-001"
+fragment: |
+  from wardline import schema_default
+
+  def process(data):
+      return schema_default(data.get("key", ""))
+taint_state: "EXTERNAL_RAW"
+boundaries:
+  - function: "process"
+    transition: "shape_validation"
+optional_fields:
+  - field: "key"
+    approved_default: ""
+    rationale: "optional by contract"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "true_negative"
+sha256: "b84d32c496bba4dcf61f9ddbfcd62741d4b139a0e90bd88ae8043e0b18aaf220"

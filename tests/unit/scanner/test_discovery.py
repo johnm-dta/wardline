@@ -333,6 +333,34 @@ class TestDiscoverAnnotations:
         ann = next(iter(result[key]))
         assert ann.canonical_name == "external_boundary"
 
+    def test_called_decorator_resolves_from_submodule_import(self) -> None:
+        """Parameterized decorators still resolve from direct submodule imports."""
+        tree = _parse("""\
+            from wardline.decorators.lifecycle import feature_gated
+            @feature_gated(flag="beta")
+            def handler(): pass
+        """)
+        result = discover_annotations(tree, "test.py")
+
+        key = ("test.py", "handler")
+        assert key in result
+        ann = next(iter(result[key]))
+        assert ann.canonical_name == "feature_gated"
+
+    def test_called_decorator_alias_resolves(self) -> None:
+        """Aliased parameterized decorators resolve to their canonical name."""
+        tree = _parse("""\
+            from wardline.decorators.operations import compensatable as comp
+            @comp(rollback=rollback_fn)
+            def handler(): pass
+        """)
+        result = discover_annotations(tree, "test.py")
+
+        key = ("test.py", "handler")
+        assert key in result
+        ann = next(iter(result[key]))
+        assert ann.canonical_name == "compensatable"
+
     def test_empty_file(self) -> None:
         """Empty file produces empty annotation map."""
         tree = _parse("")

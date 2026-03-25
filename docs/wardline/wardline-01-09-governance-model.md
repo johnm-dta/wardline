@@ -180,7 +180,11 @@ These signals are governance-level findings, not code-level findings. They appea
 
 #### 9.4 Governance capacity
 
-Governance capacity is finite. Every finding that requires human review consumes reviewer attention, and reviewer attention is the scarcest resource in any assurance process. Three mechanisms implicitly regulate governance load:
+Governance capacity is finite. Every finding that requires human review consumes reviewer attention, and reviewer attention is the scarcest resource in any assurance process.
+
+**Capacity substitution.** The wardline's governance model is designed to shift human review from syntactic pattern detection (which enforcement tooling and LLMs handle well) to semantic classification review (which requires human judgement). The governance burden is not purely additive — pattern-rule enforcement (§7) automates away code-level review that humans previously performed manually, and pre-generation context projection (§8.5) reduces violation volume upstream of enforcement. The net effect is that human attention is redirected from low-leverage syntactic review to high-leverage semantic classification decisions. However, the governance mechanisms in §9.2 (fingerprint baseline, temporal separation, manifest ratification) are net-new activities with no pre-wardline analogue. The substitution holds for code-level review; the governance surface is genuinely additional. The governance burden should be evaluated against the baseline described in §2 — in LLM-heavy development environments, the alternative to wardline governance is not "relaxed human review" but "no effective semantic review at all."
+
+Three mechanisms implicitly regulate governance load:
 
 - **Finding rate scales with annotation coverage.** Unannotated code produces no findings. As annotation coverage grows, finding volume grows proportionally. This means governance load is controllable through annotation investment — the organisation decides how much of its codebase to bring under wardline enforcement.
 - **Precision floor as implicit load limiter.** The 80% precision floor (§10) ensures that no more than 20% of findings are false positives. A rule that generates excessive governance overhead through false positives is structurally prohibited from reaching blocking status.

@@ -1,8 +1,8 @@
-"""Tests for Group 8 secrets decorators."""
+"""Tests for Group 8 secret-handling decorators."""
 
 from __future__ import annotations
 
-from wardline.decorators.secrets import handles_secrets, redacts_output
+from wardline.decorators.secrets import handles_secrets
 
 
 class TestHandlesSecrets:
@@ -31,38 +31,6 @@ class TestHandlesSecrets:
 
     def test_preserves_name(self) -> None:
         @handles_secrets
-        def my_func() -> int:
-            return 1
-
-        assert my_func.__name__ == "my_func"
-
-
-class TestRedactsOutput:
-    """@redacts_output decorator behaviour."""
-
-    def test_sets_redacts_output_attr(self) -> None:
-        @redacts_output
-        def f() -> int:
-            return 1
-
-        assert f._wardline_redacts_output is True  # type: ignore[attr-defined]
-
-    def test_sets_group_8(self) -> None:
-        @redacts_output
-        def f() -> int:
-            return 1
-
-        assert 8 in f._wardline_groups  # type: ignore[attr-defined]
-
-    def test_callable(self) -> None:
-        @redacts_output
-        def f() -> int:
-            return 42
-
-        assert f() == 42
-
-    def test_preserves_name(self) -> None:
-        @redacts_output
         def my_func() -> int:
             return 1
 

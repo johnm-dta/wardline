@@ -136,6 +136,29 @@ class TestScanContext:
         ctx = ScanContext(file_path="test.py", function_level_taint_map=mp)
         assert ctx.function_level_taint_map is mp
 
+    def test_project_maps_are_deeply_frozen(self) -> None:
+        ctx = ScanContext(
+            file_path="test.py",
+            function_level_taint_map={},
+            project_annotations_map={
+                ("test.py", "target"): (
+                    WardlineAnnotation(
+                        canonical_name="test_only",
+                        group=15,
+                        attrs={},
+                    ),
+                )
+            },
+            module_file_map={"pkg.mod": "pkg/mod.py"},
+            string_literal_counts={"beta": 2},
+        )
+
+        assert isinstance(ctx.project_annotations_map, MappingProxyType)
+        assert isinstance(ctx.module_file_map, MappingProxyType)
+        assert isinstance(ctx.string_literal_counts, MappingProxyType)
+        with pytest.raises(TypeError):
+            ctx.module_file_map["pkg.other"] = "pkg/other.py"  # type: ignore[index]
+
 
 # ── WardlineAnnotation ────────────────────────────────────────────
 

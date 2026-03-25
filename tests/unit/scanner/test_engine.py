@@ -112,6 +112,52 @@ class TestNormalScan:
         assert result.files_scanned == 1
         assert result.findings == []
 
+    def test_builds_project_indexes_before_rule_execution(self, tmp_path: Path) -> None:
+        _write_py(
+            tmp_path / "helpers.py",
+            """\
+from wardline.decorators.lifecycle import test_only
+
+@test_only
+def helper():
+    return "beta"
+""",
+        )
+        _write_py(
+            tmp_path / "service.py",
+            """\
+def use_helper():
+    return "beta"
+""",
+        )
+
+        class _ContextAssertingRule(RuleBase):
+            RULE_ID: ClassVar[RuleId] = RuleId.TOOL_ERROR
+
+            def visit_function(
+                self,
+                node: ast.FunctionDef | ast.AsyncFunctionDef,
+                *,
+                is_async: bool,
+            ) -> None:
+                assert self._context is not None
+                assert self._context.project_annotations_map is not None
+                assert self._context.module_file_map is not None
+                assert self._context.string_literal_counts is not None
+                assert ("beta" in self._context.string_literal_counts)
+                assert any(
+                    ann.canonical_name == "test_only"
+                    for annotations in self._context.project_annotations_map.values()
+                    for ann in annotations
+                )
+
+        engine = ScanEngine(target_paths=(tmp_path,), rules=(_ContextAssertingRule(),))
+
+        result = engine.scan()
+
+        assert result.files_scanned == 2
+        assert result.findings == []
+
 
 # ── Exclude paths ────────────────────────────────────────────────
 

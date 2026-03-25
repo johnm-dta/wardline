@@ -87,6 +87,21 @@
         "required": ["function", "transition"],
         "additionalProperties": false
       }
+    },
+    "optional_fields": {
+      "type": "array",
+      "description": "Optional optional_fields declarations injected into ScanContext for this specimen.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "approved_default": {},
+          "rationale": { "type": "string" },
+          "overlay_scope": { "type": "string" }
+        },
+        "required": ["field", "approved_default"],
+        "additionalProperties": false
+      }
     }
   },
   "required": ["specimen_id", "rule", "fragment", "taint_state", "verdict"],

@@ -1,0 +1,14 @@
+---
+specimen_id: "PY-WL-002-TN-attr-and-default"
+description: "obj.attr and default does not trigger PY-WL-002"
+rule: "PY-WL-002"
+fragment: |
+  def process(obj):
+      return obj.name and "fallback"
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "true_negative"
+sha256: "7c54fcd6eaf8b107c62c0e456aded3d8e941a5fbc795e429e23ab15c19cae7ad"

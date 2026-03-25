@@ -1,26 +1,34 @@
-"""Group 14 decorators — Lifecycle.
-
-These decorators mark functions with lifecycle metadata
-for the wardline scanner.
-"""
+"""Group 15 decorators — Lifecycle and scope."""
 
 from __future__ import annotations
 
 from wardline.decorators._base import wardline_decorator
 
 __all__ = [
-    "deprecated_boundary",
-    "experimental",
+    "test_only",
+    "deprecated_by",
+    "feature_gated",
 ]
 
-deprecated_boundary = wardline_decorator(
-    14,
-    "deprecated_boundary",
-    _wardline_deprecated_boundary=True,
-)
+test_only = wardline_decorator(15, "test_only", _wardline_test_only=True)
 
-experimental = wardline_decorator(
-    14,
-    "experimental",
-    _wardline_experimental=True,
-)
+
+def deprecated_by(*, date: str, replacement: str) -> object:
+    """Mark a callable as deprecated after a date with a replacement."""
+    return wardline_decorator(
+        15,
+        "deprecated_by",
+        _wardline_deprecated_by=True,
+        _wardline_deprecation_date=date,
+        _wardline_replacement=replacement,
+    )
+
+
+def feature_gated(*, flag: str) -> object:
+    """Mark a callable as controlled by a feature flag."""
+    return wardline_decorator(
+        15,
+        "feature_gated",
+        _wardline_feature_gated=True,
+        _wardline_feature_flag=flag,
+    )

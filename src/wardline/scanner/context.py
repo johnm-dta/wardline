@@ -79,6 +79,19 @@ class ScanContext:
     file_path: str
     # Maps (module_path, qualname) -> TaintState for each function
     function_level_taint_map: MappingProxyType[str, TaintState]
+    # Maps qualname -> discovered wardline annotations for that function.
+    annotations_map: (
+        MappingProxyType[str, tuple[WardlineAnnotation, ...]] | None
+    ) = None
+    # Maps (file_path, qualname) -> discovered wardline annotations across the
+    # whole scan. Used by rules that need project-wide visibility.
+    project_annotations_map: (
+        MappingProxyType[tuple[str, str], tuple[WardlineAnnotation, ...]] | None
+    ) = None
+    # Maps importable module path -> source file path for project-local modules.
+    module_file_map: MappingProxyType[str, str] | None = None
+    # Project-wide string literal counts, used for pragmatic stale-reference checks.
+    string_literal_counts: MappingProxyType[str, int] | None = None
     boundaries: tuple[BoundaryEntry, ...] = ()
     optional_fields: tuple[OptionalFieldEntry, ...] = ()
     # Level 2: maps qualname -> {variable_name: TaintState}. None when L2 is off.
@@ -95,6 +108,36 @@ class ScanContext:
                 self,
                 "function_level_taint_map",
                 MappingProxyType(self.function_level_taint_map),
+            )
+        if isinstance(self.annotations_map, dict):
+            frozen_annotations = {
+                k: tuple(v) for k, v in self.annotations_map.items()
+            }
+            object.__setattr__(
+                self,
+                "annotations_map",
+                MappingProxyType(frozen_annotations),
+            )
+        if isinstance(self.project_annotations_map, dict):
+            frozen_project_annotations = {
+                k: tuple(v) for k, v in self.project_annotations_map.items()
+            }
+            object.__setattr__(
+                self,
+                "project_annotations_map",
+                MappingProxyType(frozen_project_annotations),
+            )
+        if isinstance(self.module_file_map, dict):
+            object.__setattr__(
+                self,
+                "module_file_map",
+                MappingProxyType(self.module_file_map),
+            )
+        if isinstance(self.string_literal_counts, dict):
+            object.__setattr__(
+                self,
+                "string_literal_counts",
+                MappingProxyType(self.string_literal_counts),
             )
         if isinstance(self.variable_taint_map, dict):
             frozen = {

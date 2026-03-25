@@ -1,6 +1,6 @@
 """wardline.decorators — Decorator library for wardline annotations."""
 
-from wardline.decorators.access import requires_auth, requires_role
+from wardline.decorators.access import privileged_operation, requires_identity
 from wardline.decorators.audit import audit_critical
 from wardline.decorators.authority import (
     audit_writer,
@@ -12,45 +12,65 @@ from wardline.decorators.authority import (
     validates_shape,
 )
 from wardline.decorators.boundaries import tier_transition, trust_boundary
-from wardline.decorators.concurrency import process_safe, thread_safe
-from wardline.decorators.determinism import deterministic, nondeterministic
-from wardline.decorators.lifecycle import deprecated_boundary, experimental
-from wardline.decorators.operations import idempotent, retry_safe
+from wardline.decorators.concurrency import not_reentrant, ordered_after, thread_safe
+from wardline.decorators.determinism import deterministic, time_dependent
+from wardline.decorators.lifecycle import deprecated_by, feature_gated, test_only
+from wardline.decorators.operations import (
+    atomic,
+    compensatable,
+    emits_or_explains,
+    exception_boundary,
+    fail_closed,
+    fail_open,
+    idempotent,
+    must_propagate,
+    preserve_cause,
+)
 from wardline.decorators.plugin import system_plugin
 from wardline.decorators.provenance import int_data
-from wardline.decorators.safety import fail_safe, fail_secure, graceful_degradation
+from wardline.decorators.safety import parse_at_init
 from wardline.decorators.schema import all_fields_mapped, output_schema, schema_default
-from wardline.decorators.secrets import handles_secrets, redacts_output
-from wardline.decorators.sensitivity import financial_data, phi_handler, pii_handler
+from wardline.decorators.secrets import handles_secrets
+from wardline.decorators.sensitivity import (
+    declassifies,
+    handles_classified,
+    handles_pii,
+)
 
 __all__ = [
     "all_fields_mapped",
+    "atomic",
     "audit_critical",
     "audit_writer",
     "authoritative_construction",
-    "deprecated_boundary",
+    "compensatable",
+    "declassifies",
+    "deprecated_by",
     "deterministic",
-    "experimental",
+    "emits_or_explains",
+    "exception_boundary",
     "external_boundary",
-    "fail_safe",
-    "fail_secure",
-    "financial_data",
-    "graceful_degradation",
+    "fail_closed",
+    "fail_open",
+    "feature_gated",
+    "handles_classified",
+    "handles_pii",
     "handles_secrets",
     "idempotent",
     "int_data",
-    "nondeterministic",
+    "must_propagate",
+    "not_reentrant",
+    "ordered_after",
     "output_schema",
-    "phi_handler",
-    "pii_handler",
-    "process_safe",
-    "redacts_output",
-    "requires_auth",
-    "requires_role",
-    "retry_safe",
+    "parse_at_init",
+    "preserve_cause",
+    "privileged_operation",
+    "requires_identity",
     "schema_default",
     "system_plugin",
+    "test_only",
     "thread_safe",
+    "time_dependent",
     "tier1_read",
     "tier_transition",
     "trust_boundary",

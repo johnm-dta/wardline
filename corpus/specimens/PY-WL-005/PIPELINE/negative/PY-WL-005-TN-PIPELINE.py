@@ -1,5 +1,6 @@
-def process():
+def process(data):
     try:
-        pass
+        x = int(data)
     except ValueError:
-        pass
+        log.error("Failed to parse: %s", data)
+

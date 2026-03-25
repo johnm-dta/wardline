@@ -289,6 +289,45 @@ class TestVerdictEvaluation:
         assert result.exit_code == 0
         assert "1 TP" in result.output
 
+    def test_true_negative_with_optional_fields_and_boundaries(
+        self, tmp_path: Path
+    ) -> None:
+        """Specimen optional_fields feed ScanContext for governed defaults."""
+        source = (
+            "from wardline import schema_default\n\n"
+            "def process(data):\n"
+            '    return schema_default(data.get("key", ""))\n'
+        )
+        sha = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        specimen = tmp_path / "tn-governed-default.yaml"
+        specimen.write_text(
+            f'specimen_id: "tn-wl001-governed-default"\n'
+            f'rule: "PY-WL-001"\n'
+            f'taint_state: "EXTERNAL_RAW"\n'
+            f'verdict: "true_negative"\n'
+            f"boundaries:\n"
+            f'  - function: "process"\n'
+            f'    transition: "shape_validation"\n'
+            f"optional_fields:\n"
+            f'  - field: "key"\n'
+            f'    approved_default: ""\n'
+            f'    rationale: "optional by contract"\n'
+            f'sha256: "{sha}"\n'
+            f"fragment: |\n"
+            f"  from wardline import schema_default\n"
+            f"\n"
+            f"  def process(data):\n"
+            f'      return schema_default(data.get("key", ""))\n'
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["corpus", "verify", "--corpus-dir", str(tmp_path)],
+        )
+        assert result.exit_code == 0
+        assert "1 TN" in result.output
+
     def test_true_negative_no_rule_fires(
         self, tmp_path: Path
     ) -> None:

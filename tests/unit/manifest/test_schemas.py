@@ -154,3 +154,28 @@ class TestCorpusSpecimenSchema:
             "verdict": "true_positive",
         }
         jsonschema.validate(doc, schema)
+
+    def test_optional_fields_specimen_accepted(
+        self, schema: dict[str, object]
+    ) -> None:
+        doc = {
+            "specimen_id": "tn-wl001-governed-schema-default",
+            "rule": "PY-WL-001",
+            "fragment": "def process(data):\\n    return schema_default(data.get('key', ''))",
+            "taint_state": "EXTERNAL_RAW",
+            "verdict": "true_negative",
+            "boundaries": [
+                {
+                    "function": "process",
+                    "transition": "shape_validation",
+                }
+            ],
+            "optional_fields": [
+                {
+                    "field": "key",
+                    "approved_default": "",
+                    "rationale": "optional by contract",
+                }
+            ],
+        }
+        jsonschema.validate(doc, schema)

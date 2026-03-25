@@ -1,8 +1,8 @@
-"""Tests for Group 11 determinism decorators."""
+"""Tests for Group 12 determinism decorators."""
 
 from __future__ import annotations
 
-from wardline.decorators.determinism import deterministic, nondeterministic
+from wardline.decorators.determinism import deterministic, time_dependent
 
 
 class TestDeterministic:
@@ -20,7 +20,7 @@ class TestDeterministic:
         def f() -> int:
             return 1
 
-        assert 11 in f._wardline_groups  # type: ignore[attr-defined]
+        assert 12 in f._wardline_groups  # type: ignore[attr-defined]
 
     def test_callable(self) -> None:
         @deterministic
@@ -37,32 +37,32 @@ class TestDeterministic:
         assert my_func.__name__ == "my_func"
 
 
-class TestNondeterministic:
-    """@nondeterministic decorator behaviour."""
+class TestTimeDependent:
+    """@time_dependent decorator behaviour."""
 
-    def test_sets_nondeterministic_attr(self) -> None:
-        @nondeterministic
+    def test_sets_time_dependent_attr(self) -> None:
+        @time_dependent
         def f() -> int:
             return 1
 
-        assert f._wardline_nondeterministic is True  # type: ignore[attr-defined]
+        assert f._wardline_time_dependent is True  # type: ignore[attr-defined]
 
-    def test_sets_group_11(self) -> None:
-        @nondeterministic
+    def test_sets_group_12(self) -> None:
+        @time_dependent
         def f() -> int:
             return 1
 
-        assert 11 in f._wardline_groups  # type: ignore[attr-defined]
+        assert 12 in f._wardline_groups  # type: ignore[attr-defined]
 
     def test_callable(self) -> None:
-        @nondeterministic
+        @time_dependent
         def f() -> int:
             return 42
 
         assert f() == 42
 
     def test_preserves_name(self) -> None:
-        @nondeterministic
+        @time_dependent
         def my_func() -> int:
             return 1
 

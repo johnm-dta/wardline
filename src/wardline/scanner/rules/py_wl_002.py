@@ -40,9 +40,10 @@ class RulePyWl002(RuleBase):
     ) -> None:
         """Walk the function body looking for PY-WL-002 patterns."""
         for child in walk_skip_nested_defs(node):
-            if not isinstance(child, ast.Call):
-                continue
-            self._check_call(child, node)
+            if isinstance(child, ast.Call):
+                self._check_call(child, node)
+            elif isinstance(child, ast.BoolOp):
+                self._check_boolop(child, node)
 
     def _check_call(
         self,
@@ -57,9 +58,22 @@ class RulePyWl002(RuleBase):
         ):
             self._emit_finding(call, enclosing_func)
 
+    def _check_boolop(
+        self,
+        boolop: ast.BoolOp,
+        enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> None:
+        """Check ``obj.attr or default`` fallback expressions."""
+        if (
+            isinstance(boolop.op, ast.Or)
+            and len(boolop.values) == 2
+            and isinstance(boolop.values[0], ast.Attribute)
+        ):
+            self._emit_finding(boolop, enclosing_func)
+
     def _emit_finding(
         self,
-        call: ast.Call,
+        node: ast.expr,
         enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> None:
         """Emit a PY-WL-002 finding."""
@@ -69,14 +83,14 @@ class RulePyWl002(RuleBase):
             Finding(
                 rule_id=RuleId.PY_WL_002,
                 file_path=self._file_path,
-                line=call.lineno,
-                col=call.col_offset,
-                end_line=call.end_lineno,
-                end_col=call.end_col_offset,
+                line=node.lineno,
+                col=node.col_offset,
+                end_line=node.end_lineno,
+                end_col=node.end_col_offset,
                 message=(
                     "Attribute access with fallback default — "
-                    "getattr() with default silently fabricates "
-                    "value for missing attribute"
+                    "getattr() or `obj.attr or default` silently "
+                    "substitutes a fabricated value"
                 ),
                 severity=cell.severity,
                 exceptionability=cell.exceptionability,

@@ -340,7 +340,9 @@ def _match_decorators(
                 WardlineAnnotation(
                     canonical_name=canonical,
                     group=entry.group,
-                    attrs=MappingProxyType({}),
+                    attrs=MappingProxyType(
+                        _extract_decorator_attrs(dec, canonical)
+                    ),
                 )
             )
             continue
@@ -357,6 +359,52 @@ def _match_decorators(
             )
 
     return found
+
+
+def _extract_decorator_attrs(
+    dec: ast.expr,
+    canonical: str,
+) -> dict[str, object]:
+    """Extract scanner-usable decorator arguments for known call decorators."""
+    if not isinstance(dec, ast.Call):
+        return {}
+
+    attrs: dict[str, object] = {}
+    for keyword in dec.keywords:
+        if keyword.arg is None:
+            continue
+        value = _literalish_value(keyword.value)
+        if value is not None:
+            attrs[keyword.arg] = value
+
+    if canonical == "ordered_after" and dec.args and "name" not in attrs:
+        value = _literalish_value(dec.args[0])
+        if value is not None:
+            attrs["name"] = value
+
+    return attrs
+
+
+def _literalish_value(node: ast.expr) -> object | None:
+    """Convert a simple AST node to a scanner-friendly literalish value."""
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        receiver = _literalish_value(node.value)
+        if isinstance(receiver, str):
+            return f"{receiver}.{node.attr}"
+        return node.attr
+    if isinstance(node, (ast.List, ast.Tuple)):
+        values: list[object] = []
+        for elt in node.elts:
+            value = _literalish_value(elt)
+            if value is None:
+                return None
+            values.append(value)
+        return tuple(values)
+    return None
 
 
 def _resolve_decorator(

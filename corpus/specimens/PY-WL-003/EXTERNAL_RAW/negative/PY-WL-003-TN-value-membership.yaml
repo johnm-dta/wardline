@@ -1,0 +1,16 @@
+---
+specimen_id: "PY-WL-003-TN-value-membership"
+description: "value membership in a list does not trigger PY-WL-003"
+rule: "PY-WL-003"
+fragment: |
+  def process(items, needle):
+      if needle in [1, 2, 3]:
+          return True
+      return False
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "true_negative"
+sha256: "7dff7e0b99b9100ce95806ec3f2735dbe762ed808f12670f1194be88f7829ef9"

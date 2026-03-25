@@ -1,0 +1,17 @@
+---
+specimen_id: "PY-WL-004-TN-reraise"
+description: "broad except with immediate re-raise does not trigger PY-WL-004"
+rule: "PY-WL-004"
+fragment: |
+  def process():
+      try:
+          risky()
+      except Exception:
+          raise
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+verdict: "true_negative"
+sha256: "a70853bcf37c20afb4ed002d895db1880adb9d1d137817bc85a1c980119d4e20"

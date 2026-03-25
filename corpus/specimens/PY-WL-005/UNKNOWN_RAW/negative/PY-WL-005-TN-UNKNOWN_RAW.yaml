@@ -1,0 +1,12 @@
+---
+specimen_id: PY-WL-005-TN-UNKNOWN_RAW
+description: "PY-WL-005 true negative at UNKNOWN_RAW — handler logs error (not silent)"
+rule: PY-WL-005
+fragment: "def process(data):\n    try:\n        x = int(data)\n    except ValueError:\n        log.error(\"Failed to parse: %s\", data)\n"
+taint_state: UNKNOWN_RAW
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+sha256: "6030cafd199551afda319ba175f9ddcd375100b4c9019ec4d4acbb00a18384e8"
+verdict: true_negative

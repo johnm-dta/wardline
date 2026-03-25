@@ -98,9 +98,16 @@ class TestSarifResults:
         result = report.to_dict()["runs"][0]["results"][0]
         props = result["properties"]
         assert "wardline.rule" in props
+        assert "wardline.taintState" in props
         assert "wardline.severity" in props
         assert "wardline.exceptionability" in props
         assert "wardline.analysisLevel" in props
+
+    def test_result_property_bag_defaults_taint_state_when_missing(self) -> None:
+        report = SarifReport(findings=[_make_finding(taint_state=None)])
+        result = report.to_dict()["runs"][0]["results"][0]
+        props = result["properties"]
+        assert props["wardline.taintState"] == "UNKNOWN_RAW"
 
     def test_result_property_bag_qualname_and_snippet(self) -> None:
         """wardline.qualname and wardline.sourceSnippet appear when set."""
@@ -207,6 +214,32 @@ class TestSarifRuleDescriptors:
         output = report.to_dict()
         gaps = output["runs"][0]["properties"]["wardline.conformanceGaps"]
         assert gaps == []
+
+    def test_canonical_rule_short_descriptions_are_authoritative(self) -> None:
+        findings = [
+            _make_finding(rule_id=RuleId.PY_WL_001),
+            _make_finding(rule_id=RuleId.PY_WL_002, line=20),
+            _make_finding(rule_id=RuleId.PY_WL_003, line=30),
+            _make_finding(rule_id=RuleId.PY_WL_004, line=40),
+            _make_finding(rule_id=RuleId.PY_WL_005, line=50),
+            _make_finding(rule_id=RuleId.PY_WL_006, line=60),
+            _make_finding(rule_id=RuleId.PY_WL_007, line=70),
+            _make_finding(rule_id=RuleId.PY_WL_008, line=80),
+            _make_finding(rule_id=RuleId.PY_WL_009, line=90),
+        ]
+        report = SarifReport(findings=findings)
+        rules = report.to_dict()["runs"][0]["tool"]["driver"]["rules"]
+        descriptions = {rule["id"]: rule["shortDescription"]["text"] for rule in rules}
+
+        assert descriptions["PY-WL-001"] == "Dict key access with fallback default"
+        assert descriptions["PY-WL-002"] == "Attribute access with fallback default"
+        assert descriptions["PY-WL-003"] == "Existence-checking as structural gate"
+        assert descriptions["PY-WL-004"] == "Broad exception handler"
+        assert descriptions["PY-WL-005"] == "Silent exception handler"
+        assert descriptions["PY-WL-006"] == "Audit-critical write in broad exception handler"
+        assert descriptions["PY-WL-007"] == "Runtime type-checking on internal data"
+        assert descriptions["PY-WL-008"] == "Validation boundary with no rejection path"
+        assert descriptions["PY-WL-009"] == "Semantic validation without prior shape validation"
 
 
 # ---------------------------------------------------------------------------

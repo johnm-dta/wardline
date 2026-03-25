@@ -1,8 +1,4 @@
-"""Group 11 decorators — Determinism.
-
-These decorators mark functions with determinism metadata
-for the wardline scanner.
-"""
+"""Group 12 decorators — Determinism."""
 
 from __future__ import annotations
 
@@ -10,17 +6,17 @@ from wardline.decorators._base import wardline_decorator
 
 __all__ = [
     "deterministic",
-    "nondeterministic",
+    "time_dependent",
 ]
 
 deterministic = wardline_decorator(
-    11,
+    12,
     "deterministic",
     _wardline_deterministic=True,
 )
 
-nondeterministic = wardline_decorator(
-    11,
-    "nondeterministic",
-    _wardline_nondeterministic=True,
+time_dependent = wardline_decorator(
+    12,
+    "time_dependent",
+    _wardline_time_dependent=True,
 )

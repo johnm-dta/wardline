@@ -57,6 +57,8 @@ class RulePyWl004(RuleBase):
                 and id(child) not in trystar_handlers
             ):
                 self._check_handler(child, node)
+            elif isinstance(child, ast.Call):
+                self._check_suppress_call(child, node)
 
     def _check_handler(
         self,
@@ -64,6 +66,8 @@ class RulePyWl004(RuleBase):
         enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> None:
         """Check a single ExceptHandler for broad exception patterns."""
+        if self._is_immediate_reraise(handler):
+            return
         if handler.type is None:
             # Bare except:
             self._emit_finding(
@@ -80,6 +84,47 @@ class RulePyWl004(RuleBase):
                 f"Broad exception handler — 'except {name}' catches "
                 f"overly broad exception type",
             )
+
+    def _check_suppress_call(
+        self,
+        call: ast.Call,
+        enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> None:
+        """Detect ``contextlib.suppress(Exception)`` and imported ``suppress(Exception)``."""
+        if not self._is_suppress_call(call):
+            return
+        for arg in call.args:
+            if isinstance(arg, ast.expr) and self._resolve_broad_name(arg) is not None:
+                self._emit_finding(
+                    call,
+                    "Broad exception handler — contextlib.suppress() suppresses "
+                    "an overly broad exception type",
+                )
+                return
+
+    @staticmethod
+    def _is_immediate_reraise(handler: ast.ExceptHandler) -> bool:
+        """Return True for handlers that immediately re-raise."""
+        if len(handler.body) != 1:
+            return False
+        stmt = handler.body[0]
+        if not isinstance(stmt, ast.Raise):
+            return False
+        if stmt.exc is None:
+            return True
+        return isinstance(stmt.exc, ast.Name) and stmt.exc.id == handler.name
+
+    @staticmethod
+    def _is_suppress_call(call: ast.Call) -> bool:
+        """Return True for ``suppress(...)`` or ``contextlib.suppress(...)``."""
+        if isinstance(call.func, ast.Name):
+            return call.func.id == "suppress"
+        return (
+            isinstance(call.func, ast.Attribute)
+            and call.func.attr == "suppress"
+            and isinstance(call.func.value, ast.Name)
+            and call.func.value.id == "contextlib"
+        )
 
     @staticmethod
     def _resolve_broad_name(node: ast.expr) -> str | None:
@@ -105,7 +150,7 @@ class RulePyWl004(RuleBase):
 
     def _emit_finding(
         self,
-        handler: ast.ExceptHandler,
+        node: ast.AST,
         message: str,
     ) -> None:
         """Emit a PY-WL-004 finding."""
@@ -115,10 +160,10 @@ class RulePyWl004(RuleBase):
             Finding(
                 rule_id=RuleId.PY_WL_004,
                 file_path=self._file_path,
-                line=handler.lineno,
-                col=handler.col_offset,
-                end_line=handler.end_lineno,
-                end_col=handler.end_col_offset,
+                line=getattr(node, "lineno", 0),
+                col=getattr(node, "col_offset", 0),
+                end_line=getattr(node, "end_lineno", None),
+                end_col=getattr(node, "end_col_offset", None),
                 message=message,
                 severity=cell.severity,
                 exceptionability=cell.exceptionability,

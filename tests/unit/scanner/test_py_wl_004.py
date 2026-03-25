@@ -244,3 +244,63 @@ except KeyError as e:
         rule = _run_rule("x = 1\n")
 
         assert len(rule.findings) == 0
+
+    def test_except_exception_reraise_silent(self) -> None:
+        rule = _run_rule(
+            """\
+try:
+    pass
+except Exception:
+    raise
+"""
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_except_exception_as_e_raise_e_silent(self) -> None:
+        rule = _run_rule(
+            """\
+try:
+    pass
+except Exception as e:
+    raise e
+"""
+        )
+
+        assert len(rule.findings) == 0
+
+
+class TestContextlibSuppress:
+    """Broad ``contextlib.suppress`` usage fires PY-WL-004."""
+
+    def test_contextlib_suppress_exception_fires(self) -> None:
+        rule = _run_rule(
+            """\
+with contextlib.suppress(Exception):
+    risky()
+"""
+        )
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_004
+        assert "contextlib.suppress()" in rule.findings[0].message
+
+    def test_imported_suppress_baseexception_fires(self) -> None:
+        rule = _run_rule(
+            """\
+with suppress(BaseException):
+    risky()
+"""
+        )
+
+        assert len(rule.findings) == 1
+
+    def test_suppress_value_error_silent(self) -> None:
+        rule = _run_rule(
+            """\
+with contextlib.suppress(ValueError):
+    risky()
+"""
+        )
+
+        assert len(rule.findings) == 0

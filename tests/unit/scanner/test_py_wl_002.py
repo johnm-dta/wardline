@@ -49,6 +49,21 @@ class TestGetattrWithDefault:
         assert len(rule.findings) == 1
 
 
+class TestAttributeOrDefault:
+    """``obj.attr or default`` fires PY-WL-002."""
+
+    def test_attribute_or_default_fires(self) -> None:
+        rule = _run_rule('value = obj.name or "fallback"\n')
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_002
+
+    def test_self_attribute_or_default_fires(self) -> None:
+        rule = _run_rule("value = self.cached_value or default_value\n")
+
+        assert len(rule.findings) == 1
+
+
 # ── Multiple getattr in same function ────────────────────────────
 
 
@@ -107,5 +122,17 @@ class TestNegative:
     def test_no_getattr_silent(self) -> None:
         """No getattr at all — empty findings."""
         rule = _run_rule("x = 1 + 2\n")
+
+        assert len(rule.findings) == 0
+
+    def test_attribute_and_default_silent(self) -> None:
+        """Logical and is not a fallback-default pattern."""
+        rule = _run_rule('value = obj.name and "fallback"\n')
+
+        assert len(rule.findings) == 0
+
+    def test_method_call_or_default_silent(self) -> None:
+        """Method result fallback is not attribute access fallback."""
+        rule = _run_rule('value = obj.name() or "fallback"\n')
 
         assert len(rule.findings) == 0

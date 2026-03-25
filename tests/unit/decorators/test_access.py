@@ -1,68 +1,68 @@
-"""Tests for Group 13 access decorators."""
+"""Tests for Group 14 access decorators."""
 
 from __future__ import annotations
 
-from wardline.decorators.access import requires_auth, requires_role
+from wardline.decorators.access import privileged_operation, requires_identity
 
 
-class TestRequiresAuth:
-    """@requires_auth decorator behaviour."""
+class TestRequiresIdentity:
+    """@requires_identity decorator behaviour."""
 
-    def test_sets_requires_auth_attr(self) -> None:
-        @requires_auth
+    def test_sets_requires_identity_attr(self) -> None:
+        @requires_identity
         def f() -> int:
             return 1
 
-        assert f._wardline_requires_auth is True  # type: ignore[attr-defined]
+        assert f._wardline_requires_identity is True  # type: ignore[attr-defined]
 
-    def test_sets_group_13(self) -> None:
-        @requires_auth
+    def test_sets_group_14(self) -> None:
+        @requires_identity
         def f() -> int:
             return 1
 
-        assert 13 in f._wardline_groups  # type: ignore[attr-defined]
+        assert 14 in f._wardline_groups  # type: ignore[attr-defined]
 
     def test_callable(self) -> None:
-        @requires_auth
+        @requires_identity
         def f() -> int:
             return 42
 
         assert f() == 42
 
     def test_preserves_name(self) -> None:
-        @requires_auth
+        @requires_identity
         def my_func() -> int:
             return 1
 
         assert my_func.__name__ == "my_func"
 
 
-class TestRequiresRole:
-    """@requires_role decorator behaviour."""
+class TestPrivilegedOperation:
+    """@privileged_operation decorator behaviour."""
 
-    def test_sets_requires_role_attr(self) -> None:
-        @requires_role
+    def test_sets_privileged_operation_attr(self) -> None:
+        @privileged_operation
         def f() -> int:
             return 1
 
-        assert f._wardline_requires_role is True  # type: ignore[attr-defined]
+        assert f._wardline_privileged_operation is True  # type: ignore[attr-defined]
 
-    def test_sets_group_13(self) -> None:
-        @requires_role
+    def test_sets_group_14(self) -> None:
+        @privileged_operation
         def f() -> int:
             return 1
 
-        assert 13 in f._wardline_groups  # type: ignore[attr-defined]
+        assert 14 in f._wardline_groups  # type: ignore[attr-defined]
 
     def test_callable(self) -> None:
-        @requires_role
+        @privileged_operation
         def f() -> int:
             return 42
 
         assert f() == 42
 
     def test_preserves_name(self) -> None:
-        @requires_role
+        @privileged_operation
         def my_func() -> int:
             return 1
 

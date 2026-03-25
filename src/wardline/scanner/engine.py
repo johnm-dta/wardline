@@ -18,11 +18,12 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner._qualnames import build_qualname_map
-from wardline.scanner.context import Finding, ScanContext
+from wardline.scanner.context import Finding, ScanContext, WardlineAnnotation
 from wardline.scanner.discovery import discover_annotations
 from wardline.scanner.taint.callgraph import extract_call_edges
 from wardline.scanner.taint.callgraph_propagation import (
@@ -82,6 +83,11 @@ class ScanEngine:
         self._boundaries = boundaries
         self._optional_fields = optional_fields
         self._analysis_level = analysis_level
+        self._project_annotations: MappingProxyType[
+            tuple[str, str], tuple[WardlineAnnotation, ...]
+        ] | None = None
+        self._module_file_map: MappingProxyType[str, str] | None = None
+        self._string_literal_counts: MappingProxyType[str, int] | None = None
 
     def scan(self) -> ScanResult:
         """Run a full scan across all target paths.
@@ -89,6 +95,11 @@ class ScanEngine:
         Returns a ``ScanResult`` with all findings, counts, and errors.
         """
         result = ScanResult()
+        (
+            self._project_annotations,
+            self._module_file_map,
+            self._string_literal_counts,
+        ) = self._build_project_indexes()
 
         for target in self._target_paths:
             resolved_target = target.resolve()
@@ -196,6 +207,14 @@ class ScanEngine:
         ctx = ScanContext(
             file_path=str(file_path),
             function_level_taint_map=taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
+            annotations_map={  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
+                qualname: tuple(found)
+                for (ann_path, qualname), found in annotations.items()
+                if ann_path == str(file_path)
+            },
+            project_annotations_map=self._project_annotations,
+            module_file_map=self._module_file_map,
+            string_literal_counts=self._string_literal_counts,
             boundaries=self._boundaries,
             optional_fields=self._optional_fields,
             variable_taint_map=variable_taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
@@ -207,6 +226,95 @@ class ScanEngine:
         for rule in self._rules:
             rule.set_context(ctx)
             self._run_rule(rule, tree, file_path, result)
+
+    def _build_project_indexes(
+        self,
+    ) -> tuple[
+        MappingProxyType[tuple[str, str], tuple[WardlineAnnotation, ...]],
+        MappingProxyType[str, str],
+        MappingProxyType[str, int],
+    ]:
+        """Build project-wide discovery indexes before rule execution.
+
+        This keeps cross-file rules deterministic regardless of scan order.
+        Files that cannot be read or parsed are skipped here; the main scan pass
+        still reports those errors authoritatively.
+        """
+        all_annotations: dict[tuple[str, str], tuple[WardlineAnnotation, ...]] = {}
+        module_file_map: dict[str, str] = {}
+        string_literal_counts: dict[str, int] = {}
+
+        for root in self._target_paths:
+            resolved_root = root.resolve()
+            if not resolved_root.is_dir():
+                continue
+            for file_path in self._iter_python_files(resolved_root):
+                module_name = self._module_name_for(resolved_root, file_path)
+                if module_name is not None:
+                    module_file_map[module_name] = str(file_path)
+                try:
+                    source = file_path.read_text(encoding="utf-8")
+                    tree = ast.parse(source, filename=str(file_path))
+                except (OSError, SyntaxError):
+                    continue
+
+                for node in ast.walk(tree):
+                    if (
+                        isinstance(node, ast.Constant)
+                        and isinstance(node.value, str)
+                        and node.value
+                    ):
+                        string_literal_counts[node.value] = (
+                            string_literal_counts.get(node.value, 0) + 1
+                        )
+
+                discovered = discover_annotations(tree, file_path)
+                for key, value in discovered.items():
+                    all_annotations[key] = tuple(value)
+
+        return (
+            MappingProxyType(all_annotations),
+            MappingProxyType(module_file_map),
+            MappingProxyType(string_literal_counts),
+        )
+
+    def _iter_python_files(self, root: Path) -> list[Path]:
+        """Collect scan-eligible Python files beneath *root*."""
+        files: list[Path] = []
+        try:
+            walker = os.walk(root, followlinks=False)
+        except OSError:
+            return files
+
+        for dirpath, dirnames, filenames in walker:
+            dir_resolved = Path(dirpath).resolve()
+            dirnames[:] = [
+                d
+                for d in dirnames
+                if not self._is_excluded(dir_resolved / d)
+            ]
+            for filename in filenames:
+                if not filename.endswith(".py"):
+                    continue
+                file_path = dir_resolved / filename
+                if not self._is_excluded(file_path):
+                    files.append(file_path)
+        return files
+
+    def _module_name_for(self, root: Path, file_path: Path) -> str | None:
+        """Derive a best-effort importable module name for a source file."""
+        try:
+            rel = file_path.relative_to(root)
+        except ValueError:
+            return None
+        parts = list(rel.with_suffix("").parts)
+        if not parts:
+            return None
+        if parts[-1] == "__init__":
+            parts = parts[:-1]
+        if not parts:
+            return None
+        return ".".join(parts)
 
     def _run_variable_taint(
         self,

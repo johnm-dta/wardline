@@ -252,6 +252,18 @@ class TestNoFalsePositives:
 
         assert len(rule.findings) == 0
 
+    def test_value_membership_in_list_silent(self) -> None:
+        """``x in [1, 2, 3]`` is value membership, not existence-check gating."""
+        rule = _run_rule("x in [1, 2, 3]\n")
+
+        assert len(rule.findings) == 0
+
+    def test_value_membership_in_values_view_silent(self) -> None:
+        """``x in data.values()`` is value membership, not key existence."""
+        rule = _run_rule("x in data.values()\n")
+
+        assert len(rule.findings) == 0
+
 
 class TestDeclaredValidationBoundarySuppression:
     """Shape and combined validators suppress PY-WL-003 inside the body."""

@@ -94,7 +94,7 @@ A tool that satisfies this contract and implements at least one PY-WL rule is a 
 | Python Rule | Framework Rule | Pattern |
 |---|---|---|
 | PY-WL-001 | WL-001 (split) | Dict key access with fallback default (`.get()`, `.setdefault()`, `collections.defaultdict`) |
-| PY-WL-002 | WL-001 (split) | Attribute access with fallback default (`getattr()` with default, `hasattr()` guards) |
+| PY-WL-002 | WL-001 (split) | Attribute access with fallback default (`getattr()` with default) |
 | PY-WL-003 | WL-002 | Existence-checking as structural gate (`if key in dict`, `hasattr()` guards as validation proxy) |
 | PY-WL-004 | WL-003 | Broad exception handlers swallowing errors (`except Exception`, bare `except`) |
 | PY-WL-005 | WL-004 | Catching exceptions silently — no action taken in handler (`except: pass`, bare `except` with no re-raise or logging) |
@@ -127,10 +127,10 @@ Tools that detect wardline-relevant patterns without satisfying this contract �
 
 | Tier | Posture | Philosophy |
 |------|---------|------------|
-| **Tier 4** | Sceptical programming | Treat everything as hostile sludge. Validate structure first, normalise, reject. |
-| **Tier 3** | Guarded programming | Structure is trustworthy. Direct field access is safe; validate domain constraints before using values in business logic. |
-| **Tier 2** | Confident programming | Structure and domain meaning are trustworthy within the declared bounded context. Guard only cross-cutting concerns. |
-| **Tier 1** | Offensive programming (assert invariants; never silently recover) | Assume invariants, detonate on breach. Anomalies must surface immediately as faults. |
+| **Tier 4** | Untrusted-input (sceptical) programming | Treat everything as hostile sludge. Validate structure first, normalise, reject. |
+| **Tier 3** | Structure-verified (guarded) programming | Structure is trustworthy. Direct field access is safe; validate domain constraints before using values in business logic. |
+| **Tier 2** | Governance-assured (confident) programming | Structure and domain meaning are trustworthy within the declared bounded context. Guard only cross-cutting concerns. |
+| **Tier 1** | Strict (offensive) programming (assert invariants; never silently recover) | Assume invariants, detonate on breach. Anomalies must surface immediately as faults. |
 
 **Minimum Python version: 3.12+.** The scanner targets Python 3.12+ only. `ast.Constant` is the canonical node at this floor; `ast.Match` (3.10+) and `ast.unparse()` (3.9+) are available.
 
@@ -223,7 +223,7 @@ The 17 annotation groups are defined as language-agnostic semantic requirements 
 | # | Combination | Type | Rationale |
 |---|---|---|---|
 | 1 | `@fail_open` + `@fail_closed` | Contradictory | Mutually exclusive failure modes |
-| 2 | `@fail_open` + `@tier1_read` | Contradictory | Tier 1 requires offensive programming — fail-open is structurally incompatible |
+| 2 | `@fail_open` + `@tier1_read` | Contradictory | Tier 1 requires strict (offensive) programming — fail-open is structurally incompatible |
 | 3 | `@fail_open` + `@audit_writer` | Contradictory | Audit writes must not silently degrade |
 | 4 | `@fail_open` + `@authoritative_construction` | Contradictory | Authoritative artefacts must not have fallback construction paths |
 | 5 | `@fail_open` + `@audit_critical` | Contradictory | Audit-critical paths must not have fallback paths |
