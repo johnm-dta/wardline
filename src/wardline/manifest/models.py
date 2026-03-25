@@ -7,6 +7,7 @@ behaviour across rules.
 
 from __future__ import annotations
 
+import logging
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,6 +15,8 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from wardline.core.severity import GovernancePath
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from wardline.core.severity import RuleId
@@ -207,6 +210,8 @@ _KNOWN_KEYS: frozenset[str] = frozenset({
     "max_unknown_raw_percent",
     "allow_registry_mismatch",
     "allow_permissive_distribution",
+    "known_validators",
+    "known_validators_extra",
 })
 
 
@@ -230,6 +235,8 @@ class ScannerConfig:
     max_unknown_raw_percent: float | None = None
     allow_registry_mismatch: bool = False
     allow_permissive_distribution: bool = False
+    known_validators: tuple[str, ...] | None = None
+    known_validators_extra: tuple[str, ...] = ()
 
     @classmethod
     def from_toml(cls, path: Path) -> ScannerConfig:
@@ -312,6 +319,24 @@ class ScannerConfig:
                     f"max_unknown_raw_percent must be 0-100, got {max_pct}"
                 )
 
+        known_validators_raw = wardline_section.get("known_validators")
+        known_validators_extra_raw = wardline_section.get("known_validators_extra")
+
+        known_validators: tuple[str, ...] | None = None
+        known_validators_extra: tuple[str, ...] = ()
+
+        if known_validators_raw is not None:
+            if not isinstance(known_validators_raw, list):
+                raise ScannerConfigError("known_validators must be a list of strings")
+            known_validators = tuple(str(v) for v in known_validators_raw)
+            if known_validators_extra_raw is not None:
+                logger.warning("known_validators and known_validators_extra both set — known_validators wins")
+
+        if known_validators_extra_raw is not None and known_validators_raw is None:
+            if not isinstance(known_validators_extra_raw, list):
+                raise ScannerConfigError("known_validators_extra must be a list of strings")
+            known_validators_extra = tuple(str(v) for v in known_validators_extra_raw)
+
         return cls(
             target_paths=target_paths,
             exclude_paths=exclude_paths,
@@ -326,4 +351,6 @@ class ScannerConfig:
             allow_permissive_distribution=bool(
                 wardline_section.get("allow_permissive_distribution", False)
             ),
+            known_validators=known_validators,
+            known_validators_extra=known_validators_extra,
         )
