@@ -41,34 +41,40 @@ class TestDecoratorTaint:
         annotations = {
             ("test.py", "handler"): [_ann("external_boundary")],
         }
-        result, _sources = assign_function_taints(tree, "test.py", annotations)
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", annotations)
 
         assert result["handler"] == TaintState.EXTERNAL_RAW
 
-    def test_validates_shape_gets_shape_validated(self) -> None:
+    def test_validates_shape_body_gets_external_raw(self) -> None:
         tree = _parse("def validate(): pass\n")
         annotations = {
             ("test.py", "validate"): [_ann("validates_shape")],
         }
-        result, _sources = assign_function_taints(tree, "test.py", annotations)
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", annotations)
 
-        assert result["validate"] == TaintState.SHAPE_VALIDATED
+        # Body eval uses INPUT tier: validates_shape receives EXTERNAL_RAW data
+        assert result["validate"] == TaintState.EXTERNAL_RAW
+        # Return taint uses OUTPUT tier: validated output is SHAPE_VALIDATED
+        assert _return_map["validate"] == TaintState.SHAPE_VALIDATED
 
-    def test_validates_semantic_gets_pipeline(self) -> None:
+    def test_validates_semantic_body_gets_shape_validated(self) -> None:
         tree = _parse("def check(): pass\n")
         annotations = {
             ("test.py", "check"): [_ann("validates_semantic")],
         }
-        result, _sources = assign_function_taints(tree, "test.py", annotations)
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", annotations)
 
-        assert result["check"] == TaintState.PIPELINE
+        # Body eval uses INPUT tier: validates_semantic receives SHAPE_VALIDATED data
+        assert result["check"] == TaintState.SHAPE_VALIDATED
+        # Return taint uses OUTPUT tier: validated output is PIPELINE
+        assert _return_map["check"] == TaintState.PIPELINE
 
     def test_tier1_read_gets_audit_trail(self) -> None:
         tree = _parse("def read_data(): pass\n")
         annotations = {
             ("test.py", "read_data"): [_ann("tier1_read")],
         }
-        result, _sources = assign_function_taints(tree, "test.py", annotations)
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", annotations)
 
         assert result["read_data"] == TaintState.AUDIT_TRAIL
 
@@ -77,7 +83,7 @@ class TestDecoratorTaint:
         annotations = {
             ("test.py", "write_log"): [_ann("audit_writer")],
         }
-        result, _sources = assign_function_taints(tree, "test.py", annotations)
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", annotations)
 
         assert result["write_log"] == TaintState.AUDIT_TRAIL
 
@@ -86,7 +92,7 @@ class TestDecoratorTaint:
         annotations = {
             ("test.py", "construct"): [_ann("authoritative_construction")],
         }
-        result, _sources = assign_function_taints(tree, "test.py", annotations)
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", annotations)
 
         assert result["construct"] == TaintState.AUDIT_TRAIL
 
@@ -96,7 +102,7 @@ class TestDecoratorTaint:
         annotations = {
             ("test.py", "critical"): [_ann("audit_critical", group=2)],
         }
-        result, _sources = assign_function_taints(tree, "test.py", annotations)
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", annotations)
 
         # No taint-assigning decorator → falls to UNKNOWN_RAW
         assert result["critical"] == TaintState.UNKNOWN_RAW
@@ -123,7 +129,7 @@ class TestModuleTiersTaint:
                 ),
             ),
         )
-        result, _sources = assign_function_taints(
+        result, _return_map, _sources = assign_function_taints(
             tree, "src/myapp/handlers.py", {}, manifest=manifest
         )
 
@@ -139,7 +145,7 @@ class TestModuleTiersTaint:
                 ),
             ),
         )
-        result, _sources = assign_function_taints(
+        result, _return_map, _sources = assign_function_taints(
             tree, "src/myapp/sub/deep.py", {}, manifest=manifest
         )
 
@@ -156,7 +162,7 @@ class TestModuleTiersTaint:
                 ),
             ),
         )
-        result, _sources = assign_function_taints(
+        result, _return_map, _sources = assign_function_taints(
             tree, "api_v2/handler.py", {}, manifest=manifest
         )
 
@@ -176,7 +182,7 @@ class TestUnknownRawFallback:
                 ModuleTierEntry(path="src/other", default_taint="AUDIT_TRAIL"),
             ),
         )
-        result, _sources = assign_function_taints(
+        result, _return_map, _sources = assign_function_taints(
             tree, "src/unknown/module.py", {}, manifest=manifest
         )
 
@@ -184,7 +190,7 @@ class TestUnknownRawFallback:
 
     def test_no_manifest_gets_unknown_raw(self) -> None:
         tree = _parse("def alone(): pass\n")
-        result, _sources = assign_function_taints(tree, "test.py", {})
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", {})
 
         assert result["alone"] == TaintState.UNKNOWN_RAW
 
@@ -193,7 +199,7 @@ class TestUnknownRawFallback:
             def a(): pass
             def b(): pass
         """)
-        result, _sources = assign_function_taints(tree, "test.py", {})
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", {})
 
         assert result["a"] == TaintState.UNKNOWN_RAW
         assert result["b"] == TaintState.UNKNOWN_RAW
@@ -222,7 +228,7 @@ class TestTaintPrecedence:
         annotations = {
             ("src/myapp/api.py", "decorated"): [_ann("external_boundary")],
         }
-        result, _sources = assign_function_taints(
+        result, _return_map, _sources = assign_function_taints(
             tree, "src/myapp/api.py", annotations, manifest=manifest
         )
 
@@ -239,7 +245,7 @@ class TestTaintPrecedence:
                 ModuleTierEntry(path="src/safe", default_taint="PIPELINE"),
             ),
         )
-        result, _sources = assign_function_taints(
+        result, _return_map, _sources = assign_function_taints(
             tree, "src/safe/mod.py", {}, manifest=manifest
         )
 
@@ -257,7 +263,7 @@ class TestAsyncFunctions:
         annotations = {
             ("test.py", "handler"): [_ann("external_boundary")],
         }
-        result, _sources = assign_function_taints(tree, "test.py", annotations)
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", annotations)
 
         assert result["handler"] == TaintState.EXTERNAL_RAW
 
@@ -268,7 +274,7 @@ class TestAsyncFunctions:
                 ModuleTierEntry(path="src/api", default_taint="EXTERNAL_RAW"),
             ),
         )
-        result, _sources = assign_function_taints(
+        result, _return_map, _sources = assign_function_taints(
             tree, "src/api/client.py", {}, manifest=manifest
         )
 
@@ -276,7 +282,7 @@ class TestAsyncFunctions:
 
     def test_async_undeclared_gets_unknown_raw(self) -> None:
         tree = _parse("async def mystery(): pass\n")
-        result, _sources = assign_function_taints(tree, "test.py", {})
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", {})
 
         assert result["mystery"] == TaintState.UNKNOWN_RAW
 
@@ -290,7 +296,7 @@ class TestAsyncFunctions:
             ("test.py", "sync_fn"): [_ann("tier1_read")],
             ("test.py", "async_fn"): [_ann("external_boundary")],
         }
-        result, _sources = assign_function_taints(tree, "test.py", annotations)
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", annotations)
 
         assert result["sync_fn"] == TaintState.AUDIT_TRAIL
         assert result["async_fn"] == TaintState.EXTERNAL_RAW
@@ -310,7 +316,7 @@ class TestNesting:
         annotations = {
             ("svc.py", "MyService.handle"): [_ann("external_boundary")],
         }
-        result, _sources = assign_function_taints(tree, "svc.py", annotations)
+        result, _return_map, _sources = assign_function_taints(tree, "svc.py", annotations)
 
         assert result["MyService.handle"] == TaintState.EXTERNAL_RAW
 
@@ -322,10 +328,11 @@ class TestNesting:
         annotations = {
             ("test.py", "outer.inner"): [_ann("validates_shape")],
         }
-        result, _sources = assign_function_taints(tree, "test.py", annotations)
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", annotations)
 
         assert result["outer"] == TaintState.UNKNOWN_RAW
-        assert result["outer.inner"] == TaintState.SHAPE_VALIDATED
+        # Body eval taint: validates_shape input is EXTERNAL_RAW
+        assert result["outer.inner"] == TaintState.EXTERNAL_RAW
 
     def test_all_functions_in_file_assigned(self) -> None:
         """Every function gets a taint, even those without annotations."""
@@ -335,7 +342,7 @@ class TestNesting:
             class C:
                 def m(self): pass
         """)
-        result, _sources = assign_function_taints(tree, "test.py", {})
+        result, _return_map, _sources = assign_function_taints(tree, "test.py", {})
 
         assert len(result) == 3
         assert "a" in result
@@ -351,13 +358,13 @@ class TestEdgeCases:
 
     def test_empty_file(self) -> None:
         tree = _parse("")
-        result, _sources = assign_function_taints(tree, "empty.py", {})
+        result, _return_map, _sources = assign_function_taints(tree, "empty.py", {})
 
         assert result == {}
 
     def test_file_with_no_functions(self) -> None:
         tree = _parse("x = 1\ny = 2\n")
-        result, _sources = assign_function_taints(tree, "constants.py", {})
+        result, _return_map, _sources = assign_function_taints(tree, "constants.py", {})
 
         assert result == {}
 

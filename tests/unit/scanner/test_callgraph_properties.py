@@ -91,8 +91,8 @@ def test_convergence(
     edges, taint_map, taint_sources, resolved_counts, unresolved_counts = data
     # Must return without hanging or raising
     result_map, result_prov, _diags = propagate_callgraph_taints(
-        edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
-    )
+        edges, taint_map, taint_sources, resolved_counts, unresolved_counts, return_taint_map=taint_map,
+)
     # Basic structural checks
     assert set(result_map) == set(taint_map)
     assert set(result_prov) == set(taint_map)
@@ -115,8 +115,8 @@ def test_module_default_monotone_downward(
     """
     edges, taint_map, taint_sources, resolved_counts, unresolved_counts = data
     result_map, _, _diags = propagate_callgraph_taints(
-        edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
-    )
+        edges, taint_map, taint_sources, resolved_counts, unresolved_counts, return_taint_map=taint_map,
+)
     for func, source in taint_sources.items():
         if source == "module_default":
             initial_rank = TRUST_RANK[taint_map[func]]
@@ -143,11 +143,11 @@ def test_idempotence(
     edges, taint_map, taint_sources, resolved_counts, unresolved_counts = data
 
     result1, prov1, _diags1 = propagate_callgraph_taints(
-        edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
-    )
+        edges, taint_map, taint_sources, resolved_counts, unresolved_counts, return_taint_map=taint_map,
+)
     result2, prov2, _diags2 = propagate_callgraph_taints(
-        edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
-    )
+        edges, taint_map, taint_sources, resolved_counts, unresolved_counts, return_taint_map=taint_map,
+)
 
     assert result1 == result2, (
         f"Non-idempotent: first run and second run differ.\n"
@@ -170,8 +170,8 @@ def test_anchored_immutability(
     """Anchored (decorator-sourced) functions' taints unchanged regardless of graph."""
     edges, taint_map, taint_sources, resolved_counts, unresolved_counts = data
     result_map, _, _diags = propagate_callgraph_taints(
-        edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
-    )
+        edges, taint_map, taint_sources, resolved_counts, unresolved_counts, return_taint_map=taint_map,
+)
     for func, source in taint_sources.items():
         if source == "decorator":
             assert result_map[func] == taint_map[func], (
@@ -199,8 +199,8 @@ def test_fallback_bounded_by_callees(
     """
     edges, taint_map, taint_sources, resolved_counts, unresolved_counts = data
     result_map, _, _diags = propagate_callgraph_taints(
-        edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
-    )
+        edges, taint_map, taint_sources, resolved_counts, unresolved_counts, return_taint_map=taint_map,
+)
     for func, source in taint_sources.items():
         if source != "fallback":
             continue

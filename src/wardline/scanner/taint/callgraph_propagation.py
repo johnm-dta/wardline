@@ -50,15 +50,19 @@ def propagate_callgraph_taints(
     taint_sources: dict[str, TaintSource],
     resolved_counts: dict[str, int],
     unresolved_counts: dict[str, int],
+    *,
+    return_taint_map: dict[str, TaintState],
 ) -> tuple[dict[str, TaintState], dict[str, TaintProvenance], list[tuple[str, str]]]:
     """Run SCC-based fixed-point propagation to refine L1 taints.
 
     Args:
         edges: Forward adjacency ``{caller: {callee, ...}}``.
-        taint_map: L1 taint assignments (copied, not mutated).
+        taint_map: L1 body-evaluation taint assignments (copied, not mutated).
         taint_sources: L1 provenance classification per function.
         resolved_counts: Resolved call-site counts per caller.
         unresolved_counts: Unresolved call-site counts per caller.
+        return_taint_map: L1 return-value taint map. Used to resolve
+            decorator-anchored callee contributions (OUTPUT tier).
 
     Returns:
         Tuple of ``(refined_taint_map, provenance_map, diagnostics)``.
@@ -133,7 +137,15 @@ def propagate_callgraph_taints(
             ext_callees = (edges.get(f, set()) & taint_keys) - scc
             if ext_callees:
                 has_external_influence.add(f)
-                ext_ranks = [TRUST_RANK[current[c]] for c in ext_callees]
+                # For anchored callees, use return_taint (their static output tier).
+                # For non-anchored callees, use current[] (L3-refined body taint).
+                # This is correct because non-anchored functions always have
+                # body_taint == return_taint (enforced by _walk_and_assign in
+                # function_level.py), so current[c] serves as both.
+                ext_ranks = [
+                    TRUST_RANK[return_taint_map.get(c, current[c]) if c in anchored else current[c]]
+                    for c in ext_callees
+                ]
                 ext_max = max(ext_ranks)
                 if f in floating_down:
                     l1_rank = TRUST_RANK[taint_map[f]]
@@ -149,11 +161,14 @@ def propagate_callgraph_taints(
                 if ext_taint != current[f]:
                     current[f] = ext_taint
                     refined.add(f)
-                    # Record via_callee from external callees
+                    # Record via_callee from external callees.
+                    # Use the same anchored/floating logic as rank computation.
                     best_callee: str | None = None
                     best_rank = -1
                     for c in sorted(ext_callees):
-                        c_rank = TRUST_RANK[current[c]]
+                        c_rank = TRUST_RANK[
+                            return_taint_map.get(c, current[c]) if c in anchored else current[c]
+                        ]
                         if c_rank > best_rank:
                             best_rank = c_rank
                             best_callee = c
@@ -187,7 +202,10 @@ def propagate_callgraph_taints(
                 continue
 
             # Compute max_rank (least trusted) among callees
-            callee_ranks = [TRUST_RANK[current[c]] for c in callee_set]
+            callee_ranks = [
+                TRUST_RANK[return_taint_map.get(c, current[c]) if c in anchored else current[c]]
+                for c in callee_set
+            ]
             max_callee_rank = max(callee_ranks, default=TRUST_RANK[TaintState.AUDIT_TRAIL])
 
             # Floor clamp for module_default: result >= L1 rank
@@ -216,11 +234,14 @@ def propagate_callgraph_taints(
                 refined.add(func)
 
                 # Determine via_callee: the callee with highest rank (least trusted).
+                # Use the same anchored/floating logic as rank computation.
                 # Tie-break: alphabetically first qualname.
                 best_callee_wl: str | None = None
                 best_rank_wl = -1
                 for c in sorted(callee_set):  # sorted for tie-breaking
-                    c_rank = TRUST_RANK[current[c]]
+                    c_rank = TRUST_RANK[
+                        return_taint_map.get(c, current[c]) if c in anchored else current[c]
+                    ]
                     if c_rank > best_rank_wl:
                         best_rank_wl = c_rank
                         best_callee_wl = c

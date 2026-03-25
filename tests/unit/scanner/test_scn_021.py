@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from wardline.core.severity import RuleId, Severity
+import pytest
+
+from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner.context import ScanContext, WardlineAnnotation
-from wardline.scanner.rules.scn_021 import RuleScn021
+from wardline.scanner.rules.scn_021 import _COMBINATIONS, RuleScn021
 
 from .conftest import parse_module_source
 
@@ -124,3 +126,80 @@ def target():
         )
 
         assert len(rule.findings) == 0
+
+
+class TestAliasPairDedup:
+    def test_fail_open_audit_critical_produces_one_finding(self) -> None:
+        """Entry #5 and #19 are the same pair — must produce exactly 1 finding."""
+        rule = _run_rule(
+            """\
+@fail_open
+@audit_critical
+def target():
+    return 1
+""",
+            annotations=("fail_open", "audit_critical"),
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].severity == Severity.ERROR
+
+
+class TestAllCombinations:
+    @pytest.mark.parametrize(
+        "spec",
+        _COMBINATIONS,
+        ids=[f"{s.left}+{s.right}" for s in _COMBINATIONS],
+    )
+    def test_combination_fires(self, spec) -> None:
+        """Every entry in _COMBINATIONS must produce exactly 1 finding."""
+        rule = _run_rule(
+            f"""\
+@{spec.left}
+@{spec.right}
+def target():
+    return 1
+""",
+            annotations=(spec.left, spec.right),
+        )
+        findings = [f for f in rule.findings if f.rule_id == RuleId.SCN_021]
+        assert len(findings) == 1, (
+            f"Expected 1 finding for {spec.left}+{spec.right}, got {len(findings)}"
+        )
+        assert findings[0].severity == spec.severity
+        assert findings[0].exceptionability == Exceptionability.UNCONDITIONAL
+
+
+class TestNegativeCombinations:
+    @pytest.mark.parametrize(
+        "left,right",
+        [
+            ("fail_closed", "deterministic"),
+            ("atomic", "fail_closed"),
+            ("handles_pii", "tier1_read"),
+            ("thread_safe", "atomic"),
+            ("test_only", "deprecated_by"),
+            ("handles_secrets", "thread_safe"),
+        ],
+        ids=[f"{left}+{right}" for left, right in [
+            ("fail_closed", "deterministic"),
+            ("atomic", "fail_closed"),
+            ("handles_pii", "tier1_read"),
+            ("thread_safe", "atomic"),
+            ("test_only", "deprecated_by"),
+            ("handles_secrets", "thread_safe"),
+        ]],
+    )
+    def test_valid_combination_does_not_fire(self, left: str, right: str) -> None:
+        rule = _run_rule(
+            f"""\
+@{left}
+@{right}
+def target():
+    return 1
+""",
+            annotations=(left, right),
+        )
+        scn_findings = [f for f in rule.findings if f.rule_id == RuleId.SCN_021]
+        assert len(scn_findings) == 0, (
+            f"Valid combination {left}+{right} should not fire SCN-021"
+        )

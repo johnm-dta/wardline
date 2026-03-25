@@ -70,7 +70,7 @@ _COMBINATIONS: tuple[_CombinationSpec, ...] = (
         _CONTRADICTORY,
         "Fail-closed raises on failure; emits-or-explains requires structured error output",
     ),
-    _CombinationSpec("audit_critical", "fail_open", _CONTRADICTORY, "Audit-critical paths must not have fallback paths"),
+    # Spec entry #19 (audit_critical + fail_open) is an alias of #5 — removed to prevent duplicate findings.
     _CombinationSpec("validates_external", "validates_shape", _CONTRADICTORY, "validates_external already encompasses shape validation"),
     _CombinationSpec(
         "validates_external",

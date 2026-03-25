@@ -50,7 +50,8 @@ def explain(
     from wardline.scanner.discovery import discover_annotations
     from wardline.scanner.sarif import _PSEUDO_RULE_IDS
     from wardline.scanner.taint.function_level import (
-        DECORATOR_TAINT_MAP,
+        BODY_EVAL_TAINT,
+        RETURN_TAINT,
         assign_function_taints,
         resolve_module_default,
         taint_from_annotations,
@@ -89,7 +90,7 @@ def explain(
 
         # Discover annotations and assign taints
         annotations = discover_annotations(tree, file_path_str)
-        taint_map, _taint_sources = assign_function_taints(
+        taint_map, _return_taint_map, _taint_sources = assign_function_taints(
             tree, file_path_str, annotations, manifest_model
         )
 
@@ -126,16 +127,26 @@ def explain(
             matching = [
                 a.canonical_name
                 for a in annots
-                if a.canonical_name in DECORATOR_TAINT_MAP
+                if a.canonical_name in BODY_EVAL_TAINT
             ]
+            # Resolve return taint (OUTPUT tier) for display
+            return_taint = taint_from_annotations(
+                file_path_str, qualname, annotations, decorator_map=RETURN_TAINT,
+            )
             result["resolution"] = {
                 "source": "decorator",
                 "decorators": matching,
             }
+            result["body_eval_taint"] = str(decorator_taint)
+            result["return_taint"] = str(return_taint) if return_taint else str(decorator_taint)
             result["module_default"] = str(module_default) if module_default is not None else None
             if not output_json:
                 click.echo(f"Resolution: decorator ({', '.join(matching)})")
-                click.echo(f"  Decorator taint: {decorator_taint}")
+                if return_taint is not None and return_taint != decorator_taint:
+                    click.echo(f"  Body eval taint: {decorator_taint} (input tier)")
+                    click.echo(f"  Return taint: {return_taint} (output tier)")
+                else:
+                    click.echo(f"  Decorator taint: {decorator_taint}")
                 if module_default is not None:
                     click.echo(f"  Module default (overridden): {module_default}")
         elif module_default is not None:
@@ -179,7 +190,7 @@ def explain(
         unresolved = [
             a
             for a in annots
-            if a.canonical_name not in DECORATOR_TAINT_MAP
+            if a.canonical_name not in BODY_EVAL_TAINT
             and a.canonical_name != ""
         ]
         result["unresolved_decorators"] = [a.canonical_name for a in unresolved]

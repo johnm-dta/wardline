@@ -38,8 +38,10 @@ def compute_variable_taints(
     Args:
         func_node: The function AST node to analyze.
         function_taint: The Level 1 taint assigned to this function.
-        taint_map: Maps function qualnames to their L1 taint states,
-            used for resolving callee taint in function calls.
+        taint_map: Maps function qualnames to their callee-resolution
+            taint (what calling that function returns). For decorator-
+            anchored validators this is the OUTPUT tier (return taint);
+            for all other functions it is the L3-refined body taint.
 
     Returns:
         Dict mapping variable name to ``TaintState`` for every assigned

@@ -180,7 +180,7 @@ class ScanEngine:
         # Pass 1: Discovery + taint assignment (fault-tolerant)
         try:
             annotations = discover_annotations(tree, file_path)
-            taint_map, taint_sources = assign_function_taints(
+            body_taint_map, return_taint_map, taint_sources = assign_function_taints(
                 tree, file_path, annotations, self._manifest
             )
         except Exception as exc:
@@ -188,25 +188,31 @@ class ScanEngine:
             result.errors.append(
                 f"Discovery/taint failed for {file_path}: {exc}"
             )
-            taint_map, taint_sources = {}, {}
+            body_taint_map, return_taint_map, taint_sources = {}, {}, {}
 
         # Pass 1.5: Level 3 call-graph taint (when analysis_level >= 3)
+        # L3 refines body_taint_map using callgraph analysis. The refined map
+        # is still a body-evaluation map (what rules see inside function bodies),
+        # but non-anchored functions may be demoted based on their callees'
+        # return taints.
         taint_provenance: dict[str, TaintProvenance] | None = None
-        if self._analysis_level >= 3 and taint_map:
-            taint_map, taint_provenance = self._run_callgraph_taint(
-                tree, taint_map, taint_sources, file_path, result
+        if self._analysis_level >= 3 and body_taint_map:
+            body_taint_map, taint_provenance = self._run_callgraph_taint(
+                tree, body_taint_map, taint_sources, file_path, result,
+                return_taint_map=return_taint_map,
             )
 
         # Pass 1.75: Level 2 variable-level taint (when analysis_level >= 2)
         variable_taint_map: dict[str, dict[str, TaintState]] | None = None
-        if self._analysis_level >= 2 and taint_map:
+        if self._analysis_level >= 2 and body_taint_map:
             variable_taint_map = self._run_variable_taint(
-                tree, taint_map, file_path, result
+                tree, body_taint_map, return_taint_map, taint_sources,
+                file_path, result,
             )
 
         ctx = ScanContext(
             file_path=str(file_path),
-            function_level_taint_map=taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
+            function_level_taint_map=body_taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
             annotations_map={  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
                 qualname: tuple(found)
                 for (ann_path, qualname), found in annotations.items()
@@ -320,6 +326,8 @@ class ScanEngine:
         self,
         tree: ast.Module,
         taint_map: dict[str, TaintState],
+        return_taint_map: dict[str, TaintState],
+        taint_sources: dict[str, TaintSource],
         file_path: Path,
         result: ScanResult,
     ) -> dict[str, dict[str, TaintState]] | None:
@@ -328,6 +336,15 @@ class ScanEngine:
         Returns a dict mapping qualname -> {variable: TaintState}, or None
         on failure.
         """
+        # Build callee resolution map: for decorator-anchored callees, use
+        # the return (OUTPUT) tier taint so that `x = validates_shape(data)`
+        # assigns SHAPE_VALIDATED to x. For non-anchored callees, keep the
+        # L3-refined body taint (which equals return taint at L1, but may
+        # have been demoted by L3 callgraph analysis).
+        callee_taint_map: dict[str, TaintState] = dict(taint_map)
+        for qn, src in taint_sources.items():
+            if src == "decorator" and qn in return_taint_map:
+                callee_taint_map[qn] = return_taint_map[qn]
 
         var_map: dict[str, dict[str, _TS]] = {}
         qualname_map = self._build_qualname_map(tree)
@@ -338,7 +355,7 @@ class ScanEngine:
                     if qualname is not None and qualname in taint_map:
                         func_taint = taint_map[qualname]
                         var_taints = compute_variable_taints(
-                            node, func_taint, taint_map
+                            node, func_taint, callee_taint_map
                         )
                         var_map[qualname] = var_taints
         except Exception as exc:
@@ -359,6 +376,8 @@ class ScanEngine:
         taint_sources: dict[str, TaintSource],
         file_path: Path,
         result: ScanResult,
+        *,
+        return_taint_map: dict[str, TaintState],
     ) -> tuple[dict[str, TaintState], dict[str, TaintProvenance] | None]:
         """Run Level 3 call-graph taint propagation.
 
@@ -372,7 +391,8 @@ class ScanEngine:
                 tree, qualname_map
             )
             refined_map, provenance, l3_diagnostics = propagate_callgraph_taints(
-                edges, taint_map, taint_sources, resolved_counts, unresolved_counts
+                edges, taint_map, taint_sources, resolved_counts, unresolved_counts,
+                return_taint_map=return_taint_map,
             )
             # Convert L3 diagnostics to Finding objects
             _diag_rule_map = {
