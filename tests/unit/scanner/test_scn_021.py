@@ -124,3 +124,19 @@ def target():
         )
 
         assert len(rule.findings) == 0
+
+
+class TestAliasPairDedup:
+    def test_fail_open_audit_critical_produces_one_finding(self) -> None:
+        """Entry #5 and #19 are the same pair — must produce exactly 1 finding."""
+        rule = _run_rule(
+            """\
+@fail_open
+@audit_critical
+def target():
+    return 1
+""",
+            annotations=("fail_open", "audit_critical"),
+        )
+        assert len(rule.findings) == 1
+        assert rule.findings[0].severity == Severity.ERROR
