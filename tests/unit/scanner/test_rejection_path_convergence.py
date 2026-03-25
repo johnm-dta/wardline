@@ -24,10 +24,20 @@ class TestSingleRoundExpansion:
     """Default max_rounds=1 preserves two-hop behavior."""
 
     def test_two_hop_chain(self) -> None:
-        """a() calls b() which has raise -> both in index."""
+        """a() calls b() which has raise -> both in index at max_rounds=1."""
         source = "def a():\n    b()\n\ndef b():\n    raise ValueError('bad')\n"
         fd = _file_data(source, "mod")
         result, converged = expand_rejection_index([fd], frozenset({"mod.b"}), max_rounds=1)
+        assert "mod.a" in result
+        assert "mod.b" in result
+        # converged=False because max_rounds=1 doesn't get a verification round
+        assert not converged
+
+    def test_two_hop_chain_converges_with_headroom(self) -> None:
+        """With max_rounds=2, round 2 finds nothing → converged=True."""
+        source = "def a():\n    b()\n\ndef b():\n    raise ValueError('bad')\n"
+        fd = _file_data(source, "mod")
+        result, converged = expand_rejection_index([fd], frozenset({"mod.b"}), max_rounds=2)
         assert "mod.a" in result
         assert "mod.b" in result
         assert converged
@@ -53,11 +63,11 @@ class TestSingleRoundExpansion:
 class TestMultiRoundConvergence:
     """Deeper expansion when max_rounds > 1."""
 
-    def test_three_hop_with_two_rounds(self) -> None:
-        """a->b->c (c raises), max_rounds=2 -> all three in index."""
+    def test_three_hop_with_three_rounds(self) -> None:
+        """a->b->c (c raises), max_rounds=3 -> all three, converged."""
         source = "def a():\n    b()\n\ndef b():\n    c()\n\ndef c():\n    raise ValueError('bad')\n"
         fd = _file_data(source, "mod")
-        result, converged = expand_rejection_index([fd], frozenset({"mod.c"}), max_rounds=2)
+        result, converged = expand_rejection_index([fd], frozenset({"mod.c"}), max_rounds=3)
         assert result == frozenset({"mod.a", "mod.b", "mod.c"})
         assert converged
 
