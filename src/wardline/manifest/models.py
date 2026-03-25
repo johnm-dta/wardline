@@ -212,6 +212,7 @@ _KNOWN_KEYS: frozenset[str] = frozenset({
     "allow_permissive_distribution",
     "known_validators",
     "known_validators_extra",
+    "max_expansion_rounds",
 })
 
 
@@ -237,6 +238,7 @@ class ScannerConfig:
     allow_permissive_distribution: bool = False
     known_validators: tuple[str, ...] | None = None
     known_validators_extra: tuple[str, ...] = ()
+    max_expansion_rounds: int = 1
 
     @classmethod
     def from_toml(cls, path: Path) -> ScannerConfig:
@@ -337,6 +339,10 @@ class ScannerConfig:
                 raise ScannerConfigError("known_validators_extra must be a list of strings")
             known_validators_extra = tuple(str(v) for v in known_validators_extra_raw)
 
+        max_expansion_rounds = int(wardline_section.get("max_expansion_rounds", 1))
+        if max_expansion_rounds < 1:
+            raise ScannerConfigError("max_expansion_rounds must be >= 1")
+
         return cls(
             target_paths=target_paths,
             exclude_paths=exclude_paths,
@@ -353,4 +359,5 @@ class ScannerConfig:
             ),
             known_validators=known_validators,
             known_validators_extra=known_validators_extra,
+            max_expansion_rounds=max_expansion_rounds,
         )

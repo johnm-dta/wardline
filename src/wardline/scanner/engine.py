@@ -71,6 +71,54 @@ class ProjectIndex:
     rejection_path_index: frozenset[str] = frozenset()
 
 
+def expand_rejection_index(
+    file_data: list[tuple[ast.Module, dict[str, str], dict[int, str], str]],
+    seed: frozenset[str],
+    *,
+    max_rounds: int = 1,
+) -> tuple[frozenset[str], bool]:
+    """Expand a rejection path seed to transitive callers.
+
+    Each round adds functions that call any function already in the index.
+    Iteration stops when no new entries are added or ``max_rounds`` is
+    reached.  Default ``max_rounds=1`` preserves spec-compliant two-hop
+    behavior.
+
+    Returns:
+        Tuple of (expanded_index, converged). ``converged`` is True if
+        expansion reached fixed point; False if ``max_rounds`` was hit.
+    """
+    index = set(seed)
+    for _round in range(max_rounds):
+        new_entries: set[str] = set()
+        for tree, alias_map, qualname_map, module_name in file_data:
+            local_fqns = frozenset(
+                f"{module_name}.{qn}" for qn in qualname_map.values()
+            )
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                qualname = qualname_map.get(id(node))
+                if qualname is None:
+                    continue
+                fqn = f"{module_name}.{qualname}"
+                if fqn in index:
+                    continue
+                for child in walk_skip_nested_defs(node):
+                    if not isinstance(child, ast.Call):
+                        continue
+                    callee_fqn = resolve_call_fqn(
+                        child, alias_map, local_fqns, module_name
+                    )
+                    if callee_fqn is not None and callee_fqn in index:
+                        new_entries.add(fqn)
+                        break
+        if not new_entries:
+            return frozenset(index), True
+        index.update(new_entries)
+    return frozenset(index), False
+
+
 class ScanEngine:
     """Orchestrates file discovery → AST parsing → rule execution.
 
@@ -92,6 +140,7 @@ class ScanEngine:
         optional_fields: tuple[OptionalFieldEntry, ...] = (),
         analysis_level: int = 1,
         known_validators: frozenset[str] | None = None,
+        max_expansion_rounds: int = 1,
     ) -> None:
         self._target_paths = target_paths
         self._exclude_paths = tuple(p.resolve() for p in exclude_paths)
@@ -101,6 +150,7 @@ class ScanEngine:
         self._optional_fields = optional_fields
         self._analysis_level = analysis_level
         self._known_validators = known_validators if known_validators is not None else BUILTIN_KNOWN_VALIDATORS
+        self._max_expansion_rounds = max_expansion_rounds
         self._project_index: ProjectIndex | None = None
 
     def scan(self) -> ScanResult:
@@ -257,9 +307,9 @@ class ScanEngine:
         Files that cannot be read or parsed are skipped here; the main scan pass
         still reports those errors authoritatively.
 
-        Also computes the rejection path index for two-hop resolution:
+        Also computes the rejection path index:
         1. Seed: project functions with direct rejection paths + known_validators
-        2. Expand: one round — any project function calling a seed entry enters the index
+        2. Expand: iterate up to max_expansion_rounds (default 1 = two-hop per spec)
         """
         all_annotations: dict[tuple[str, str], tuple[WardlineAnnotation, ...]] = {}
         module_file_map: dict[str, str] = {}
@@ -323,36 +373,32 @@ class ScanEngine:
         # Add known validators to the seed
         rejection_seed.update(self._known_validators)
 
-        # Expansion: one round — functions calling a seed entry also enter the index
-        expanded: set[str] = set()
-        for tree, alias_map, qualname_map, module_name in file_data:
-            local_fqns = frozenset(
-                f"{module_name}.{qn}" for qn in qualname_map.values()
+        # Expansion: configurable depth (default 1 = two-hop per spec)
+        try:
+            rejection_path_index, converged = expand_rejection_index(
+                file_data, frozenset(rejection_seed),
+                max_rounds=self._max_expansion_rounds,
             )
-            for node in ast.walk(tree):
-                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    continue
-                qualname = qualname_map.get(id(node))
-                if qualname is None:
-                    continue
-                fqn = f"{module_name}.{qualname}"
-                if fqn in rejection_seed:
-                    continue  # already in seed
-                for child in walk_skip_nested_defs(node):
-                    if not isinstance(child, ast.Call):
-                        continue
-                    callee_fqn = resolve_call_fqn(
-                        child, alias_map, local_fqns, module_name
-                    )
-                    if callee_fqn is not None and callee_fqn in rejection_seed:
-                        expanded.add(fqn)
-                        break
+        except Exception as exc:
+            logger.warning(
+                "Rejection path expansion failed: %s — falling back to seed",
+                exc,
+            )
+            rejection_path_index = frozenset(rejection_seed)
+            converged = True
+
+        if not converged:
+            logger.warning(
+                "Rejection path expansion hit max_rounds=%d "
+                "(%d entries in index)",
+                self._max_expansion_rounds, len(rejection_path_index),
+            )
 
         return ProjectIndex(
             annotations=MappingProxyType(all_annotations),
             module_file_map=MappingProxyType(module_file_map),
             string_literal_counts=MappingProxyType(string_literal_counts),
-            rejection_path_index=frozenset(rejection_seed | expanded),
+            rejection_path_index=rejection_path_index,
         )
 
     def _iter_python_files(self, root: Path) -> list[Path]:
