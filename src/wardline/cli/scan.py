@@ -191,7 +191,10 @@ def _disabled_rule_findings(
 
 @click.command()
 @click.argument("path", default=".", type=click.Path(exists=True))
-@click.option("--manifest", type=click.Path(exists=False), default=None,
+@click.option(
+    "--manifest",
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    default=None,
               help="Path to wardline.yaml manifest.")
 @click.option("--config", type=click.Path(exists=False), default=None,
               help="Path to wardline.toml config.")
@@ -584,12 +587,6 @@ def _load_manifest(
 
     if manifest_arg is not None:
         manifest_path = Path(manifest_arg)
-        if not manifest_path.exists():
-            _error(f"manifest not found: {manifest_arg}")
-            return None
-        if manifest_path.is_dir():
-            _error(f"manifest path is a directory, not a file: {manifest_arg}")
-            return None
     else:
         manifest_path = discover_manifest(Path.cwd())
         if manifest_path is None:

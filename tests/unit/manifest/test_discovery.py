@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
@@ -79,26 +80,36 @@ class TestDiscoverManifest:
         assert result is None
 
     def test_symlink_cycle_detection(
-        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        # Create a symlink cycle: a -> b -> a
-        dir_a = tmp_path / "a"
-        dir_a.mkdir()
-        dir_b = tmp_path / "b"
-        dir_b.mkdir()
-        # Create symlinks that form a cycle in the parent chain
-        # We can't easily make a parent-chain cycle, so test
-        # the inode tracking by creating the scenario where
-        # the walk would revisit the same directory.
-        # Simplest: symlink a directory to itself as a parent
-        # Actually, the real test is that discover_manifest handles
-        # it gracefully. Let's test with a real .git stop instead
-        # and verify the WARNING path separately.
-        (tmp_path / ".git").mkdir()
+        from wardline.manifest import discovery as discovery_module
+
+        start = tmp_path / "src"
+        start.mkdir()
+        real_stat = discovery_module.os.stat
+        call_count = 0
+
+        def fake_stat(path: object) -> object:
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 2:
+                return SimpleNamespace(st_ino=4242)
+            return real_stat(path)
+
+        monkeypatch.setattr(
+            discovery_module,
+            "os",
+            SimpleNamespace(stat=fake_stat),
+        )
+
         with caplog.at_level(logging.WARNING):
-            result = discover_manifest(tmp_path)
-        # No cycle here, just verifying the function works
+            result = discover_manifest(start)
+
         assert result is None
+        assert "Symlink cycle detected" in caplog.text
 
 
 # ── discover_overlays ─────────────────────────────────────────────

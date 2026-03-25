@@ -5,11 +5,17 @@ from __future__ import annotations
 import functools
 import inspect
 import logging
-from typing import Any
+from typing import Any, Protocol, overload
 
 from wardline.core.registry import REGISTRY
 
 logger = logging.getLogger(__name__)
+
+
+class _WardlineDecorated(Protocol):
+    """Protocol for callables already marked with wardline metadata."""
+
+    _wardline_groups: object
 
 
 def _compute_output_tier(semantic_attrs: dict[str, Any]) -> int | None:
@@ -176,6 +182,14 @@ def wardline_decorator(
         return wrapper
 
     return decorator
+
+
+@overload
+def get_wardline_attrs(fn: _WardlineDecorated) -> dict[str, Any]: ...
+
+
+@overload
+def get_wardline_attrs(fn: Any) -> dict[str, Any] | None: ...
 
 
 def get_wardline_attrs(fn: Any) -> dict[str, Any] | None:

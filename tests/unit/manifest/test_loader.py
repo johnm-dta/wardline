@@ -513,3 +513,9 @@ class TestNonMappingYaml:
         f.write_text("just a string\n")
         with pytest.raises(ManifestLoadError, match="must be a YAML mapping"):
             load_manifest(f)
+
+    def test_overlay_list_yaml_rejected(self, tmp_path: Path) -> None:
+        f = tmp_path / "wardline.overlay.yaml"
+        f.write_text("- item1\n- item2\n")
+        with pytest.raises(ManifestLoadError, match="must be a YAML mapping"):
+            load_overlay(f)

@@ -71,6 +71,21 @@ class TestCliExitCodes:
             f"stdout: {result.output}\n"
         )
 
+    def test_exit_2_manifest_directory(self, tmp_path: Path) -> None:
+        """Directory passed to --manifest exits 2 before command execution."""
+        manifest_dir = tmp_path / "manifest-dir"
+        manifest_dir.mkdir()
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, ["scan", "--manifest", str(manifest_dir)]
+        )
+        assert result.exit_code == 2, (
+            f"Expected exit 2, got {result.exit_code}.\n"
+            f"stderr: {result.stderr}\n"
+        )
+        assert "directory" in result.stderr.lower()
+
     def test_exit_2_invalid_yaml(self, tmp_path: Path) -> None:
         """Manifest with invalid YAML exits 2, no traceback."""
         bad_manifest = tmp_path / "wardline.yaml"
@@ -183,7 +198,7 @@ class TestCliStructuredErrors:
             cli, ["scan", "--manifest", "/nonexistent/wardline.yaml"]
         )
         # The error message should be on stderr
-        assert "error:" in result.stderr
+        assert "Error:" in result.stderr
         # stdout should NOT contain the error prefix
         assert "error:" not in result.stdout
 

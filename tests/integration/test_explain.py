@@ -143,7 +143,7 @@ class TestExplainUndeclaredModule:
         )
 
         assert result.exit_code == 2
-        assert "error: malformed manifest:" in result.output
+        assert "error: malformed manifest:" in result.stderr
 
 
 @pytest.mark.integration

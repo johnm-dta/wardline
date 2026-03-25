@@ -311,6 +311,8 @@ def corpus() -> None:
 def verify(corpus_dir: str, analysis_level: int) -> None:
     """Verify corpus specimens against scanner rules."""
     corpus_path = Path(corpus_dir)
+    # Keep the two glob results concatenated before sorting so `.yaml` and
+    # `.yml` files share one deterministic ordering regardless of extension.
     specimens = sorted(
         list(corpus_path.glob("**/*.yaml"))
         + list(corpus_path.glob("**/*.yml"))

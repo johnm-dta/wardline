@@ -58,9 +58,9 @@ class TestManifestValidate:
         result = runner.invoke(cli, ["manifest", "validate", str(manifest)])
         assert result.exit_code == 1, (
             f"Expected exit 1, got {result.exit_code}.\n"
-            f"output: {result.output}\n"
+            f"stderr: {result.stderr}\n"
         )
-        assert "error:" in result.output
+        assert "error:" in result.stderr
 
     def test_validate_file_not_found(self) -> None:
         """Non-existent file exits 2."""
@@ -70,9 +70,9 @@ class TestManifestValidate:
         )
         assert result.exit_code == 2, (
             f"Expected exit 2, got {result.exit_code}.\n"
-            f"output: {result.output}\n"
+            f"stderr: {result.stderr}\n"
         )
-        assert "not found" in result.output
+        assert "not found" in result.stderr
 
 
 @pytest.mark.integration
