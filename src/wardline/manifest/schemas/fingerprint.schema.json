@@ -76,7 +76,9 @@
           },
           "annotation_hash": {
             "type": "string",
-            "description": "SHA-256 hash of the normalised annotation."
+            "minLength": 16,
+            "pattern": "^[0-9a-f]{16,64}$",
+            "description": "SHA-256 hash of the normalised annotation (minimum 16 hex chars / 64 bits)."
           },
           "tier_context": {
             "type": "integer",

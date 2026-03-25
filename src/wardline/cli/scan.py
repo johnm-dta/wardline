@@ -189,6 +189,38 @@ def _disabled_rule_findings(
     return findings
 
 
+def _effective_known_validators(
+    cfg: ScannerConfig | None,
+) -> frozenset[str]:
+    """Return the effective known_validators set after config merging."""
+    from wardline.scanner.rejection_path import BUILTIN_KNOWN_VALIDATORS
+
+    if cfg is None:
+        return BUILTIN_KNOWN_VALIDATORS
+    if cfg.known_validators is not None:
+        return frozenset(cfg.known_validators)
+    if cfg.known_validators_extra:
+        return BUILTIN_KNOWN_VALIDATORS | frozenset(cfg.known_validators_extra)
+    return BUILTIN_KNOWN_VALIDATORS
+
+
+def _custom_known_validator_findings(
+    effective_known_validators: frozenset[str],
+) -> list[Finding]:
+    """Emit GOVERNANCE findings for non-built-in known_validators entries."""
+    from wardline.scanner.rejection_path import BUILTIN_KNOWN_VALIDATORS
+
+    custom_entries = sorted(effective_known_validators - BUILTIN_KNOWN_VALIDATORS)
+    return [
+        _make_governance_finding(
+            RuleId.GOVERNANCE_CUSTOM_KNOWN_VALIDATOR,
+            f"Custom known_validators entry active: {entry}",
+            severity=Severity.WARNING,
+        )
+        for entry in custom_entries
+    ]
+
+
 @click.command()
 @click.argument("path", default=".", type=click.Path(exists=True))
 @click.option(
@@ -304,6 +336,11 @@ def scan(
             )
         )
 
+    effective_known_validators = _effective_known_validators(cfg)
+    governance_findings.extend(
+        _custom_known_validator_findings(effective_known_validators)
+    )
+
     # --- Determine target paths ---
     scan_path = Path(path).resolve()
     target_paths = cfg.target_paths if cfg is not None and cfg.target_paths else (scan_path,)
@@ -356,6 +393,7 @@ def scan(
         boundaries=boundaries,
         optional_fields=optional_fields,  # type: ignore[arg-type]
         analysis_level=analysis_level,
+        known_validators=effective_known_validators,
         max_expansion_rounds=cfg.max_expansion_rounds if cfg is not None else 1,
     )
 

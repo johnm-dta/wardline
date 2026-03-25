@@ -57,7 +57,7 @@ Before rules run, the engine pre-computes a set of fully-qualified function name
 
 2. **Third-party known validators** — a configurable list of FQN third-party functions known to raise on invalid input. The scanner cannot follow into third-party source, so these are declared.
 
-**Two-hop-aware index construction (per ST review):** After the initial index is seeded from sources 1-2, apply one round of expansion: any project function that calls a function already in the index also enters the index. **The expansion step builds per-file import alias maps** to resolve calls to known_validators entries. **[R2 fix #1: Alias maps must be built during `_build_project_indexes`, not deferred to `_scan_file`.]**
+**Two-hop-aware index construction (per ST review):** After the initial index is seeded from sources 1-2, apply one round of expansion: any project function that contains a **reachable** call to a function already in the index also enters the index. The expansion step MUST apply the same reachability discipline as direct rejection-path detection: calls inside dead branches (`if False:`, `if 0:`, etc.) do not qualify, and nested function bodies are not scanned when determining whether the outer function delegates rejection. **The expansion step builds per-file import alias maps** to resolve calls to known_validators entries. **[R2 fix #1: Alias maps must be built during `_build_project_indexes`, not deferred to `_scan_file`.]**
 
 This covers the common **wrapper pattern**:
 
@@ -102,6 +102,8 @@ Building the map is cheap (one walk of module-level statements, O(imports)).
 - Attribute call `jsonschema.validate(data)` → look up `"jsonschema"` → `"jsonschema"`, concat → `"jsonschema.validate"` → check index
 - Bare call `validate(data)` with no import → look up `"validate"` → not found → check against intra-module FQNs only
 
+**Receiver method calls are OUT OF SCOPE for this design:** Calls like `self.validate(data)` or `obj.validator.validate(data)` are not resolvable with the proposed syntactic alias map alone because the receiver type is unknown. Treat them as unresolvable and let PY-WL-008 fire unless the boundary also has a direct reachable rejection path. This keeps the design aligned with the spec's structural requirement while avoiding unsound pseudo-resolution.
+
 **Local definitions shadow imports (FunctionDef/AsyncFunctionDef only):** If a module defines its own `def validate():`, bare-name calls resolve to the local definition (checked via its FQN in the index), NOT to the import alias. This prevents false negatives where a local no-op `validate` is mistaken for `jsonschema.validate`. Assignments (`validate = lambda x: x`) and class definitions are NOT considered local shadows — only `def`/`async def` at module level. **[R2 fix from PE #5: Scoped to FunctionDef/AsyncFunctionDef.]**
 
 **Known limitations:**
@@ -145,7 +147,7 @@ Note: `cerberus.Validator.validate` removed from defaults (per ST review — it 
 
 **Artefact classification (per SecA review):** `known_validators` is a **policy artefact** (§9.3.1), not an enforcement artefact. Entries directly suppress a MUST-level E/U rule. Changes SHOULD be tracked in the fingerprint baseline and SHOULD require the same review as boundary declarations.
 
-**GOVERNANCE finding for custom entries:** The scanner MUST emit a `GOVERNANCE_CUSTOM_KNOWN_VALIDATOR` finding (severity: `WARNING`) for each entry in the effective known_validators set that is NOT in `_BUILTIN_KNOWN_VALIDATORS`. This makes custom additions visible in SARIF output and subject to governance review. **[R2 fix #3: New RuleId `GOVERNANCE_CUSTOM_KNOWN_VALIDATOR` with explicit `Severity.WARNING`.]**
+**GOVERNANCE finding for custom entries:** The scanner MUST emit a `GOVERNANCE_CUSTOM_KNOWN_VALIDATOR` finding (severity: `WARNING`) for each entry in the effective known_validators set that is NOT in `_BUILTIN_KNOWN_VALIDATORS`. This makes custom additions visible in SARIF output and subject to governance review. **Emission point:** after CLI/config merging determines the effective validator set, and before `ScanEngine.scan()` runs, `scan.py` appends one governance finding per custom entry using the existing governance-finding path (the same mechanism already used for disabled rules, permissive distribution, and registry mismatch). This avoids hiding policy-surface changes inside the engine and keeps the review signal in SARIF even when no PY-WL-008 finding fires. **[R2 fix #3: explicit owner for RuleId emission.]**
 
 **Config location:** Both keys live under `[wardline]` (the existing config section), NOT `[scanner]`. The `_KNOWN_KEYS` frozenset in `models.py` must be extended.
 
@@ -169,6 +171,12 @@ Engine._build_project_indexes()
 Engine._scan_file()
   ├── build per-file import_alias_map (reuse from index if same file, else rebuild)
   └── pass rejection_path_index + import_alias_map to ScanContext
+
+CLI scan setup
+  ├── load wardline.toml / CLI overrides
+  ├── compute effective known_validators set
+  ├── compare effective set to built-in defaults
+  └── emit GOVERNANCE_CUSTOM_KNOWN_VALIDATOR findings for custom entries
 
 PY-WL-008.visit_function(node)
   ├── _has_rejection_path(node)  [existing — unchanged]
@@ -221,31 +229,32 @@ Callers in `scan()` and `_scan_file()` that currently access `self._project_anno
 
 **Error handling:** If `_has_rejection_path` raises on a malformed function node during the indexing pass, catch the exception, log a warning, and exclude the function from the index. Follow the existing fault-tolerance pattern (try/except with TOOL-ERROR finding).
 
-### File changes
+### Implementation touchpoints
 
 | Action | File | What |
 |--------|------|------|
-| Create | `src/wardline/scanner/rejection_path.py` | Extract `_has_rejection_path` + helpers from `py_wl_008.py` **[R2 fix #4: Lives in `scanner/`, not `scanner/rules/`, to avoid engine→rules circular import]** |
-| Create | `src/wardline/scanner/import_resolver.py` | `build_import_alias_map(tree) → dict[str, str]` |
+| Modify | `src/wardline/scanner/rejection_path.py` | Keep `_has_rejection_path` + helpers authoritative here; ensure expansion and direct detection share reachability semantics |
+| Modify | `src/wardline/scanner/import_resolver.py` | `build_import_alias_map(tree) → dict[str, str]`; keep resolver explicitly limited to syntactic import/local-name resolution |
 | Modify | `src/wardline/scanner/rules/py_wl_008.py` | Import from `scanner.rejection_path`, add `_has_delegated_rejection` |
 | Modify | `src/wardline/scanner/context.py` | Add `rejection_path_index` and `import_alias_map` fields + `__post_init__` |
 | Modify | `src/wardline/scanner/engine.py` | `ProjectIndex` dataclass, compute index + alias maps in `_build_project_indexes`, update all `self._project_*` → `self._project_index.*` |
 | Modify | `src/wardline/core/severity.py` | Add `GOVERNANCE_CUSTOM_KNOWN_VALIDATOR` RuleId |
 | Modify | `src/wardline/scanner/sarif.py` | Add new RuleId to `_RULE_SHORT_DESCRIPTIONS` and `_PSEUDO_RULE_IDS` |
 | Modify | `src/wardline/manifest/models.py` | Add `known_validators` + `known_validators_extra` to `_KNOWN_KEYS` and `ScannerConfig` |
+| Modify | `src/wardline/cli/scan.py` | Compute effective known_validators, emit GOVERNANCE_CUSTOM_KNOWN_VALIDATOR findings, and thread the effective set into `ScanEngine` |
 
 ### Pre-existing bug to fix: `_is_inside_dead_branch` walks into nested defs
 
 **[R2 fix #6 from PE:]** `_is_inside_dead_branch` in current `py_wl_008.py` (line 115-129) uses `ast.walk(root)` which descends into nested function bodies. A nested function's `raise` could wrongly mark the outer function as NOT being inside a dead branch. When extracting to `scanner/rejection_path.py`, replace `ast.walk` with `walk_skip_nested_defs` in `_is_inside_dead_branch`. This is a pre-existing bug that the index would amplify.
 
-### Testing strategy (expanded — 33 cases)
+### Testing strategy (expanded — 36 cases)
 
 **Unit tests for `_has_delegated_rejection` (isolated, no boundary context):**
 1. Body calls function in index → True
 2. Body calls function NOT in index → False
 3. Multiple calls, only one in index → True (any match suffices)
 4. No calls at all → False
-5. Call to `self.validate()` where `ClassName.validate` is in index via FQN → resolved correctly
+5. Call to imported project module attribute `validators.validate()` where `validators` resolves via alias map and `myproject.validators.validate` is in index → resolved correctly
 6. Lambda in body → not matched as delegation
 
 **Unit tests for import alias resolution (`build_import_alias_map`):**
@@ -268,25 +277,27 @@ Callers in `scan()` and `_scan_file()` that currently access `self._project_anno
 21. Three-hop chain: boundary → wrapper → helper → raise → finding fires (expansion limited to one round) **[R2 fix #9 from SecA: clarified description]**
 22. Async boundary with delegated rejection → no finding
 23. Decorator-detected boundary (no manifest) with delegation → no finding
+24. Boundary calling helper only in `if False:` block → finding fires (delegated call is unreachable, so expansion/reuse does not suppress)
 
 **Config tests:**
-24. `known_validators_extra` merges with built-in defaults
-25. `known_validators` replaces built-in defaults
-26. Both present → `known_validators` wins with warning
-27. Neither present → built-in defaults used
-28. Custom entry produces `GOVERNANCE_CUSTOM_KNOWN_VALIDATOR` finding with `Severity.WARNING`
+25. `known_validators_extra` merges with built-in defaults
+26. `known_validators` replaces built-in defaults
+27. Both present → `known_validators` wins with warning
+28. Neither present → built-in defaults used
+29. Custom entry produces `GOVERNANCE_CUSTOM_KNOWN_VALIDATOR` finding with `Severity.WARNING`
 
 **Backward compatibility:**
-29. Empty `rejection_path_index` (ScanContext default) → all existing behavior preserved
-30. Boundary calling `jsonschema.validate()` with empty index still fires (confirms index is required, not automatic)
+30. Empty `rejection_path_index` (ScanContext default) → all existing behavior preserved
+31. Boundary calling `jsonschema.validate()` with empty index still fires (confirms index is required, not automatic)
 
 **Edge cases:**
-31. Qualname collision: `foo.validate` (has rejection) vs `bar.validate` (no rejection) — FQNs distinguish them
-32. Circular calls between project functions — neither has a raise, neither enters index
-33. Malformed function node during index build → warning logged, function excluded, scan continues
+32. Qualname collision: `foo.validate` (has rejection) vs `bar.validate` (no rejection) — FQNs distinguish them
+33. Circular calls between project functions — neither has a raise, neither enters index
+34. Malformed function node during index build → warning logged, function excluded, scan continues
+35. `self.validate()` / receiver-method call remains unresolved and does not suppress the finding
 
 **Integration test for full pipeline:**
-34. Engine with fixture project: file with `@validates_shape` boundary delegating to local helper with raise → no finding end-to-end (validates `_build_project_indexes` → ScanContext → rule)
+36. Engine with fixture project: file with `@validates_shape` boundary delegating to local helper with raise → no finding end-to-end (validates `_build_project_indexes` → ScanContext → rule)
 
 ### Interaction with existing rules
 
@@ -300,9 +311,10 @@ Callers in `scan()` and `_scan_file()` that currently access `self._project_anno
 
 1. **Star imports** — `from jsonschema import *` makes `validate` unresolvable. Finding fires.
 2. **Dynamic imports** — `importlib.import_module` calls cannot be followed. Finding fires.
-3. **Vacuous guards in callees** — a function with `if some_runtime_condition: raise` where the condition is always false at runtime but not a constant expression will be in the index despite never actually rejecting. This is inherited from `_has_rejection_path` and **amplified by the index** (per SecA review — one poisoned function suppresses all boundaries that call it, vs current intraprocedural check which requires evasion at each boundary individually). Mitigated by the existing constant-false guard exclusion and by the GOVERNANCE finding on custom known_validators entries.
+3. **Vacuous guards in callees** — a function with `if some_runtime_condition: raise` where the condition is always false at runtime but not a constant expression will be in the index despite never actually rejecting. This is inherited from `_has_rejection_path` and **amplified by the index** (per SecA review — one poisoned function suppresses all boundaries that call it, vs current intraprocedural check which requires evasion at each boundary individually). Mitigated by requiring expansion to honor the same dead-branch exclusions as direct rejection-path detection, plus the GOVERNANCE finding on custom known_validators entries. This remains a residual risk, not a conformance blocker, because WL-007 is defined in the spec as a structural-presence check rather than a semantic-proof obligation.
 4. **`sys.exit()` and `typing.assert_never()`** — not recognized as rejection paths by `_has_rejection_path`. Pre-existing limitation, not introduced by this design.
 5. **Assignments as local shadows** — `validate = some_factory()` at module level does not shadow an imported `validate` for the purposes of call resolution. Only `def`/`async def` count as local definitions.
+6. **Receiver method calls** — `self.validate()` / `obj.validate()` are intentionally unresolved in this design. Supporting them would require receiver/type analysis beyond the spec-required two-hop structural check.
 
 ---
 
@@ -312,10 +324,12 @@ Callers in `scan()` and `_scan_file()` that currently access `self._project_anno
 - `@validates_shape` boundary calling a local helper with `raise` does NOT fire
 - `@validates_shape` boundary calling a wrapper around `jsonschema.validate` does NOT fire (index expansion)
 - `@validates_shape` boundary with no rejection path (direct or delegated) DOES fire
+- Delegated suppression only occurs for reachable calls; dead-branch helper calls do NOT satisfy WL-007
 - All existing PY-WL-008 tests continue to pass with empty index
 - `known_validators_extra` merges with defaults; `known_validators` replaces
 - Custom entries produce `GOVERNANCE_CUSTOM_KNOWN_VALIDATOR` finding at `Severity.WARNING`
 - Import aliases correctly resolved across all 4 import forms
+- Receiver-method calls such as `self.validate()` remain unresolved by design and do not suppress WL-007
 - FQNs used throughout (index, alias map, call resolution)
 - `_is_inside_dead_branch` uses `walk_skip_nested_defs` (pre-existing bug fix)
 - `uv run pytest` green, `uv run ruff check` clean, `uv run mypy` clean

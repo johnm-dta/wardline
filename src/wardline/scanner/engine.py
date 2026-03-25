@@ -29,8 +29,8 @@ from wardline.scanner.import_resolver import build_import_alias_map, resolve_cal
 from wardline.scanner.rejection_path import (
     BUILTIN_KNOWN_VALIDATORS,
     has_rejection_path,
+    iter_reachable_calls,
 )
-from wardline.scanner.rules.base import walk_skip_nested_defs
 from wardline.scanner.taint.callgraph import extract_call_edges
 from wardline.scanner.taint.callgraph_propagation import (
     TaintProvenance,
@@ -104,9 +104,7 @@ def expand_rejection_index(
                 fqn = f"{module_name}.{qualname}"
                 if fqn in index:
                     continue
-                for child in walk_skip_nested_defs(node):
-                    if not isinstance(child, ast.Call):
-                        continue
+                for child in iter_reachable_calls(node):
                     callee_fqn = resolve_call_fqn(
                         child, alias_map, local_fqns, module_name
                     )
@@ -364,10 +362,10 @@ class ScanEngine:
                         try:
                             if has_rejection_path(node):
                                 rejection_seed.add(fqn)
-                        except Exception:
-                            logger.debug(
-                                "Rejection path check failed for %s in %s",
-                                fqn, file_path,
+                        except Exception as exc:
+                            logger.warning(
+                                "Rejection path check failed for %s in %s: %s",
+                                fqn, file_path, exc,
                             )
 
         # Add known validators to the seed

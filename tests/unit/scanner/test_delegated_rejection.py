@@ -8,7 +8,6 @@ from __future__ import annotations
 import ast
 from types import MappingProxyType
 
-from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.core.taints import TaintState
 from wardline.scanner.context import ScanContext
 from wardline.scanner.rules.py_wl_008 import RulePyWl008
@@ -302,3 +301,23 @@ def validate_payload(data):
         )
         findings = _run_rule(source, ctx)
         assert len(findings) == 1  # empty index means no delegation recognized
+
+    def test_boundary_call_in_dead_branch_does_not_suppress(self) -> None:
+        """Dead-branch delegated call does not satisfy rejection-path evidence."""
+        source = """\
+import jsonschema
+from wardline.decorators import validates_shape
+
+@validates_shape
+def validate_payload(data):
+    if False:
+        jsonschema.validate(data, {})
+    return data
+"""
+        ctx = _make_context(
+            rejection_path_index=frozenset({"jsonschema.validate"}),
+            import_alias_map={"jsonschema": "jsonschema"},
+            module_file_map={"myproject.validators": "src/myproject/validators.py"},
+        )
+        findings = _run_rule(source, ctx)
+        assert len(findings) == 1

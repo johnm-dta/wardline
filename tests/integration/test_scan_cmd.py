@@ -518,6 +518,64 @@ class TestPermissiveDistribution:
 
 
 @pytest.mark.integration
+class TestKnownValidatorsGovernance:
+    """Governance visibility for custom known_validators config."""
+
+    def test_known_validators_extra_emits_governance_finding(
+        self, tmp_path: Path
+    ) -> None:
+        manifest = _minimal_manifest(tmp_path)
+        config = tmp_path / "wardline.toml"
+        config.write_text(
+            "[wardline]\n"
+            "allow_registry_mismatch = true\n"
+            'known_validators_extra = ["mycompany.validators.check_payload"]\n'
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--config", str(config),
+        ])
+        assert result.exit_code == 0
+        sarif = json.loads(result.stdout)
+        results = sarif["runs"][0]["results"]
+        gov_custom = [
+            r for r in results
+            if r["ruleId"] == "GOVERNANCE-CUSTOM-KNOWN-VALIDATOR"
+        ]
+        assert len(gov_custom) == 1
+        assert "mycompany.validators.check_payload" in gov_custom[0]["message"]["text"]
+
+    def test_builtin_replacement_only_emits_no_custom_governance(
+        self, tmp_path: Path
+    ) -> None:
+        manifest = _minimal_manifest(tmp_path)
+        config = tmp_path / "wardline.toml"
+        config.write_text(
+            "[wardline]\n"
+            "allow_registry_mismatch = true\n"
+            'known_validators = ["jsonschema.validate"]\n'
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--config", str(config),
+        ])
+        assert result.exit_code == 0
+        sarif = json.loads(result.stdout)
+        results = sarif["runs"][0]["results"]
+        gov_custom = [
+            r for r in results
+            if r["ruleId"] == "GOVERNANCE-CUSTOM-KNOWN-VALIDATOR"
+        ]
+        assert gov_custom == []
+
+
+@pytest.mark.integration
 class TestPreviewPhase2Flag:
     """Smoke tests for --preview-phase2 flag."""
 

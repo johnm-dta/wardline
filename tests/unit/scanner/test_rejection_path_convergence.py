@@ -135,6 +135,22 @@ class TestMultiRoundConvergence:
         assert "myproject.validators.validate" in result
         assert converged
 
+    def test_dead_branch_call_does_not_expand(self) -> None:
+        """Calls inside if False do not count as delegated rejection."""
+        source = (
+            "import jsonschema\n\n"
+            "def validate(data):\n"
+            "    if False:\n"
+            "        jsonschema.validate(data, {})\n"
+            "    return data\n"
+        )
+        fd = _file_data(source, "myproject.validators")
+        result, converged = expand_rejection_index(
+            [fd], frozenset({"jsonschema.validate"}), max_rounds=10
+        )
+        assert "myproject.validators.validate" not in result
+        assert converged
+
     def test_bound_exceeded_returns_not_converged(self) -> None:
         """Chain of 12 hops, max_rounds=3 -> converged=False."""
         lines = []

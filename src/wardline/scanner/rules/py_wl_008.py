@@ -17,7 +17,8 @@ from wardline.manifest.scope import path_within_scope
 from wardline.scanner.context import Finding
 from wardline.scanner.import_resolver import resolve_call_fqn
 from wardline.scanner.rejection_path import has_rejection_path as _has_rejection_path
-from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
+from wardline.scanner.rejection_path import iter_reachable_calls
+from wardline.scanner.rules.base import RuleBase
 
 _BOUNDARY_TRANSITIONS = frozenset({
     "shape_validation",
@@ -103,9 +104,7 @@ class RulePyWl008(RuleBase):
             fqn for fqn in index if fqn.startswith(f"{module_prefix}.")
         ) if module_prefix else frozenset()
 
-        for child in walk_skip_nested_defs(node):
-            if not isinstance(child, ast.Call):
-                continue
+        for child in iter_reachable_calls(node):
             fqn = resolve_call_fqn(child, alias_map, local_fqns, module_prefix)
             if fqn is not None and fqn in index:
                 return True

@@ -13,8 +13,12 @@ call boundaries.
 from __future__ import annotations
 
 import ast
+from typing import TYPE_CHECKING
 
 from wardline.scanner.rules.base import walk_skip_nested_defs
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -74,7 +78,7 @@ def _is_constant_false(expr: ast.expr) -> bool:
     """
     if not isinstance(expr, ast.Constant):
         return False
-    return not expr.value and expr.value is not ...
+    return expr.value in (False, 0, 0.0, 0j, "", b"", None)
 
 
 def _is_inside_dead_branch(
@@ -91,7 +95,8 @@ def _is_inside_dead_branch(
             continue
         if not _is_constant_false(stmt.test):
             continue
-        # Check if target is inside this dead branch's body
+        # Check if target is inside this dead branch's body/orelse without
+        # descending into nested defs, matching direct rejection-path semantics.
         for body_node in walk_skip_nested_defs(stmt):
             if body_node is target:
                 return True
@@ -118,9 +123,24 @@ def _has_rejection_path(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     return False
 
 
+def _iter_reachable_calls(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> Iterator[ast.Call]:
+    """Yield ast.Call nodes reachable under the same dead-branch rules.
+
+    This intentionally mirrors the reachability discipline used for direct
+    rejection-path detection: nested defs are skipped, and calls inside
+    trivially-dead branches do not count as delegated rejection evidence.
+    """
+    for child in walk_skip_nested_defs(node):
+        if isinstance(child, ast.Call) and not _is_inside_dead_branch(child, node):
+            yield child
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 #: Public alias for use by other modules.
 has_rejection_path = _has_rejection_path
+iter_reachable_calls = _iter_reachable_calls
