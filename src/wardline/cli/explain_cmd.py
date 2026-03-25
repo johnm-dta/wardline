@@ -10,6 +10,7 @@ from typing import Any
 
 import click
 
+from wardline.cli._helpers import cli_error
 from wardline.cli.scan import EXIT_CONFIG_ERROR
 
 
@@ -71,7 +72,7 @@ def explain(
         try:
             manifest_model = load_manifest(manifest_path)
         except (WardlineYAMLError, ManifestLoadError) as exc:
-            click.echo(f"error: malformed manifest: {exc}", err=True)
+            cli_error(f"malformed manifest: {exc}")
             sys.exit(EXIT_CONFIG_ERROR)
         except OSError as exc:
             click.echo(f"warning: could not load manifest: {exc}", err=True)
@@ -264,7 +265,7 @@ def explain(
         if output_json:
             click.echo(json_mod.dumps({"error": f"function '{qualname}' not found"}))
         else:
-            click.echo(f"error: function '{qualname}' not found")
+            cli_error(f"function '{qualname}' not found")
         sys.exit(1)
 
 

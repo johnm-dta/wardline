@@ -4,6 +4,7 @@ Detects patterns where code silently fabricates values for missing
 dictionary keys, bypassing validation:
 
 - ``d.get(key, default)`` — ``.get()`` with a default argument
+- ``d.pop(key, default)`` — ``.pop()`` with a fallback default
 - ``d.setdefault(key, default)`` — mutates dict with fabricated default
 - ``defaultdict(factory)`` — constructor registers a default factory
 
@@ -71,12 +72,11 @@ class RulePyWl001(RuleBase):
             wrapped_get = self._unwrap_schema_default_get(child)
             if wrapped_get is not None:
                 handled_calls.add(id(wrapped_get))
-            self._check_call(child, node)
+            self._check_call(child)
 
     def _check_call(
         self,
         call: ast.Call,
-        enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> None:
         """Check a single Call node for PY-WL-001 patterns."""
         if self._unwrap_schema_default_get(call) is not None:
@@ -85,17 +85,22 @@ class RulePyWl001(RuleBase):
 
         # Pattern 1: d.get(key, default) — .get() with ≥2 args
         if self._is_method_call(call, "get") and len(call.args) >= 2:
-            self._emit_finding(call, enclosing_func)
+            self._emit_finding(call)
             return
 
-        # Pattern 2: d.setdefault(key, default)
+        # Pattern 2: d.pop(key, default) — .pop() with ≥2 args (default present)
+        if self._is_method_call(call, "pop") and len(call.args) >= 2:
+            self._emit_finding(call)
+            return
+
+        # Pattern 3: d.setdefault(key, default)
         if self._is_method_call(call, "setdefault") and len(call.args) >= 2:
-            self._emit_finding(call, enclosing_func)
+            self._emit_finding(call)
             return
 
-        # Pattern 3: defaultdict(factory)
+        # Pattern 4: defaultdict(factory)
         if self._is_defaultdict_call(call):
-            self._emit_finding(call, enclosing_func)
+            self._emit_finding(call)
 
     @staticmethod
     def _is_method_call(call: ast.Call, method_name: str) -> bool:
@@ -167,7 +172,6 @@ class RulePyWl001(RuleBase):
     def _emit_finding(
         self,
         call: ast.Call,
-        enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> None:
         """Emit a PY-WL-001 finding."""
         taint = self._get_function_taint(self._current_qualname)

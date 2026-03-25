@@ -16,7 +16,7 @@ from wardline.scanner.rules.base import RuleBase
 class _ValidRule(RuleBase):
     """A valid concrete rule for test dispatch."""
 
-    RULE_ID: RuleId = RuleId.TOOL_ERROR
+    RULE_ID: RuleId = RuleId.TEST_STUB
 
     def __init__(self) -> None:
         super().__init__()

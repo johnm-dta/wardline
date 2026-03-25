@@ -178,8 +178,7 @@ def taint_from_annotations(
     """Resolve taint from decorator annotations.
 
     If multiple taint-assigning decorators are present, returns the
-    first one found. (Multiple taint decorators on a single function
-    is unusual and will be flagged by later rules.)
+    first one found and logs a warning about the conflict.
 
     Args:
         decorator_map: Which decorator-name→taint mapping to use.
@@ -192,12 +191,24 @@ def taint_from_annotations(
     if not anns:
         return None
 
+    first_taint: TaintState | None = None
+    first_name: str | None = None
     for ann in anns:
         taint = decorator_map.get(ann.canonical_name)
         if taint is not None:
-            return taint
+            if first_taint is None:
+                first_taint = taint
+                first_name = ann.canonical_name
+            elif taint != first_taint:
+                logger.warning(
+                    "Multiple taint decorators on %s in %s: "
+                    "using %s (%s), ignoring %s (%s)",
+                    qualname, file_path,
+                    first_name, first_taint,
+                    ann.canonical_name, taint,
+                )
 
-    return None
+    return first_taint
 
 
 def _walk_and_assign(

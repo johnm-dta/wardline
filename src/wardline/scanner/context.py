@@ -6,6 +6,7 @@ ScanContext's function_level_taint_map is deeply frozen via MappingProxyType.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -57,9 +58,11 @@ class WardlineAnnotation:
     attrs: MappingProxyType[str, object]
 
     def __post_init__(self) -> None:
-        if isinstance(self.attrs, dict):
+        if isinstance(self.attrs, Mapping) and not isinstance(
+            self.attrs, MappingProxyType
+        ):
             object.__setattr__(
-                self, "attrs", MappingProxyType(self.attrs)
+                self, "attrs", MappingProxyType(dict(self.attrs))
             )
 
 

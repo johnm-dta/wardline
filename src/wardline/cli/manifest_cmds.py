@@ -8,6 +8,8 @@ from pathlib import Path
 
 import click
 
+from wardline.cli._helpers import cli_error
+
 
 @click.group()
 def manifest() -> None:
@@ -40,7 +42,7 @@ def validate(file: str | None) -> None:
     if file is not None:
         manifest_path = Path(file)
         if not manifest_path.exists():
-            click.echo(f"error: manifest not found: {file}", err=True)
+            cli_error(f"manifest not found: {file}")
             sys.exit(2)
     else:
         manifest_path = discover_manifest(Path.cwd())
@@ -54,7 +56,7 @@ def validate(file: str | None) -> None:
     try:
         load_manifest(manifest_path)
     except (WardlineYAMLError, yaml.YAMLError, ManifestLoadError) as exc:
-        click.echo(f"error: manifest invalid: {exc}", err=True)
+        cli_error(f"manifest invalid: {exc}")
         sys.exit(1)
 
     click.echo(f"manifest valid: {manifest_path}")
@@ -103,13 +105,13 @@ def _baseline_update(*, approve: bool, manifest_file: str | None) -> None:
 
     if manifest_path is None or not manifest_path.exists():
         looked_up = manifest_file if manifest_file is not None else str(Path.cwd())
-        click.echo(f"error: manifest not found: {looked_up}", err=True)
+        cli_error(f"manifest not found: {looked_up}")
         sys.exit(2)
 
     try:
         manifest_model = load_manifest(manifest_path)
     except (WardlineYAMLError, yaml.YAMLError, ManifestLoadError) as exc:
-        click.echo(f"error: manifest invalid: {exc}", err=True)
+        cli_error(f"manifest invalid: {exc}")
         sys.exit(1)
 
     # Build manifest baseline JSON

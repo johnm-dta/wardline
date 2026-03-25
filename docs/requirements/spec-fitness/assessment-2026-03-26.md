@@ -4,14 +4,14 @@ This is the first repo fitness assessment against the baseline in this folder.
 
 ## Rollup
 
-- Pass: 17
+- Pass: 18
 - Partial: 8
-- Fail: 6
+- Fail: 5
 
 Overall judgment: the project has a solid core implementation and test surface, but it is not yet fit to claim clean alignment with the current normative spec. The main issues are concentrated in three areas:
 
 1. Python binding incompleteness: `@restoration_boundary(...)` is still missing, and generic boundary decorators are not parameterized per the binding contract.
-2. Manifest/spec drift: the implementation still uses `bounded_context` where the current spec uses `validation_scope`, and several governance/profile fields remain hardcoded or absent from schemas and SARIF.
+2. Manifest/spec drift: the implementation still uses `bounded_context` where the current spec uses `validation_scope`, and several governance/reporting surfaces remain behind the normative wording.
 3. Conformance surface gaps: the scanner and corpus are strong in core areas, but corpus breadth, self-hosting strictness, and some SARIF/run-level properties lag the spec.
 
 ## Verification Run
@@ -54,11 +54,11 @@ Result: `252 passed in 0.38s`
 | `WL-FIT-MAN-005` | partial | `src/wardline/manifest/models.py`, `src/wardline/manifest/loader.py`, `src/wardline/manifest/resolve.py` | Contract bindings are separate and name-based, but contract declarations remain raw dicts and cross-validation is weak. |
 | `WL-FIT-MAN-006` | pass | `src/wardline/scanner/rules/py_wl_001.py`, `tests/unit/scanner/test_py_wl_001.py`, `src/wardline/manifest/resolve.py` | `schema_default()` is tied to overlay optional-field governance and tested. |
 | `WL-FIT-MAN-007` | partial | `src/wardline/manifest/models.py`, `src/wardline/manifest/regime.py`, `tests/unit/manifest/test_regime.py` | Ratification age is computed and surfaced in regime metrics, but the evidence is stronger in governance CLI than in scan-time findings. |
-| `WL-FIT-MAN-008` | fail | `src/wardline/manifest/schemas/wardline.schema.json`, `src/wardline/manifest/regime.py`, `src/wardline/scanner/sarif.py`, `docs/audits/2026-03-25-rule-conformance/phase-2/f3/compliance-surface.md` | Governance profile is hardcoded to `lite`, not modeled in the manifest, and absent from SARIF. |
+| `WL-FIT-MAN-008` | pass | `src/wardline/manifest/schemas/wardline.schema.json`, `src/wardline/manifest/models.py`, `src/wardline/manifest/loader.py`, `src/wardline/manifest/regime.py`, `src/wardline/scanner/sarif.py` | Governance profile is now modeled in the manifest, consumed by regime reporting, and emitted in SARIF as `wardline.governanceProfile`. |
 | `WL-FIT-SCAN-001` | pass | `src/wardline/scanner/rules/__init__.py`, `src/wardline/scanner/sarif.py`, `tests/unit/scanner/test_sarif.py` | Implemented rules are declared and pseudo-rules are excluded from `implementedRules`. |
 | `WL-FIT-SCAN-002` | pass | `tests/unit/scanner/test_py_wl_001.py` through `test_py_wl_009.py`, `tests/unit/scanner/test_scn_021.py` | Implemented rule behavior has substantial unit coverage. |
 | `WL-FIT-SCAN-003` | pass | `tests/unit/scanner/test_engine_l3.py`, `tests/unit/scanner/test_delegated_rejection.py`, `tests/unit/scanner/test_rejection_path_convergence.py` | Direct, two-hop, delegated, and convergence paths are explicitly tested. |
-| `WL-FIT-SCAN-004` | partial | `src/wardline/scanner/sarif.py`, `tests/unit/scanner/test_sarif.py`, ready issues `keisei-d1dfd63456` and related audit notes | SARIF is deterministic and has core Wardline properties, but run-level property coverage is incomplete relative to the current spec/audit expectations. |
+| `WL-FIT-SCAN-004` | partial | `src/wardline/scanner/sarif.py`, `tests/unit/scanner/test_sarif.py`, ready issues `keisei-d1dfd63456` and related audit notes | SARIF is deterministic and now includes core Wardline properties including governance profile, but run-level property coverage is still incomplete relative to the current spec/audit expectations. |
 | `WL-FIT-SCAN-005` | pass | `src/wardline/scanner/engine.py`, `tests/unit/scanner/test_engine.py`, `tests/unit/scanner/test_engine_l3.py` | Tool failures are surfaced and fall back behavior is tested. |
 | `WL-FIT-SCAN-006` | partial | `corpus/specimens`, `tests/unit/corpus/test_corpus_skeleton.py`, `tests/unit/scanner/test_corpus_runner.py` | Corpus machinery exists and is runnable, but skeleton coverage is still narrower than the full claimed rule surface. |
 | `WL-FIT-SCAN-007` | partial | `docs/audits/2026-03-25-rule-conformance/phase-2/f3/compliance-surface.md`, `tests/unit/test_wp04_hardening.py`, CLI scan/regime surfaces | Self-hosting is measurable, but the current gate is closer to stability checking than strict “passes its own rules” conformance. |
@@ -83,14 +83,11 @@ Result: `252 passed in 0.38s`
 3. Add proper parameterized generic boundaries.
    `trust_boundary(from_tier=..., to_tier=...)` and `tier_transition(...)` need to carry real transition metadata instead of boolean presence markers.
 
-4. Make governance profile a real manifest concept.
-   It should exist in schema/model, flow into regime reporting, and be emitted in SARIF.
-
-5. Tighten conformance reporting.
+4. Tighten conformance reporting.
    The repo already knows about several active spec mismatches; the machine-readable conformance surface should stop claiming an empty gap set while those remain open.
 
 ## Suggested Next Moves
 
 1. Fix the binding blockers first: `WL-FIT-PY-002`, `WL-FIT-PY-003`, `WL-FIT-PY-004`.
-2. Fix the manifest drift next: `WL-FIT-MAN-004`, `WL-FIT-MAN-008`, `WL-FIT-CORE-006`.
+2. Fix the manifest drift next: `WL-FIT-MAN-004`, `WL-FIT-CORE-006`.
 3. Then refresh SARIF/conformance honesty: `WL-FIT-SCAN-004`, `WL-FIT-SCAN-008`, `WL-FIT-SCAN-007`.

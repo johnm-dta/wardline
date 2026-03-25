@@ -14,16 +14,14 @@ from typing import Any
 
 import click
 
+from wardline.cli._helpers import cli_error
 from wardline.cli.scan import EXIT_CONFIG_ERROR
 
 # Exit codes
 _EXIT_CLEAN = 0
 _EXIT_GATE_FAILURE = 1
 
-
-def _error(msg: str) -> None:
-    """Print structured error to stderr."""
-    click.echo(f"error: {msg}", err=True)
+_error = cli_error  # backward-compat alias used throughout this module
 
 
 def _load_and_validate_baseline(

@@ -13,6 +13,8 @@ from typing import Any
 
 import click
 
+from wardline.cli._helpers import cli_error
+
 from wardline.cli._helpers import COHERENCE_SEVERITY_MAP as SEVERITY_MAP
 from wardline.cli.scan import EXIT_CONFIG_ERROR
 
@@ -95,13 +97,13 @@ def coherence(
     # --- Load manifest ---
     manifest_path = Path(manifest_file)
     if not manifest_path.exists():
-        click.echo(f"error: manifest not found: {manifest_file}", err=True)
+        cli_error(f"manifest not found: {manifest_file}")
         sys.exit(EXIT_CONFIG_ERROR)
 
     try:
         manifest_model = load_manifest(manifest_path)
     except (WardlineYAMLError, yaml.YAMLError, ManifestLoadError) as exc:
-        click.echo(f"error: malformed manifest: {exc}", err=True)
+        cli_error(f"malformed manifest: {exc}")
         sys.exit(EXIT_CONFIG_ERROR)
 
     # --- Discover annotations ---

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 class _CountingRule(RuleBase):
     """Counts function visits — used to verify the engine runs rules."""
 
-    RULE_ID: ClassVar[RuleId] = RuleId.TOOL_ERROR
+    RULE_ID: ClassVar[RuleId] = RuleId.TEST_STUB
 
     def __init__(self) -> None:
         super().__init__()
@@ -41,7 +41,7 @@ class _CountingRule(RuleBase):
 class _CrashingRule(RuleBase):
     """Always raises RuntimeError — used to test TOOL-ERROR handling."""
 
-    RULE_ID: ClassVar[RuleId] = RuleId.TOOL_ERROR
+    RULE_ID: ClassVar[RuleId] = RuleId.TEST_STUB
 
     def visit_function(
         self,
@@ -132,7 +132,7 @@ def use_helper():
         )
 
         class _ContextAssertingRule(RuleBase):
-            RULE_ID: ClassVar[RuleId] = RuleId.TOOL_ERROR
+            RULE_ID: ClassVar[RuleId] = RuleId.TEST_STUB
 
             def visit_function(
                 self,
@@ -460,7 +460,7 @@ class TestMultipleTargets:
 class _ContextCapturingRule(RuleBase):
     """Captures self._context on visit_function for test inspection."""
 
-    RULE_ID: ClassVar[RuleId] = RuleId.TOOL_ERROR
+    RULE_ID: ClassVar[RuleId] = RuleId.TEST_STUB
 
     def __init__(self) -> None:
         super().__init__()

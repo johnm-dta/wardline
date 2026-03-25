@@ -21,6 +21,7 @@ from wardline.core.severity import (
 )
 from wardline.scanner.context import Finding, make_governance_finding
 from wardline.scanner.rules import make_rules
+from wardline.cli._helpers import cli_error
 from wardline.scanner.sarif import _PSEUDO_RULE_IDS, SarifReport
 
 if TYPE_CHECKING:
@@ -44,9 +45,7 @@ EXIT_CONFIG_ERROR = 2
 EXIT_TOOL_ERROR = 3
 
 
-def _error(msg: str) -> None:
-    """Print structured error to stderr."""
-    click.echo(f"error: {msg}", err=True)
+_error = cli_error  # backward-compat alias used throughout this module
 
 
 def _compute_manifest_hash(manifest_path: Path) -> str | None:
@@ -507,7 +506,7 @@ def scan(
             try:
                 Path(output).write_text(report_text, encoding="utf-8")
             except OSError as exc:
-                click.echo(f"error: cannot write to '{output}': {exc}", err=True)
+                cli_error(f"cannot write to '{output}': {exc}")
                 sys.exit(EXIT_CONFIG_ERROR)
         else:
             click.echo(report_text, nl=False)
@@ -556,7 +555,7 @@ def scan(
         try:
             Path(output).write_text(sarif_text, encoding="utf-8")
         except OSError as exc:
-            click.echo(f"error: cannot write to '{output}': {exc}", err=True)
+            cli_error(f"cannot write to '{output}': {exc}")
             sys.exit(EXIT_CONFIG_ERROR)
     else:
         click.echo(sarif_text, nl=False)
@@ -591,8 +590,16 @@ def scan(
         sys.exit(EXIT_CLEAN)
 
 
+_CLI_HANDLER_NAME = "wardline_cli"
+
+
 def _setup_logging(*, verbose: bool, debug: bool) -> None:
-    """Configure logging level based on CLI flags."""
+    """Configure logging level based on CLI flags.
+
+    Uses a named handler so we only remove our own handler on
+    re-entry, preserving any handlers installed by test harnesses
+    (e.g. pytest's ``caplog`` fixture).
+    """
     if debug:
         level = logging.DEBUG
     elif verbose:
@@ -600,8 +607,14 @@ def _setup_logging(*, verbose: bool, debug: bool) -> None:
     else:
         level = logging.WARNING
 
-    logger.handlers.clear()
+    # Remove only the CLI handler we previously installed (if any),
+    # leaving test-harness and library handlers intact.
+    for h in logger.handlers[:]:
+        if getattr(h, "name", None) == _CLI_HANDLER_NAME:
+            logger.removeHandler(h)
+
     handler = logging.StreamHandler(sys.stderr)
+    handler.set_name(_CLI_HANDLER_NAME)
     handler.setFormatter(logging.Formatter("%(levelname)s: %(name)s: %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(level)

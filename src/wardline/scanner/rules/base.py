@@ -60,6 +60,7 @@ class RuleBase(ast.NodeVisitor, ABC):
     RULE_ID: ClassVar[RuleId]
 
     def __init__(self) -> None:
+        super().__init__()
         self.findings: list[Finding] = []
         self._file_path: str = ""
         self._context: ScanContext | None = None

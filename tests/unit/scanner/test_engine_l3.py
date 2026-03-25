@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 class _ContextCapturingRule(RuleBase):
     """Captures the ScanContext set by the engine for later inspection."""
 
-    RULE_ID: ClassVar[RuleId] = RuleId.TOOL_ERROR
+    RULE_ID: ClassVar[RuleId] = RuleId.TEST_STUB
 
     def __init__(self) -> None:
         super().__init__()

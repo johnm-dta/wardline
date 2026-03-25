@@ -89,6 +89,7 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
         RuleId.GOVERNANCE_CUSTOM_KNOWN_VALIDATOR,
         RuleId.L3_LOW_RESOLUTION,
         RuleId.L3_CONVERGENCE_BOUND,
+        RuleId.TEST_STUB,
     }
 )
 

@@ -5,8 +5,15 @@ from __future__ import annotations
 import ast
 from typing import TYPE_CHECKING, Any
 
+import click
+
 if TYPE_CHECKING:
     from pathlib import Path
+
+def cli_error(msg: str) -> None:
+    """Print structured error to stderr with consistent 'error:' prefix."""
+    click.echo(f"error: {msg}", err=True)
+
 
 # Canonical coherence-issue severity map.  Imported by coherence_cmd and
 # regime_cmd so the classification cannot diverge.

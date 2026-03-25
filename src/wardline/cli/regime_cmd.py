@@ -14,6 +14,8 @@ from typing import Any
 
 import click
 
+from wardline.cli._helpers import cli_error
+
 from wardline.cli._helpers import COHERENCE_SEVERITY_MAP as _COHERENCE_SEVERITY_MAP
 from wardline.cli.scan import EXIT_CONFIG_ERROR
 
@@ -156,7 +158,7 @@ def status(
 
     manifest_path = Path(manifest_file)
     if not manifest_path.exists():
-        click.echo(f"error: manifest not found: {manifest_file}", err=True)
+        cli_error(f"manifest not found: {manifest_file}")
         sys.exit(EXIT_CONFIG_ERROR)
 
     manifest_dir = manifest_path.parent
@@ -358,7 +360,7 @@ def verify(
 
     manifest_path = Path(manifest_file)
     if not manifest_path.exists():
-        click.echo(f"error: manifest not found: {manifest_file}", err=True)
+        cli_error(f"manifest not found: {manifest_file}")
         sys.exit(EXIT_CONFIG_ERROR)
 
     manifest_dir = manifest_path.parent

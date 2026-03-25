@@ -90,6 +90,36 @@ class TestGetWithoutDefault:
         assert len(rule.findings) == 0
 
 
+# ── Positive: .pop() ────────────────────────────────────────────
+
+
+class TestPop:
+    """``d.pop(key, default)`` fires PY-WL-001 (value fabrication)."""
+
+    def test_pop_with_default_fires(self) -> None:
+        rule = _run_rule('d.pop("key", None)\n')
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001
+
+    def test_pop_with_complex_default_fires(self) -> None:
+        rule = _run_rule('d.pop("key", [])\n')
+
+        assert len(rule.findings) == 1
+
+    def test_pop_one_arg_silent(self) -> None:
+        """pop with only key arg raises KeyError on miss — no fabrication."""
+        rule = _run_rule('d.pop("key")\n')
+
+        assert len(rule.findings) == 0
+
+    def test_pop_no_args_silent(self) -> None:
+        """Edge case: .pop() with no args — not our problem."""
+        rule = _run_rule("d.pop()\n")
+
+        assert len(rule.findings) == 0
+
+
 # ── Positive: .setdefault() ──────────────────────────────────────
 
 

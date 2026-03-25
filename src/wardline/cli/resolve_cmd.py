@@ -16,6 +16,8 @@ from pathlib import Path
 
 import click
 
+from wardline.cli._helpers import cli_error
+
 logger = logging.getLogger("wardline")
 
 
@@ -37,7 +39,7 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
     if manifest is not None:
         manifest_path = Path(manifest)
         if not manifest_path.exists():
-            click.echo(f"error: manifest not found: {manifest}", err=True)
+            cli_error(f"manifest not found: {manifest}")
             sys.exit(2)
     else:
         manifest_path = discover_manifest(root)
@@ -190,7 +192,7 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
         try:
             Path(output).write_text(text, encoding="utf-8")
         except OSError as exc:
-            click.echo(f"error: cannot write to '{output}': {exc}", err=True)
+            cli_error(f"cannot write to '{output}': {exc}")
             sys.exit(2)
     else:
         click.echo(text, nl=False)

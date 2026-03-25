@@ -308,6 +308,10 @@ class ScannerConfig:
                 ) from None
 
         analysis_level = wardline_section.get("analysis_level", 1)
+        if isinstance(analysis_level, bool) or not isinstance(analysis_level, int) or analysis_level < 1 or analysis_level > 3:
+            raise ScannerConfigError(
+                f"analysis_level must be 1, 2, or 3, got {analysis_level!r}"
+            )
 
         # Parse max_unknown_raw_percent
         max_pct = wardline_section.get("max_unknown_raw_percent")
