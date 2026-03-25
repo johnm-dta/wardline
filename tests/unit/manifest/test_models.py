@@ -21,6 +21,7 @@ from wardline.manifest.models import (
     ModuleTierEntry,
     RulesConfig,
     ScannerConfig,
+    ScannerConfigError,
     TierEntry,
     WardlineManifest,
     WardlineOverlay,
@@ -342,6 +343,34 @@ analysis_level = 2
         config = ScannerConfig.from_toml(toml_file)
         with pytest.raises(FrozenInstanceError):
             config.analysis_level = 3  # type: ignore[misc]
+
+    @pytest.mark.parametrize("bad_value,toml_repr", [
+        (True, "true"),
+        (False, "false"),
+        (0, "0"),
+        (4, "4"),
+        (-1, "-1"),
+    ])
+    def test_analysis_level_rejects_invalid(
+        self, tmp_path: Path, bad_value: object, toml_repr: str
+    ) -> None:
+        toml_file = tmp_path / "wardline.toml"
+        toml_file.write_text(
+            f"[wardline]\nanalysis_level = {toml_repr}\n"
+        )
+        with pytest.raises(ScannerConfigError, match="analysis_level"):
+            ScannerConfig.from_toml(toml_file)
+
+    @pytest.mark.parametrize("level", [1, 2, 3])
+    def test_analysis_level_accepts_valid(
+        self, tmp_path: Path, level: int
+    ) -> None:
+        toml_file = tmp_path / "wardline.toml"
+        toml_file.write_text(
+            f"[wardline]\nanalysis_level = {level}\n"
+        )
+        config = ScannerConfig.from_toml(toml_file)
+        assert config.analysis_level == level
 
 
 # ── RulesConfig deep-freeze ──────────────────────────────────────

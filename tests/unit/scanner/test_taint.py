@@ -401,3 +401,98 @@ class TestMostSpecificModuleTier:
         )
         result = resolve_module_default("src/app/external/client.py", manifest)
         assert result == TaintState.EXTERNAL_RAW
+
+
+# ── Taint conflict detection ────────────────────────────────────
+
+
+class TestTaintConflictDetection:
+    """taint_from_annotations detects and reports conflicting taint decorators."""
+
+    def test_conflicting_decorators_returns_first_and_reports(self) -> None:
+        from wardline.scanner.taint.function_level import (
+            BODY_EVAL_TAINT,
+            TaintConflict,
+            taint_from_annotations,
+        )
+
+        annotations = {
+            ("test.py", "f"): [
+                WardlineAnnotation(
+                    canonical_name="external_boundary", group=1,
+                    attrs=MappingProxyType({}),
+                ),
+                WardlineAnnotation(
+                    canonical_name="tier1_read", group=1,
+                    attrs=MappingProxyType({}),
+                ),
+            ]
+        }
+        conflicts: list[TaintConflict] = []
+        result = taint_from_annotations(
+            "test.py", "f", annotations,
+            decorator_map=BODY_EVAL_TAINT,
+            conflicts=conflicts,
+        )
+        assert result == TaintState.EXTERNAL_RAW  # first wins
+        assert len(conflicts) == 1
+        assert conflicts[0].qualname == "f"
+        assert conflicts[0].used_decorator == "external_boundary"
+        assert conflicts[0].ignored_decorator == "tier1_read"
+
+    def test_same_taint_decorators_no_conflict(self) -> None:
+        """Two decorators mapping to the same taint are not a conflict."""
+        from wardline.scanner.taint.function_level import (
+            BODY_EVAL_TAINT,
+            TaintConflict,
+            taint_from_annotations,
+        )
+
+        # validates_shape and validates_external both map to EXTERNAL_RAW
+        annotations = {
+            ("test.py", "g"): [
+                WardlineAnnotation(
+                    canonical_name="validates_shape", group=1,
+                    attrs=MappingProxyType({}),
+                ),
+                WardlineAnnotation(
+                    canonical_name="validates_external", group=1,
+                    attrs=MappingProxyType({}),
+                ),
+            ]
+        }
+        conflicts: list[TaintConflict] = []
+        result = taint_from_annotations(
+            "test.py", "g", annotations,
+            decorator_map=BODY_EVAL_TAINT,
+            conflicts=conflicts,
+        )
+        assert result == TaintState.EXTERNAL_RAW
+        assert len(conflicts) == 0  # same taint = no conflict
+
+    def test_assign_collects_conflicts(self) -> None:
+        """assign_function_taints returns conflicts in its 4th element."""
+        source = textwrap.dedent("""\
+            @external_boundary
+            @tier1_read
+            def mixed():
+                pass
+        """)
+        tree = _parse(source)
+        annotations = {
+            ("test.py", "mixed"): [
+                WardlineAnnotation(
+                    canonical_name="external_boundary", group=1,
+                    attrs=MappingProxyType({}),
+                ),
+                WardlineAnnotation(
+                    canonical_name="tier1_read", group=1,
+                    attrs=MappingProxyType({}),
+                ),
+            ]
+        }
+        _body, _ret, _src, conflicts = assign_function_taints(
+            tree, "test.py", annotations,
+        )
+        assert len(conflicts) >= 1
+        assert conflicts[0].qualname == "mixed"

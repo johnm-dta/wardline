@@ -194,8 +194,10 @@ def taint_from_annotations(
     """Resolve taint from decorator annotations.
 
     If multiple taint-assigning decorators are present, returns the
-    first one found, logs a warning, and appends a ``TaintConflict``
-    to *conflicts* (if provided) so the engine can emit a SARIF finding.
+    first one found.  When the decorators disagree on taint state, logs
+    a warning and appends a ``TaintConflict`` to *conflicts* (if
+    provided) so the engine can emit a SARIF finding.  Duplicate
+    decorators that agree on taint state are silently accepted.
 
     Args:
         decorator_map: Which decorator-name→taint mapping to use.

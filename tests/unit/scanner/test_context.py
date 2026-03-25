@@ -201,6 +201,17 @@ class TestWardlineAnnotation:
         )
         assert ann.attrs is mp
 
+    def test_non_dict_mapping_frozen(self) -> None:
+        """Non-dict Mapping subtypes (e.g., OrderedDict) are frozen."""
+        from collections import OrderedDict
+
+        od = OrderedDict({"_wardline_tier_source": TaintState.EXTERNAL_RAW})
+        ann = WardlineAnnotation(
+            canonical_name="external_boundary", group=1, attrs=od  # type: ignore[arg-type]
+        )
+        assert isinstance(ann.attrs, MappingProxyType)
+        assert ann.attrs["_wardline_tier_source"] == TaintState.EXTERNAL_RAW
+
 
 # ── make_governance_finding ───────────────────────────────────────
 
