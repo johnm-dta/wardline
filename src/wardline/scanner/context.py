@@ -101,6 +101,10 @@ class ScanContext:
     analysis_level: int = 1
     # Level 3: maps qualname -> TaintProvenance. None when L3 didn't run.
     taint_provenance: MappingProxyType[str, TaintProvenance] | None = None
+    # Two-hop rejection path index: FQNs of functions with rejection paths.
+    rejection_path_index: frozenset[str] = frozenset()
+    # Per-file import alias map: {local_name: FQN}.
+    import_alias_map: MappingProxyType[str, str] | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.function_level_taint_map, dict):
@@ -154,6 +158,18 @@ class ScanContext:
                 self,
                 "taint_provenance",
                 MappingProxyType(self.taint_provenance),
+            )
+        if isinstance(self.rejection_path_index, set):
+            object.__setattr__(
+                self,
+                "rejection_path_index",
+                frozenset(self.rejection_path_index),
+            )
+        if isinstance(self.import_alias_map, dict):
+            object.__setattr__(
+                self,
+                "import_alias_map",
+                MappingProxyType(self.import_alias_map),
             )
 
 
