@@ -27,7 +27,13 @@ def _make_context_with_boundary(
     return ScanContext(
         file_path="test.py",
         function_level_taint_map={qualname: taint},
-        boundaries=(BoundaryEntry(function=qualname, transition=transition),),
+        boundaries=(
+            BoundaryEntry(
+                function=qualname,
+                transition=transition,
+                overlay_scope=".",  # cwd is parent of test.py for path_within_scope
+            ),
+        ),
     )
 
 

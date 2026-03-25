@@ -55,9 +55,10 @@ def _write_py(path: Path, content: str) -> None:
 
 
 class TestEngineCallsDiscovery:
-    """discover_annotations is called once per scanned file."""
+    """discover_annotations is called per file in both project indexing and scanning."""
 
-    def test_called_once_per_file(self, tmp_path: Path) -> None:
+    def test_called_twice_per_file(self, tmp_path: Path) -> None:
+        """2 files × 2 passes (project index + scan) = 4 calls."""
         _write_py(tmp_path / "a.py", "def foo(): pass\n")
         _write_py(tmp_path / "sub" / "b.py", "def bar(): pass\n")
 
@@ -78,7 +79,8 @@ class TestEngineCallsDiscovery:
         ):
             engine.scan()
 
-        assert mock_disc.call_count == 2
+        # 2 files × 2 passes: _build_project_indexes + per-file scan
+        assert mock_disc.call_count == 4
 
 
 # ── TestEngineCallsTaintAssignment ──────────────────────────────
@@ -152,7 +154,7 @@ class TestEngineSetsContext:
 
 
 class TestDiscoveryFailure:
-    """If discover_annotations raises, scan continues with empty taint map."""
+    """If discover_annotations raises during per-file scan, scan continues."""
 
     def test_scan_continues_with_empty_taint_map(self, tmp_path: Path) -> None:
         _write_py(tmp_path / "bad.py", "def oops(): pass\n")
@@ -163,9 +165,19 @@ class TestDiscoveryFailure:
             rules=(rule,),
         )
 
+        # First call succeeds (project indexing), second call fails (per-file scan)
+        call_count = 0
+
+        def _discover_side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 1:
+                return {}  # project indexing pass succeeds
+            raise RuntimeError("boom")  # per-file scan pass fails
+
         with patch(
             "wardline.scanner.engine.discover_annotations",
-            side_effect=RuntimeError("boom"),
+            side_effect=_discover_side_effect,
         ):
             result = engine.scan()
 

@@ -188,6 +188,7 @@ class ScanEngine:
             result.errors.append(
                 f"Discovery/taint failed for {file_path}: {exc}"
             )
+            annotations = {}
             body_taint_map, return_taint_map, taint_sources = {}, {}, {}
 
         # Pass 1.5: Level 3 call-graph taint (when analysis_level >= 3)

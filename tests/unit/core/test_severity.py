@@ -41,8 +41,8 @@ class TestRuleId:
         assert str(RuleId.GOVERNANCE_REGISTRY_MISMATCH_ALLOWED) == "GOVERNANCE-REGISTRY-MISMATCH-ALLOWED"
 
     def test_canonical_count(self) -> None:
-        """9 canonical rules + 16 pseudo-rule-IDs = 25 total."""
-        assert len(RuleId) == 25
+        """9 canonical rules + 2 supplementary + 16 pseudo-rule-IDs = 27 total."""
+        assert len(RuleId) == 27
 
     def test_json_serialisation(self) -> None:
         """StrEnum members serialise as plain strings."""
