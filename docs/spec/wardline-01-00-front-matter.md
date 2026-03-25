@@ -47,7 +47,7 @@ This document comprises two parts: Part I (the framework specification) and Part
     - 5.1 Trust classification and validation status — 5.2 Transition semantics — 5.3 Trusted restoration boundaries — 5.4 Cross-language taint propagation — 5.5 Third-party in-process dependency taint
 6. [Annotation vocabulary](#6-annotation-vocabulary)
 7. [Pattern rules](#7-pattern-rules)
-    - 7.1 The rules — 7.2 Structural verification — 7.2.1 Structural-contract defaults and WL-001 — 7.3 Severity matrix — 7.4 Worked examples — 7.5 Derivation principles — 7.6 Taint analysis scope
+    - 7.1 The rules — 7.2 Structural verification — 7.2.1 Structural-guarantee defaults and WL-001 — 7.3 Severity matrix — 7.4 Worked examples — 7.5 Derivation principles — 7.6 Taint analysis scope
 8. [Enforcement layers](#8-enforcement-layers)
     - 8.1 Static analysis — 8.2 Type system — 8.3 Runtime structural — 8.4 Orthogonality principle — 8.5 Pre-generation context projection (advisory)
 9. [Governance model](#9-governance-model)

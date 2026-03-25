@@ -19,15 +19,15 @@ Ten criteria define the full wardline conformance surface. They are grouped by w
 2. Pattern rule detection: the six active pattern rules (WL-001 through WL-006) are detected intraprocedurally within annotated bodies (§7, §8.1)
 3. Structural verification: WL-007 is enforced on all validation boundary functions (shape, semantic, combined, and restoration) and WL-008 (validation ordering) is enforced on semantic-validation boundaries (§7.2, §8.1)
 4. Taint-flow tracking: explicit-flow taint between declared boundaries is traced for at minimum direct flows and two-hop unannotated intermediaries (§8.1). The two-hop scope also applies to WL-007 delegation — a validation function that delegates to a called validator satisfies WL-007 through two-hop call-graph analysis (§8.1)
-5. Precision and recall are measured, tracked, and published per rule, per tool (§10)
-6. A golden corpus of labelled specimens exists and is maintained (§10)
+5. Precision and recall are measured, tracked, and published per cell (rule × taint state), per tool (§10)
+6. A golden corpus of labelled specimens exists and is maintained (§10), including evasion-variant specimens where a tool claims semantic-equivalent coverage for a rule
 7. Each enforcement tool passes its own rules where applicable (self-hosting gate) (§10)
 8. Enforcement output is deterministic SARIF v2.1.0 with the wardline-specific property bags defined in §10.1
 
 **Governance infrastructure** (necessary for assessable enforcement):
 
 9. The governance model supports at minimum: protected-file review, temporal separation, and annotation fingerprint baseline (§9)
-10. The wardline manifest (§13) — root manifest, overlays, exception register, and fingerprint baseline — is consumed and validated against the framework's JSON Schemas
+10. The wardline manifest system (§13) — root manifest, overlays, exception register, and fingerprint baseline — is consumed by the tools that depend on it, and JSON Schema validation is performed either by that tool or by a declared Wardline-Governance tool in the same regime. A tool that relies on manifest context but delegates full schema validation MUST document that delegation.
 
 #### 14.3 Conformance profiles
 
@@ -41,8 +41,8 @@ Four enforcement profiles are defined. Each profile declares which of the ten cr
 
 | Profile | What it covers | Criteria (minimum + conditional) | Typical implementer |
 |---------|---------------|-------------------|---------------------|
-| **Wardline-Core** | Manifest consumption, schema validation, wardline SARIF output, pattern rule detection for a declared rule subset | 2, 5, 6, 8, 10 (+ 3, 4, 7 conditionally) | Linter plugin (ruff, semgrep, CodeQL), custom AST scanner |
-| **Wardline-Type** | Tier metadata in the type system, tier mismatch diagnostics in signatures | 1, 5, 6 (+ 7 conditionally) | Type checker (mypy, pyright, mypy plugin) |
+| **Wardline-Core** | Manifest consumption, declared-schema-validation responsibility, wardline SARIF output, pattern rule detection for a declared rule subset | 2, 5, 6, 8, 10 (+ 3, 4, 7 conditionally) | Linter plugin (ruff, semgrep, CodeQL), custom AST scanner |
+| **Wardline-Type** | Tier metadata in the type system, tier mismatch diagnostics in signatures | 1 (core groups only), 5, 6 (+ 7 conditionally) | Type checker (mypy, pyright, mypy plugin) |
 | **Wardline-Governance** | Exception register, fingerprint baseline, control-law reporting, retrospective scan markers | 9, 10 | CI orchestrator, thin wardline runner |
 | **Wardline-Full** | The complete conformance surface | All ten criteria | An enforcement regime (§14.4 below), or a monolithic tool that covers everything |
 
@@ -50,9 +50,9 @@ Conditional criteria are elaborated in the profile semantics below.
 
 **Profile semantics:**
 
-- **Wardline-Core** requires criteria 2 and 8, but a Wardline-Core tool MAY implement a *declared subset* of the pattern rules rather than all eight. The tool's documentation MUST declare which rules it implements. Criteria 5 and 6 (precision/recall measurement and golden corpus) apply only to the rules the tool claims — a ruff plugin implementing WL-001 and WL-003 maintains corpus specimens and measures precision for those two rules only. Criterion 3 (WL-007 structural verification and WL-008 validation ordering) and criterion 4 (taint-flow tracking) are included in Wardline-Core when the tool's declared rule set includes WL-007, WL-008, or taint-dependent rules; they are not required for a tool that implements only pattern-matching rules (WL-001 through WL-006). Criterion 7 (self-hosting) applies when the tool's own source code can meaningfully be checked against the rules it implements — a scanner written in the same language it analyses should pass its own rules on its own codebase. Tools whose source is not in the analysed language (e.g., a Rust-based scanner that analyses Python) are exempt.
-- **Wardline-Type** requires that the type-system layer (§8.2) makes tier mismatches visible at development time. It requires criterion 1 at the type layer — the type system can express tier metadata — but does not require the full 17-group annotation vocabulary, only the core classification groups (1–4, 16–17) to the extent that the type system can represent them. Criterion 5 applies: precision and recall for type-system enforcement are measured against type-system-specific corpus specimens.
-- **Wardline-Governance** covers the governance infrastructure that no analysis tool naturally provides: exception register management, fingerprint baseline tracking, manifest validation and ratification enforcement, control-law state reporting, and the expedited governance ratio metric. A governance tool need not perform any code analysis.
+- **Wardline-Core** requires criteria 2 and 8, but a Wardline-Core tool MAY implement a *declared subset* of the pattern rules rather than all eight. The tool's documentation MUST declare which rules it implements. If the tool claims semantic-equivalent coverage beyond the base syntactic patterns for any rule, that claim MUST also be declared, and criteria 5 and 6 (precision/recall measurement and golden corpus) apply to those claimed equivalents as well as the base rule patterns. A ruff plugin implementing WL-001 and WL-003 maintains corpus specimens and measures precision for those two rules only; a tool claiming WL-001 plus schema-default evasion coverage must include specimens for both the base pattern and the claimed evasion variants. Criterion 3 (WL-007 structural verification and WL-008 validation ordering) and criterion 4 (taint-flow tracking) are included in Wardline-Core when the tool's declared rule set includes WL-007, WL-008, or taint-dependent rules; they are not required for a tool that implements only pattern-matching rules (WL-001 through WL-006). Criterion 10 applies to Wardline-Core only to the extent needed to consume manifest context safely: a Wardline-Core tool MUST read the manifest fields it depends on and MUST either validate the relevant manifest structures itself or document delegated full-schema validation to a Wardline-Governance tool in the same regime. Criterion 7 (self-hosting) applies when the tool's own source code can meaningfully be checked against the rules it implements — a scanner written in the same language it analyses SHOULD pass its own rules on its own codebase. Tools whose source is not in the analysed language (e.g., a Rust-based scanner that analyses Python) are exempt.
+- **Wardline-Type** requires that the type-system layer (§8.2) makes tier mismatches visible at development time. It requires criterion 1 at the type layer for the core classification groups only — the type system can express Groups 1–4 and 16–17 to the extent that the type system can represent them — but does not require the full 17-group annotation vocabulary at the type layer. Full-vocabulary expressiveness remains a regime-level requirement under criterion 1. Criterion 5 applies: precision and recall for type-system enforcement are measured against type-system-specific corpus specimens.
+- **Wardline-Governance** covers the governance infrastructure that no analysis tool naturally provides: exception register management, fingerprint baseline tracking, manifest validation and ratification enforcement, control-law state reporting, retrospective scan verification for degraded windows, and the expedited governance ratio metric. A governance tool need not perform any code analysis.
 - **Wardline-Full** is not a separate profile — it is the assertion that all ten criteria are satisfied. A single tool MAY claim Wardline-Full. More commonly, Wardline-Full conformance is a property of an enforcement regime (§14.4).
 
 ##### 14.3.2 Governance profiles
@@ -71,7 +71,7 @@ Wardline Lite requirements:
 | SARIF output with wardline property bags | MUST | Enforcement output is structured and assessable |
 | CODEOWNERS protection for governance artefacts | MUST | Policy artefact changes require designated reviewer approval |
 | Exception tracking | MUST | Exception register with reviewer identity, rationale, and expiry. The register exists and is maintained — exceptions are not granted informally |
-| Temporal separation | SHOULD | Separate change, different actor, approved before dependent code merges. Teams that cannot sustain temporal separation MUST document their alternative: same-actor approval is permitted for *enforcement artefact* changes (§9.3.1) with mandatory retrospective review within a defined window (recommended: next sprint boundary or 10 business days, whichever is shorter). However, *policy artefact* changes (tier definitions, delegation policy, bounded-context declarations) MUST require different-actor approval even under the Lite profile — the governance risk of same-actor policy changes is categorically higher, since a poisoned policy artefact corrupts all downstream enforcement (§9.3.2). The documented alternative is recorded in the root manifest and is an assessable governance decision, not a silent omission |
+| Temporal separation | SHOULD | Separate change, different actor, approved before dependent code merges. Teams that cannot sustain temporal separation MUST document their alternative: same-actor approval is permitted for *enforcement artefact* changes (§9.3.1) with mandatory retrospective review within a defined window (recommended: next sprint boundary or 10 business days, whichever is shorter). However, *policy artefact* changes (tier definitions, delegation policy, validation-scope declarations) MUST require different-actor approval even under the Lite profile — the governance risk of same-actor policy changes is categorically higher, since a poisoned policy artefact corrupts all downstream enforcement (§9.3.2). The documented alternative is recorded in the root manifest and is an assessable governance decision, not a silent omission |
 | Bootstrap golden corpus | SHOULD | A minimum of 20–30 specimens covering UNCONDITIONAL cells and Tier 1 taint states (AUDIT_TRAIL, PIPELINE). The bootstrap corpus demonstrates that the enforcement tools detect the highest-consequence violations. The full 126+ specimen requirement (§10) is deferred to the Assurance governance profile |
 | Annotation change tracking | MUST | Changes to the annotation surface (annotations added, modified, or removed) are flagged for human review. This MAY be implemented through VCS diff review of annotation-bearing files rather than a full fingerprint baseline — the requirement is visibility of annotation changes, not a specific tracking mechanism |
 | Expedited governance ratio | RECOMMENDED | The ratio metric (§9.4) SHOULD be computed and reported. Projects that do not yet compute the ratio MUST instead document their expedited exception approval process and review it at each manifest ratification |
@@ -84,7 +84,7 @@ Wardline Lite deferred items — these are not omitted, they are explicitly defe
 
 Wardline Lite is not "Wardline minus the unpleasant bits." It includes a governance checklist (below) that makes the governance posture assessable even without the full artefact set. An assessor evaluating a Lite deployment verifies the checklist, not a reduced version of the Assurance procedure. For the graduation path from Lite to Assurance — including triggers and a pre-graduation checklist — see §14.3.3.
 
-> **ISM-layer perspective.** The companion recommendations document (*Proposed Framework Changes and Recommendations*, §3.2) proposes ISM-style controls for manifest governance — semantic policy change authority, adequacy review, exception governance, and tool assurance — framed as outcome-stated controls sitting above this specification. Those controls address the same governance surface from the policy framework's perspective: where this section specifies *how* the governance mechanisms work, the ISM-layer controls specify *what outcomes* the organisation must demonstrate to an assessor.
+> **ISM-layer perspective.** The companion recommendations document (*Proposed Framework Changes and Recommendations*, §3.2) proposes ISM-style controls for manifest governance — semantic policy change authority, adequacy review, exception governance, and tool assurance — framed as outcome-stated controls sitting above this specification. Those controls address the same governance surface from the policy framework's perspective: where this section specifies *how* the governance mechanisms work, the ISM-layer controls specify *what outcomes* the organisation MUST demonstrate to an assessor.
 
 **Wardline Lite governance checklist.** An assessor evaluating a Lite deployment verifies the following:
 
@@ -92,11 +92,11 @@ Wardline Lite is not "Wardline minus the unpleasant bits." It includes a governa
 2. CODEOWNERS (or equivalent) protects `wardline.yaml`, overlay files, and the exception register
 3. Exception register entries have reviewer identity, documented rationale, and expiry date
 4. Temporal separation is either implemented or a documented alternative is recorded in the manifest
-5. Annotation changes in the most recent assessment window were reviewed (evidence: PR review history, commit review records, or equivalent)
+5. Annotation changes in the most recent assessment window were reviewed (evidence: PR review history, commit review records, or equivalent). At minimum, the evidence MUST show that the PR or commit containing the annotation change was approved by a designated reviewer (for example, through CODEOWNERS or equivalent path protection). Evidence that the reviewer specifically examined the annotation change itself is RECOMMENDED but not required at Lite level.
 6. If a bootstrap corpus exists: enforcement tools detect the specimens correctly
 7. If expedited exceptions were granted: the process is documented and retrospective review occurred
 
-**Wardline Assurance.** The full governance profile as described in §9. Wardline Assurance requires all governance mechanisms defined in §9.2 without relaxation: full temporal separation (MUST, no documented alternatives), full golden corpus (126+ specimens with adversarial cases per §10), full fingerprint baseline with canonical hashing and structured change detection, expedited governance ratio computation with declared threshold and automated governance-level findings when exceeded, and SIEM export for ISM-assessed systems (SHOULD). Wardline Assurance is the governance profile expected for systems undergoing IRAP assessment, systems processing data at PROTECTED or above, or any deployment where the organisation's risk appetite requires the full governance surface.
+**Wardline Assurance.** The full governance profile as described in §9. Wardline Assurance requires all governance mechanisms defined in §9.2 without relaxation: full temporal separation (MUST; no documented alternatives permitted), full golden corpus (126+ specimens with adversarial cases per §10), full fingerprint baseline with canonical hashing and structured change detection, expedited governance ratio computation with declared threshold and automated governance-level findings when exceeded, and SIEM export for ISM-assessed systems (SHOULD). Wardline Assurance is the governance profile expected for systems undergoing IRAP assessment, systems processing data at PROTECTED or above, or any deployment where the organisation's risk appetite requires the full governance surface.
 
 Wardline Assurance requirements add to or strengthen the Lite requirements:
 
@@ -105,6 +105,7 @@ Wardline Assurance requirements add to or strengthen the Lite requirements:
 | Temporal separation | MUST | No documented alternatives — separate change, different actor, full stop |
 | Golden corpus | MUST — full 126+ specimens | Expanded from bootstrap corpus of 20–30 specimens |
 | Fingerprint baseline | MUST — full structured baseline per §9.2 | Replaces annotation change tracking |
+| Manifest coherence checks | MUST — CI gate before code-level enforcement | New requirement |
 | Expedited governance ratio | MUST — computed, threshold declared, automated finding | Strengthened from RECOMMENDED |
 | SIEM export of governance events | SHOULD (MUST for ISM-assessed systems) | New requirement |
 
@@ -138,17 +139,19 @@ An **enforcement regime** is the set of tools that collectively enforce a wardli
 
 **Regime composition rules:**
 
-- **Coverage completeness.** Every criterion must be satisfied by at least one tool in the regime. A regime comprising a Wardline-Core tool (criteria 2, 5, 6, 8, 10) and a Wardline-Governance tool (criteria 9, 10) is missing criteria 1 (full annotation expressiveness), 3 (WL-007), and 4 (taint-flow). Criterion 7 (self-hosting) applies to the Wardline-Core tool conditionally on its implementation language. Adding a Wardline-Type tool and ensuring the Wardline-Core tool covers WL-007 and taint-flow closes the gap.
-- **Rule coverage completeness.** The union of all Wardline-Core tools in the regime must cover all eight rules — six pattern rules (WL-001 through WL-006) and two structural verification rules (WL-007 and WL-008). If tool A implements WL-001 through WL-004 and tool B implements WL-005, WL-006, WL-007, and WL-008, the regime's rule coverage is complete. Gaps in rule coverage must be documented.
-- **Corpus union.** Each tool maintains corpus specimens for the rules it implements. The regime's corpus is the union of all constituent tools' corpora. Regime-level corpus coverage must satisfy the minimum specimen counts defined in §10 across the full rule set.
+- **Coverage completeness.** Every criterion MUST be satisfied by at least one tool in the regime. A regime comprising a Wardline-Core tool (criteria 2, 5, 6, 8, 10) and a Wardline-Governance tool (criteria 9, 10) is missing criteria 1 (full annotation expressiveness), 3 (WL-007), and 4 (taint-flow). Criterion 7 (self-hosting) applies to the Wardline-Core tool conditionally on its implementation language. Adding a Wardline-Type tool and ensuring the Wardline-Core tool covers WL-007 and taint-flow closes the gap.
+- **Rule coverage completeness.** The union of all Wardline-Core tools in the regime MUST cover all eight rules — six pattern rules (WL-001 through WL-006) and two structural verification rules (WL-007 and WL-008). If tool A implements WL-001 through WL-004 and tool B implements WL-005, WL-006, WL-007, and WL-008, the regime's rule coverage is complete. Gaps in rule coverage MUST be documented.
+- **Corpus union.** Each tool maintains corpus specimens for the rules it implements. The regime's corpus is the union of all constituent tools' corpora. Regime-level corpus coverage MUST satisfy the minimum specimen counts defined in §10 across the full rule set.
 - **SARIF aggregation.** Each tool produces its own SARIF run. The regime's combined output is a multi-run SARIF log (§10.1). A regime orchestrator — which may be a Wardline-Governance tool — aggregates runs and computes regime-level metrics (coverage ratio, expedited ratio, control-law state).
-- **Self-hosting.** Criterion 7 (self-hosting gate) applies per tool: each enforcement tool in the regime must pass the wardline rules that it itself implements, applied to its own source code. A type checker plugin that enforces tier mismatches must pass tier-mismatch checks on its own source. A linter plugin that detects WL-001 must not violate WL-001 in its own code. Tools that perform no code analysis (e.g., a pure governance orchestrator) are exempt from self-hosting.
+- **Self-hosting.** Criterion 7 (self-hosting gate) applies per tool: each enforcement tool in the regime MUST pass the wardline rules that it itself implements, applied to its own source code. A type checker plugin that enforces tier mismatches MUST pass tier-mismatch checks on its own source. A linter plugin that detects WL-001 MUST NOT violate WL-001 in its own code. Tools that perform no code analysis (e.g., a pure governance orchestrator) are exempt from self-hosting.
 
 **Regime documentation.** A regime MUST be documented: which tools, which profiles, which rules each tool covers, and which criteria remain unmet (if any). This documentation is the artefact an assessor evaluates. The assessor does not need to understand each tool's internals — they need the regime composition table and the combined corpus. The regime composition is documented in the language binding reference — for example, Part II-A §A.6 provides the regime composition matrix for the Python ecosystem, and Part II-B §B.6 for Java. Assessors evaluating a regime consult the binding reference for the composition table and the combined corpus.
 
 #### 14.5 Supplementary group enforcement scope
 
 Criterion 1 requires that the ecosystem can *express* all 17 annotation groups. Criteria 2–8 require *enforcement* only for the eight rules — six pattern rules (WL-001–WL-006) and two structural verification rules (WL-007–WL-008) — plus taint-flow tracking — all of which operate on core classification annotations (Groups 1–4, 16–17). The framework does not mandate standardised enforcement semantics for supplementary contract annotations (Groups 5–15). Tools define their own enforcement rules for supplementary groups, with their own severity and exceptionability (§9.3), declared in the overlay's supplementary section (§13.1.2). This means a regime can be Wardline-Full conformant while providing rich enforcement for some supplementary groups and minimal enforcement for others. An assessor evaluating a regime SHOULD document which supplementary groups have enforcement rules and which are expressiveness-only — the overlay supplementary section provides the structured location for this documentation, so that adopters understand the regime's actual coverage versus the full annotation vocabulary.
+
+This distinction governs incremental adoption as well. A deployment that begins with core classification annotations to establish trust topology, and adds supplementary annotations later, is not non-conformant for lacking uniform supplementary enforcement depth. What matters is that the binding can express the full vocabulary and that the regime documentation accurately declares which supplementary groups are enforced versus expressiveness-only at the current stage.
 
 #### 14.6 Assessment procedure
 
@@ -180,15 +183,15 @@ This subsection defines a repeatable verification procedure for assessors evalua
 - Obtain the corpus artefact and verify integrity (specimen hashes against manifest)
 - Run `wardline corpus verify` with each tool in the regime against its specimen subset
 - Record pass/fail per specimen, per tool
-- Compute corpus precision and recall per rule. Verify precision ≥ 80% floor and recall ≥ 70% floor (§10 properties 3–4)
+- Compute corpus precision and recall per cell. Verify precision meets the applicable floor: ≥ 80% generally, ≥ 65% permitted for MIXED_RAW cells; and recall meets the applicable floor: ≥ 70% for STANDARD/RELAXED cells and ≥ 90% for UNCONDITIONAL cells (§10 properties 3–4)
 - Check adversarial specimen coverage: ≥1 adversarial false positive and ≥1 adversarial false negative per rule
 
 **Step 4: Enforcement execution.**
 - Run the full regime against the project codebase
 - Verify SARIF output contains required wardline property bags (§10.1)
 - Verify `wardline.controlLaw` reports "normal" for the declared adoption phase
-- Verify `wardline.deterministic: true`
 - Run the tool twice on the same codebase and verify byte-identical SARIF in verification mode (property 5)
+- Confirm `wardline.deterministic: true` is present in the SARIF output as the tool's self-report
 
 **Step 5: Governance artefact review.**
 - Inspect the exception register: verify entries have reviewer identity, rationale, expiry, and provenance
@@ -206,11 +209,11 @@ This subsection defines a repeatable verification procedure for assessors evalua
 | Regime covers all 10 criteria | All criteria mapped to a tool | Any criterion unmapped without documented compensating control |
 | Manifest schema-valid | Exit code 0 | Schema validation error |
 | Manifest coherence (Assurance) | No orphaned annotations, undeclared boundaries, tier–topology contradictions, unmatched contracts, or stale contract bindings | Any coherence failure without documented exception |
-| Corpus precision per rule | ≥ 80% (or project-declared threshold) | Below threshold |
-| Corpus recall per rule | ≥ 70% (or project-declared threshold) | Below threshold |
+| Corpus precision per cell | ≥ 80% generally, or ≥ 65% for MIXED_RAW cells (or stricter project-declared thresholds) | Below the applicable threshold |
+| Corpus recall per cell | ≥ 70% for STANDARD/RELAXED cells and ≥ 90% for UNCONDITIONAL cells (or stricter project-declared thresholds) | Below the applicable threshold |
 | SARIF property bags present | All required properties on results and runs | Missing properties |
 | Control law normal | Normal for declared phase | Alternate or direct without governance acknowledgement |
-| Deterministic output | Byte-identical SARIF on repeated runs (verification mode) | Non-deterministic output |
+| Deterministic output | Byte-identical SARIF from the same tool binary on repeated runs (verification mode) | Non-deterministic output |
 | Exception register well-formed | All entries have reviewer, rationale, expiry | Missing required fields |
 | Self-hosting passes | Tool passes own rules | Tool violates own rules |
 
@@ -248,39 +251,39 @@ partner-landscape/
 **Root manifest (`wardline.yaml`):**
 
 ```yaml
-wardline:
-  version: "0.2.0"
+metadata:
+  organisation: "Department of Example"
+  ratified_by:
+    name: "Jane Smith"
+    role: "Chief Information Security Officer"
+  ratification_date: "2026-02-01"
+  review_interval_days: 180
 
-  ratification:
-    authority: "Jane Smith, Chief Information Security Officer"
-    date: "2026-02-01"
-    review_interval_days: 180
+tiers:
+  - id: "partner-api"
+    tier: 4
+    description: "External partner data from Partner Gateway API"
+  - id: "internal-database"
+    tier: 1
+    description: "Authoritative audit records in PostgreSQL"
 
-  tier_definitions:
-    - name: "partner-api"
-      tier: 4
-      description: "External partner data from Partner Gateway API"
-    - name: "internal-database"
-      tier: 1
-      description: "Authoritative audit records in PostgreSQL"
+rules:
+  overrides: []
+  expedited_ratio_threshold: 0.10
 
-  rule_configuration:
-    # No overrides — framework defaults apply
-    expedited_ratio_threshold: 0.10
+delegation:
+  default_authority: "RELAXED"
+  grants:
+    - path: "audit/"
+      authority: "NONE"  # All audit exceptions require root-level approval
 
-  delegation:
-    default_authority: RELAXED
-    grants:
-      - path: "audit/"
-        authority: NONE  # All audit exceptions require root-level approval
-
-  module_tier_mappings:
-    - module: "adapters"
-      default_taint: EXTERNAL_RAW
-    - module: "domain"
-      default_taint: PIPELINE
-    - module: "audit"
-      default_taint: AUDIT_TRAIL
+module_tiers:
+  - path: "adapters/"
+    default_taint: "EXTERNAL_RAW"
+  - path: "domain/"
+    default_taint: "PIPELINE"
+  - path: "audit/"
+    default_taint: "AUDIT_TRAIL"
 ```
 
 **CI pipeline (relevant steps from `.github/workflows/ci.yml`):**
@@ -333,6 +336,7 @@ corpus/                      @security-team
     },
     "exceptionability": "STANDARD",
     "severity_at_grant": "ERROR",
+    "exceptionability_at_grant": "STANDARD",
     "rationale": "Legacy partner API v1 omits 'status' field on inactive partners. Default 'INACTIVE' approved by data owner (JIRA-4521).",
     "reviewer": {
       "identity": "jane.smith@myorg.gov.au",
@@ -404,27 +408,14 @@ health-notifications/
 **Root manifest (`wardline.yaml`):**
 
 ```yaml
-wardline:
-  version: "0.2.0"
-
+metadata:
+  organisation: "Health Notifications Program"
+  ratified_by:
+    name: "Alex Chen"
+    role: "Tech Lead"
+  ratification_date: "2026-03-01"
+  review_interval_days: 90
   governance_profile: "lite"
-
-  ratification:
-    authority: "Alex Chen, Tech Lead"
-    date: "2026-03-01"
-    review_interval_days: 90
-
-  tier_definitions:
-    - name: "health-api"
-      tier: 4
-      description: "External health notification records from partner API"
-    - name: "notification-db"
-      tier: 1
-      description: "Authoritative notification summaries in PostgreSQL"
-
-  rule_configuration:
-    # Framework defaults apply
-
   temporal_separation:
     alternative: "same-actor-with-retrospective"
     retrospective_window_days: 10
@@ -434,11 +425,22 @@ wardline:
       within 10 business days. Retrospective reviews are tracked as
       PR comments on the original governance change.
 
-  delegation:
-    default_authority: RELAXED
-    grants:
-      - path: "store/"
-        authority: NONE  # Tier 1 writes — all exceptions require tech lead approval
+tiers:
+  - id: "health-api"
+    tier: 4
+    description: "External health notification records from partner API"
+  - id: "notification-db"
+    tier: 1
+    description: "Authoritative notification summaries in PostgreSQL"
+
+rules:
+  overrides: []
+
+delegation:
+  default_authority: "RELAXED"
+  grants:
+    - path: "store/"
+      authority: "NONE"  # Tier 1 writes — all exceptions require tech lead approval
 ```
 
 **CODEOWNERS:**
@@ -461,8 +463,10 @@ The team maintains 24 specimens covering UNCONDITIONAL cells and Tier 1 taint st
 | WL-004 | AUDIT_TRAIL, EXTERNAL_RAW | 4 |
 | WL-005 | AUDIT_TRAIL | 2 |
 | WL-006 | AUDIT_TRAIL, EXTERNAL_RAW | 4 |
+| WL-007 | AUDIT_TRAIL | 2 |
+| WL-008 | SHAPE_VALIDATED | 2 |
 
-The bootstrap corpus focuses on the cells where findings are UNCONDITIONAL or ERROR at Tier 1. Full coverage of all 126+ cells is deferred to governance graduation.
+The bootstrap corpus focuses on the cells where findings are UNCONDITIONAL or ERROR at Tier 1, and includes at least one structural-verification specimen for WL-007 and WL-008 so the invariant rules are not absent from early assessment. Full coverage of all 126+ cells is deferred to governance graduation.
 
 **CI pipeline (relevant steps):**
 

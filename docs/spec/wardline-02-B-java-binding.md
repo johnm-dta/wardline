@@ -77,7 +77,7 @@ Any tool that implements Wardline-Core rules for the Java regime MUST satisfy th
 
 1. **Manifest consumption.** The tool MUST consume the wardline manifest (`wardline.yaml` and overlays) and validate it against the framework's JSON Schemas before producing findings.
 
-2. **Annotation discovery.** The tool MUST discover wardline annotation syntax from the target codebase — either from source AST or from compiled bytecode — identifying which methods carry which annotations and extracting their parameters. The canonical annotation names and parameter schemas are defined in B.4.
+2. **Annotation discovery.** The tool MUST discover wardline annotation syntax from the target codebase — either from source AST or from compiled bytecode — identifying which methods carry which annotations and extracting their parameters. The Java annotation vocabulary and parameter schemas are defined in B.4. Cross-binding machine identity remains the Part I annotation-group numbering and manifest schema identifiers, not the Java annotation spellings.
 
 3. **Schema default recognition.** The tool MUST recognise `SchemaDefault.of()` as a JV-WL-001 suppression marker. Calls wrapped in `SchemaDefault.of()` where the default value matches the overlay's declared approved default are governed by the overlay declaration, not by JV-WL-001.
 
@@ -130,47 +130,47 @@ Meta-annotation composition is Java's native mechanism for annotation reuse and 
 
 ##### B.4.3 Annotation mapping table
 
-The following table maps each of the 17 abstract annotation groups (Part I §6) to their concrete Java annotations.
+The following table maps each of the 17 abstract annotation groups (Part I §6) to their concrete Java annotations. In SARIF and other cross-binding interchange, annotation context is identified by Part I group numbers (`wardline.annotationGroups`), while Java annotation names remain binding-specific diagnostic detail.
 
 | Group | Abstract Name | Java Annotation(s) | Signature / Parameters | Brief Description |
 |---|---|---|---|---|
 | **1** | Trust boundary declarations | `@ExternalBoundary` | `@Target(METHOD)` | Marks method returning T4 (EXTERNAL_RAW) data from outside the system boundary |
-| | | `@ValidatesShape` | `@Target(METHOD)` | T4 → T3 transition. Body must contain rejection path (JV-WL-007) |
-| | | `@ValidatesSemantic` | `@Target(METHOD)` | T3 → T2 transition. Body must contain rejection path. Scanner verifies validation ordering (JV-WL-008) |
-| | | `@ValidatesExternal` | `@Target(METHOD)` | Combined T4 → T2. Body must satisfy both shape and semantic validation requirements |
+| | | `@ValidatesShape` | `@Target(METHOD)` | T4 → T3 transition. Body MUST contain rejection path (JV-WL-007) |
+| | | `@ValidatesSemantic` | `@Target(METHOD)` | T3 → T2 transition. Body MUST contain rejection path. Scanner verifies validation ordering (JV-WL-008) |
+| | | `@ValidatesExternal` | `@Target(METHOD)` | Combined T4 → T2. Body MUST satisfy both shape and semantic validation requirements |
 | | | `@Tier1Read` | `@Target(METHOD)` | Returns T1 (AUDIT_TRAIL) data. Body rules at AUDIT_TRAIL severity |
-| | | `@AuthoritativeConstruction` | `@Target(METHOD)` | T2 → T1 transition. All return type fields must be explicitly supplied |
-| | | `@AuditWriter` | `@Target(METHOD)` | Audit-sensitive write. AUDIT_TRAIL severity. Must precede `@EmitsTelemetry`. Fallback paths that bypass the audit call produce a finding |
+| | | `@AuthoritativeConstruction` | `@Target(METHOD)` | T2 → T1 transition. All return type fields MUST be explicitly supplied |
+| | | `@AuditWriter` | `@Target(METHOD)` | Audit-sensitive write. AUDIT_TRAIL severity. MUST precede `@EmitsTelemetry`. Fallback paths that bypass the audit call produce a finding |
 | **2** | Audit primacy | `@AuditCritical` | `@Target(METHOD)` | All `@AuditWriter` rules plus implicit `@MustPropagate` on exception paths |
-| | | `@EmitsTelemetry` | `@Target(METHOD)` | Telemetry emission. Must not precede `@AuditWriter` on shared code paths |
-| **3** | Plugin/component contract | `@SystemComponent` | `@Target(METHOD)` | System-owned contract. Crash-not-catch semantics; exceptions must propagate |
+| | | `@EmitsTelemetry` | `@Target(METHOD)` | Telemetry emission. MUST NOT precede `@AuditWriter` on shared code paths |
+| **3** | Plugin/component contract | `@SystemComponent` | `@Target(METHOD)` | System-owned contract. Crash-not-catch semantics; exceptions MUST propagate |
 | **4** | Internal data provenance | `@IntData` | `@Target(METHOD)` | Declares internal provenance. AUDIT_TRAIL body restrictions. Return tagged UNKNOWN_RAW without `@RestorationBoundary` |
-| **5** | Schema contracts | `@AllFieldsMapped` | `@Target(METHOD)` | Every field of return type must be explicitly supplied or wrapped in `SchemaDefault.of()` |
-| | | `@OutputSchema(fields = {...})` | `@Target(METHOD)`, `String[] fields` | Returned object must contain all declared fields |
+| **5** | Schema contracts | `@AllFieldsMapped` | `@Target(METHOD)` | Every field of return type MUST be explicitly supplied or wrapped in `SchemaDefault.of()` |
+| | | `@OutputSchema(fields = {...})` | `@Target(METHOD)`, `String[] fields` | Returned object MUST contain all declared fields |
 | **6** | Layer boundaries | `@Layer(value)` | `@Target(TYPE)`, `String value` | Enforces import direction constraints between architectural layers |
-| **7** | Template/parse safety | `@TemplateRenderer` | `@Target(METHOD)` | Template rendering must use parameterised APIs. Input must be T2+ |
+| **7** | Template/parse safety | `@TemplateRenderer` | `@Target(METHOD)` | Template rendering MUST use parameterised APIs. Input MUST be T2+ |
 | | | `@ParseAtInit` | `@Target(METHOD)` | Method called only from constructors, static initialisers, or `@PostConstruct` |
-| **8** | Secret handling | `@HandlesSecrets` | `@Target(METHOD)` | Return value must not appear in logger calls, string concatenation reaching loggers, or serialisation reaching persistence |
-| **9** | Operation semantics | `@Idempotent` | `@Target(METHOD)` | First state-modifying call must be preceded by a guard |
-| | | `@Atomic` | `@Target(METHOD)` | Multiple state-modifying calls must be within `@Transactional` or explicit transaction |
-| | | `@Compensatable(rollback)` | `@Target(METHOD)`, `String rollback` | Referenced rollback method must exist with compatible signature |
-| **10** | Failure mode | `@FailClosed` | `@Target(METHOD)` | No fallback values, no continue-on-error. Must throw on failure |
+| **8** | Secret handling | `@HandlesSecrets` | `@Target(METHOD)` | Return value MUST NOT appear in logger calls, string concatenation reaching loggers, or serialisation reaching persistence |
+| **9** | Operation semantics | `@Idempotent` | `@Target(METHOD)` | First state-modifying call MUST be preceded by a guard |
+| | | `@Atomic` | `@Target(METHOD)` | Multiple state-modifying calls MUST be within `@Transactional` or explicit transaction |
+| | | `@Compensatable(rollback)` | `@Target(METHOD)`, `String rollback` | Referenced rollback method MUST exist with compatible signature |
+| **10** | Failure mode | `@FailClosed` | `@Target(METHOD)` | No fallback values, no continue-on-error. MUST throw on failure |
 | | | `@FailOpen` | `@Target(METHOD)` | Graceful degradation permitted. Requires trust classification annotation |
-| | | `@EmitsOrExplains` | `@Target(METHOD)` | Every exit path must emit or explain |
+| | | `@EmitsOrExplains` | `@Target(METHOD)` | Every exit path MUST emit or explain |
 | | | `@ExceptionBoundary` | `@Target(METHOD)` | Authorised exception translation point |
-| | | `@MustPropagate` | `@Target(METHOD)` | Exceptions must propagate to an `@ExceptionBoundary` |
-| | | `@PreserveCause` | `@Target(METHOD)` | Every catch-and-rethrow must chain the cause. *Java-specific extension* |
-| **11** | Data sensitivity | `@HandlesPii(fields)` | `@Target(METHOD)`, `String[] fields` | Named fields must not appear in logs, exceptions, or unencrypted persistence |
+| | | `@MustPropagate` | `@Target(METHOD)` | Exceptions MUST propagate to an `@ExceptionBoundary` |
+| | | `@PreserveCause` | `@Target(METHOD)` | Every catch-and-rethrow MUST chain the cause. *Java-specific extension* |
+| **11** | Data sensitivity | `@HandlesPii(fields)` | `@Target(METHOD)`, `String[] fields` | Named fields MUST NOT appear in logs, exceptions, or unencrypted persistence |
 | | | `@HandlesClassified(level)` | `@Target(METHOD)`, `String level` | No mixing with lower classification levels |
-| | | `@Declassifies(fromLevel, toLevel)` | `@Target(METHOD)`, `String fromLevel`, `String toLevel` | Body must contain rejection path. Input must not leak unchanged to output |
-| **12** | Determinism | `@Deterministic` | `@Target(METHOD)` | Body must not contain non-deterministic calls (Random, UUID, Instant.now, HashMap iteration) |
+| | | `@Declassifies(fromLevel, toLevel)` | `@Target(METHOD)`, `String fromLevel`, `String toLevel` | Body MUST contain rejection path. Input MUST NOT leak unchanged to output |
+| **12** | Determinism | `@Deterministic` | `@Target(METHOD)` | Body MUST NOT contain non-deterministic calls (Random, UUID, Instant.now, HashMap iteration) |
 | | | `@TimeDependent` | `@Target(METHOD)` | Explicitly declares wall-clock dependency |
-| **13** | Concurrency/ordering | `@ThreadSafe` | `@Target(METHOD)` | Shared mutable state access must be synchronised |
-| | | `@OrderedAfter(value)` | `@Target(METHOD)`, `String value` | At call sites, named method must be called first |
-| | | `@NotReentrant` | `@Target(METHOD)` | Call graph must not lead back to this method |
-| **14** | Access/attribution | `@RequiresIdentity` | `@Target(METHOD)` | Identity-typed parameter must be received and passed to audit/persistence |
-| | | `@PrivilegedOperation` | `@Target(METHOD)` | Authorisation check must precede state modification |
-| **15** | Lifecycle/scope | `@TestOnly` | `@Target(TYPE)` | No production module may import this symbol |
+| **13** | Concurrency/ordering | `@ThreadSafe` | `@Target(METHOD)` | Shared mutable state access MUST be synchronised |
+| | | `@OrderedAfter(value)` | `@Target(METHOD)`, `String value` | At call sites, named method MUST be called first |
+| | | `@NotReentrant` | `@Target(METHOD)` | Call graph MUST NOT lead back to this method |
+| **14** | Access/attribution | `@RequiresIdentity` | `@Target(METHOD)` | Identity-typed parameter MUST be received and passed to audit/persistence |
+| | | `@PrivilegedOperation` | `@Target(METHOD)` | Authorisation check MUST precede state modification |
+| **15** | Lifecycle/scope | `@TestOnly` | `@Target(TYPE)` | Production modules MUST NOT import this symbol |
 | | | `@DeprecatedBy(date, replacement)` | `@Target(METHOD)`, `String date`, `String replacement` | After expiry: BLOCKING finding. Before: advisory |
 | | | `@FeatureGated(flag)` | `@Target(METHOD)`, `String flag` | Tracks flag lifecycle and stale flag detection |
 | **16** | Generic trust boundary | `@TrustBoundary(fromTier, toTier)` | `@Target(METHOD)`, `int fromTier`, `int toTier` | Generic tier transition. Valid tiers 1–4. Skip-promotions to T1 are schema-invalid |
@@ -189,7 +189,7 @@ The following table maps each of the 17 abstract annotation groups (Part I §6) 
 
 **Spring-specific considerations.** The annotation vocabulary deliberately avoids runtime behaviour. Spring annotations (`@Transactional`, `@Cacheable`, `@Async`) trigger runtime proxy generation; wardline annotations are pure metadata. This means wardline annotations and Spring annotations can coexist on the same method without interaction — except where the Spring proxy's behaviour contradicts the wardline annotation's intent (see B.7 for residual risks). The safe-composition table in B.7 defines which Spring annotations are known-safe with wardline annotations.
 
-**Checked exception interaction with `@FailClosed`.** A method declared to throw a checked exception forces callers to handle or declare it — compiler-enforced propagation. The scanner treats checked exception declarations as complementary to `@MustPropagate`. For Tier 1 integrity errors, the binding recommends unchecked exceptions — they should halt processing, not be declared in signatures where every caller must decide what to do with them.
+**Checked exception interaction with `@FailClosed`.** A method declared to throw a checked exception forces callers to handle or declare it — compiler-enforced propagation. The scanner treats checked exception declarations as complementary to `@MustPropagate`. For Tier 1 integrity errors, the binding recommends unchecked exceptions — they are expected to halt processing, not be declared in signatures where every caller must decide what to do with them.
 
 **`SchemaDefault.of()` formal semantics.** `SchemaDefault` is a static utility class in the `dev.wardline.annotations` package:
 
@@ -200,7 +200,7 @@ public final class SchemaDefault {
 }
 ```
 
-The scanner recognises `SchemaDefault.of(...)` syntactically and suppresses JV-WL-001 for the wrapped expression when the overlay declares the field as optional with an approved default matching the code default. Three conditions must all be met for suppression: (1) the field is declared in the overlay's `optional_fields`, (2) the code default matches the overlay's `approved_default` exactly, and (3) the call occurs within a `@ValidatesShape` or `@ValidatesExternal` boundary. `SchemaDefault.of()` inside `@ValidatesSemantic` is a finding — by the time semantic validation runs, field presence should be guaranteed by the T3 contract.
+The scanner recognises `SchemaDefault.of(...)` syntactically and suppresses JV-WL-001 for the wrapped expression when the overlay declares the field as optional with an approved default matching the code default. Three conditions MUST all be met for suppression: (1) the field is declared in the overlay's `optional_fields`, (2) the code default matches the overlay's `approved_default` exactly, and (3) the call occurs within a `@ValidatesShape` or `@ValidatesExternal` boundary. `SchemaDefault.of()` inside `@ValidatesSemantic` is a finding — by the time semantic validation runs, field presence is guaranteed by the T3 contract.
 
 **Java-specific severity matrix changes.** The Java binding's 8-rule × 8-state severity matrix reproduces the parent specification's framework matrix with two cell changes, both moving toward SUPPRESS (less severe):
 
@@ -466,7 +466,7 @@ public record ValidatedPartner(
     }
 }
 
-// bounded_context in overlay:
+// validation_scope in overlay:
 //   consumers: ["recordToLandscape", "generatePartnerReport"]
 @ValidatesSemantic
 public ValidatedPartner validatePartnerSemantics(PartnerDTO dto) {
@@ -602,7 +602,7 @@ Each line is a tier transition. Each method has one annotation declaring one tra
 
 The mandatory property bags (`wardline.rule`, `wardline.taintState`, `wardline.enclosingTier`, `wardline.severity`, `wardline.exceptionability`, `wardline.excepted`, `wardline.annotationGroups`) follow the parent specification's SARIF contract (Part I §10.1). The additional properties (`wardline.enclosingAnnotation`, `wardline.boundaryFunction`) are binding-specific extensions that provide Java-specific diagnostic context — they are not required by the interface contract but are recommended for implementers.
 
-**Agent guidance note.** For agents working in wardline-annotated Java codebases, the scanner finding-to-remediation mapping in the original §60.9 provides specific actions for each JV-WL rule. Key patterns: replace `.orElse(default)` with `.orElseThrow()` for JV-WL-001; narrow `catch (Exception e)` to specific types for JV-WL-003; add rejection paths for JV-WL-007; verify validation ordering for JV-WL-008. Multi-agent workflows should treat wardline annotations and governance artefacts as requiring the same human review as single-agent output.
+**Agent guidance note.** For agents working in wardline-annotated Java codebases, the scanner finding-to-remediation mapping in the original §60.9 provides specific actions for each JV-WL rule. Key patterns: replace `.orElse(default)` with `.orElseThrow()` for JV-WL-001; narrow `catch (Exception e)` to specific types for JV-WL-003; add rejection paths for JV-WL-007; verify validation ordering for JV-WL-008. Multi-agent workflows are expected to treat wardline annotations and governance artefacts as requiring the same human review as single-agent output.
 
 **Annotation change impact preview.** Java binding implementations SHOULD support annotation change impact preview using the SARIF metadata defined in Part I §10.1. When a developer modifies a tier assignment or annotation — e.g., adding `@ValidatesExternal` to replace a `@ValidatesShape` + `@ValidatesSemantic` pair, or changing a module's tier declaration in the manifest — the tool shows the cascade: newly applicable pattern rules, resolved findings, severity changes, and affected modules. The primary span is the changed annotation; secondary spans (carried in SARIF `relatedLocations`) are code locations whose compliance status changes. Because Error Prone fires during `javac`, Phase 2 advisory implementations MAY surface a simplified cascade view at compile time; the full SARIF-based impact preview is a Phase 3 (Wardline-Core) capability.
 
@@ -625,7 +625,7 @@ The Java regime supports four incremental adoption phases:
 
 **Phase 3 is a legitimate end state.** Wardline-Core achieves meaningful assurance: authoritative tier-graded findings, taint-flow analysis, governance-grade SARIF. Phase 4 adds compile-time enforcement but is not required for conformance.
 
-**Java version requirement.** Java 17+ is a hard minimum. Records, sealed classes, and pattern matching are essential. Projects on earlier versions should plan a Java 17 migration before adopting this binding. A Java 11 project receives more value from the Python binding on its Python services than from a degraded Java binding.
+**Java version requirement.** Java 17+ is a hard minimum. Records, sealed classes, and pattern matching are essential. Projects on earlier versions need to plan a Java 17 migration before adopting this binding. A Java 11 project receives more value from the Python binding on its Python services than from a degraded Java binding.
 
 **The adoption bottleneck is organisational, not technical.** Annotating code (Phase 1) is immediate. Phase 2 requires platform team approval for Error Prone. Phase 3 requires a new CI step. Phase 4 requires Checker Framework — a GPL-licensed dependency that government legal may flag. Each transition crosses an organisational boundary.
 
@@ -655,7 +655,7 @@ The Java regime's scanner error handling follows the same principles as the Pyth
 | **3** | Reference scanner + wardline CLI | Error Prone absent (advisory) | Scanner absent OR CLI absent |
 | **4** | Error Prone + Scanner + Checker + CLI | Error Prone absent OR Checker absent | Scanner absent OR CLI absent |
 
-The declared phase is set in `wardline.toml` (`[regime] phase = 3`). Phase transitions are governance events requiring review. Regressing from Phase 4 to Phase 3 reduces assurance and should be documented.
+The declared phase is set in `wardline.toml` (`[regime] phase = 3`). Phase transitions are governance events requiring review. Regressing from Phase 4 to Phase 3 reduces assurance and is expected to be documented.
 
 **Control-law transition governance:**
 

@@ -35,6 +35,8 @@ Iteration 3 used seven specialist agent perspectives to refine the design. Binar
 | **Runtime object model** | Strong | Descriptors (`__get__`/`__set__`/`__set_name__`), `__init_subclass__`, and metaclasses provide rich runtime structural enforcement. Standard CPython machinery, not extensions. |
 | **Class hierarchy enforcement** | Strong | `__init_subclass__` fires at class definition time (import time), not at instance creation time. Violations caught at module load. |
 | **Serialisation boundary control** | Weak | Static analysis cannot cross serialisation boundaries. `json.loads()` returns `dict` regardless of what was serialised. Descriptors provide partial runtime coverage, but the fundamental blind spot remains. |
+| **Error model** | Strong | Python's exception model provides a rich and explicit detection surface for WL-003, WL-004, and WL-005. `raise`, `except`, cause chaining, and broad-catch idioms are all visible in the AST. |
+| **Concurrency model** | Moderate | Python combines threads, `asyncio`, multiprocessing, and callback-heavy frameworks. The GIL narrows some shared-memory races but does not eliminate ordering or coordination hazards; Group 13 reasoning remains binding-defined and context-sensitive. |
 | **Tooling ecosystem** | Strong | mypy, pyright, ruff, bandit, and extensive AST tooling. SARIF is the standard interchange format. |
 
 ##### A.2.1 Where Python falls short
@@ -69,7 +71,7 @@ Any tool that implements Wardline-Core rules for the Python regime — whether a
 
 1. **Manifest consumption.** The tool MUST consume the wardline manifest (`wardline.yaml` and any overlays) and validate the manifest against the framework's JSON Schemas before producing findings. A tool that produces findings without validating the manifest is non-conformant. (Note: `wardline.yaml` is the trust topology manifest. `wardline.toml` is the scanner's operational configuration. The two files serve different purposes.)
 
-2. **Decorator discovery.** The tool MUST discover wardline decorator syntax from the target codebase's AST — identifying which functions carry which decorators and extracting their arguments. The tool SHALL NOT rely on runtime introspection or dynamic attribute inspection as the primary discovery mechanism. The canonical decorator names and their argument schemas are defined in §A.4.
+2. **Decorator discovery.** The tool MUST discover wardline decorator syntax from the target codebase's AST — identifying which functions carry which decorators and extracting their arguments. The tool SHALL NOT rely on runtime introspection or dynamic attribute inspection as the primary discovery mechanism. The Python decorator vocabulary and its argument schemas are defined in §A.4. Cross-binding machine identity remains the Part I annotation-group numbering and manifest schema identifiers, not the Python decorator spellings.
 
 3. **Schema default recognition.** The tool MUST recognise `schema_default()` as a PY-WL-001 suppression marker. Calls wrapped in `schema_default()` where the default value matches the overlay's declared approved default are governed by the overlay declaration, not by PY-WL-001.
 
@@ -83,11 +85,25 @@ Any tool that implements Wardline-Core rules for the Python regime — whether a
     | `wardline.exceptionability` | string | `UNCONDITIONAL`, `STANDARD`, `RELAXED`, or `TRANSPARENT` |
     | `wardline.analysisLevel` | integer | Analysis level that produced the finding (1, 2, or 3) |
 
-5. **Rule declaration.** The tool MUST declare which rules it implements and MUST maintain golden corpus specimens for those rules.
+    `wardline.analysisLevel` values are defined as follows:
 
-6. **Verification mode.** The tool SHOULD support the `--verification-mode` output profile for deterministic byte-identical output against the golden corpus.
+    - `1` — minimum conformant static analysis: intraprocedural rule detection plus the framework's required two-hop scope for WL-007 delegation and taint-flow through unannotated intermediaries
+    - `2` — level 1 plus variable-level taint tracking within function bodies and container-sensitive propagation beyond whole-function approximation
+    - `3` — level 2 plus transitive interprocedural inference beyond the required two-hop minimum
 
-A tool that satisfies this contract and implements at least one PY-WL rule is a partial Wardline-Core tool. A tool that implements all nine binding rules (PY-WL-001 through PY-WL-009) with tier-aware severity grading is a complete Wardline-Core tool.
+    A tool MUST emit the lowest level whose capabilities are sufficient to justify the finding as produced. Tools that implement only the framework minimum emit `wardline.analysisLevel: 1` for all findings.
+
+5. **Decorator composition.** The tool MUST resolve decorator stacking on the same function. In particular, `@int_data` without `@restoration_boundary` produces `UNKNOWN_RAW`; `@int_data` composed with `@restoration_boundary` produces the effective tier determined by the Part I §5.3 evidence matrix.
+
+6. **Third-party delegation resolution.** For PY-WL-008 / framework WL-007 delegation analysis, the tool SHOULD resolve calls into installed package source where that source is available to static analysis. Where installed source is unavailable or resolution is not implemented, the tool MUST treat the delegation as unresolvable for minimum-conformance purposes and evaluate the boundary conservatively.
+
+7. **Rule declaration.** The tool MUST declare which rules it implements and MUST maintain golden corpus specimens for those rules.
+
+8. **Verification mode.** The tool MUST support the `--verification-mode` output profile for deterministic byte-identical output against the golden corpus (Part I §10, property 5).
+
+9. **Run-level SARIF properties.** In addition to the mandatory result-level properties above, the tool MUST emit the required run-level SARIF properties defined in Part I §10.1 for Wardline-Core tools, including `wardline.inputHash`, `wardline.inputFiles`, `wardline.manifestHash`, and `wardline.controlLaw`.
+
+A tool that satisfies this contract and implements at least one PY-WL rule is a partial Wardline-Core tool. A tool that implements all nine binding rules (PY-WL-001 through PY-WL-009) with tier-aware severity grading is a complete Wardline-Core tool. Note: PY-WL-001 and PY-WL-002 both derive from framework rule WL-001 (split by access idiom). PY-WL-003 derives from framework WL-002, and the binding numbering is offset by one from PY-WL-003 onward.
 
 **Rule mapping.** The nine Python binding rules derive from the eight framework rules (Part I §7) as follows. WL-001 splits into two binding rules because Python has two distinct access-with-fallback idioms (`dict.get()` and `getattr()`); all other framework rules map one-to-one with a numbering offset:
 
@@ -129,58 +145,58 @@ Tools that detect wardline-relevant patterns without satisfying this contract �
 |------|---------|------------|
 | **Tier 4** | Untrusted-input (sceptical) programming | Treat everything as hostile sludge. Validate structure first, normalise, reject. |
 | **Tier 3** | Structure-verified (guarded) programming | Structure is trustworthy. Direct field access is safe; validate domain constraints before using values in business logic. |
-| **Tier 2** | Governance-assured (confident) programming | Structure and domain meaning are trustworthy within the declared bounded context. Guard only cross-cutting concerns. |
+| **Tier 2** | Governance-assured (confident) programming | Structure and domain meaning are trustworthy within the declared validation scope. Guard only cross-cutting concerns. |
 | **Tier 1** | Strict (offensive) programming (assert invariants; never silently recover) | Assume invariants, detonate on breach. Anomalies must surface immediately as faults. |
 
 **Minimum Python version: 3.12+.** The scanner targets Python 3.12+ only. `ast.Constant` is the canonical node at this floor; `ast.Match` (3.10+) and `ast.unparse()` (3.9+) are available.
 
 ##### A.4.2 Decorator mapping table
 
-The 17 annotation groups are defined as language-agnostic semantic requirements in Part I §6. This table provides the Python-specific decorator syntax. Decorators set `_wardline_*` metadata attributes on the decorated callable; they do almost nothing at runtime.
+The 17 annotation groups are defined as language-agnostic semantic requirements in Part I §6. This table provides the Python-specific decorator syntax. Decorators set `_wardline_*` metadata attributes on the decorated callable; they do almost nothing at runtime. In SARIF and other cross-binding interchange, annotation context is identified by Part I group numbers (`wardline.annotationGroups`), while Python decorator names remain binding-specific diagnostic detail.
 
 | # | Group | Python Decorator(s) | Signature / Parameters | Scanner Checks |
 |---|-------|---------------------|----------------------|----------------|
 | 1 | Authority Tier Flow | `@external_boundary` | *(none)* | Return value tagged TIER_4. Auto-detected for known external call sites but explicit annotation preferred. |
-| 1 | | `@validates_shape` | *(none)* | Body must contain rejection path (WL-007). T4 → T3 constructor. |
-| 1 | | `@validates_semantic` | *(none)* | Body must contain rejection path (WL-007). Inputs must trace to `@validates_shape` output (WL-008/PY-WL-009). T3 → T2 constructor. Bounded context declared in overlay. |
-| 1 | | `@validates_external` | *(none)* | Combined T4 → T2. Body must contain rejection path (WL-007). Must perform both structural and semantic checks (§5.2). |
+| 1 | | `@validates_shape` | *(none)* | Absence of rejection path in body produces a finding (WL-007). T4 → T3 constructor. |
+| 1 | | `@validates_semantic` | *(none)* | Absence of rejection path in body produces a finding (WL-007). Inputs that do not trace to `@validates_shape` output produce a finding (WL-008/PY-WL-009). T3 → T2 constructor. Validation scope declared in the overlay per Part I §13.1.2. |
+| 1 | | `@validates_external` | *(none)* | Combined T4 → T2. Absence of rejection path in body produces a finding (WL-007). The scanner verifies that the body performs both structural and semantic checks (§5.2). |
 | 1 | | `@tier1_read` | *(none)* | Body bans: `.get()` with defaults, `getattr()` with fallbacks, `hasattr()`, broad `except`. Return tagged TIER_1. |
-| 1 | | `@audit_writer` | *(none)* | Call-site bans: enclosing swallowing `except`. Audit must dominate telemetry on shared execution paths. Fallback paths that bypass the audit call produce a finding. Return tagged TIER_1. |
+| 1 | | `@audit_writer` | *(none)* | Call-site bans: enclosing swallowing `except`. Audit call MUST dominate telemetry on shared execution paths. Violation produces a finding. Fallback paths that bypass the audit call produce a finding. Return tagged TIER_1. |
 | 1 | | `@authoritative_construction` | *(none)* | Same body restrictions as `@tier1_read`. Semantically equivalent to `@audit_writer` but for non-audit authoritative artefacts. Return tagged TIER_1. |
-| 2 | Audit Primacy | `@audit_critical` | *(none)* | Superset of `@audit_writer` — call sites must not have fallback paths that skip the audit call. |
+| 2 | Audit Primacy | `@audit_critical` | *(none)* | Superset of `@audit_writer` — fallback paths at call sites that skip the audit call produce a finding. |
 | 3 | Plugin Contract | `@system_plugin` | *(none)* | Body bans top-level broad `except`. Allows narrower `except` for external calls and row-value operations. "Wrap your external calls; let your own bugs crash." |
 | 4 | Data Provenance | `@int_data` | *(none)* | Tier 1 body restrictions. Return value is UNKNOWN_RAW unless composed with `@restoration_boundary`. Allow-list/deny-list on call targets. |
-| 5 | Schema Contracts | `@all_fields_mapped(source=Class)` | `source`: the class whose fields must all appear in the body | Verifies every field on `source` appears as attribute access on the parameter. |
+| 5 | Schema Contracts | `@all_fields_mapped(source=Class)` | `source`: the class whose fields are verified to all appear in the body | Verifies every field on `source` appears as attribute access on the parameter. |
 | 5 | | `@output_schema(fields=[...])` | `fields`: list of output field names | Field collision detection at call sites. |
 | 5 | *(access-site)* | `schema_default(expr)` | Wraps a `.get()` expression | Suppression marker for PY-WL-001. Scanner verifies overlay declaration, default value match, and validation boundary context. Part of Wardline-Core interface contract. |
 | 6 | Layer Boundaries | `@layer(N)` | `N`: integer layer number | Import direction enforcement. Upward imports are findings. Hybrid: default layer from directory path via `wardline.toml`, decorator overrides per symbol. |
-| 7 | Template Safety | `@parse_at_init` | *(none)* | Call sites must be in `__init__`, `__post_init__`, or setup methods. Calls from per-row methods are findings. |
+| 7 | Template Safety | `@parse_at_init` | *(none)* | Call sites outside `__init__`, `__post_init__`, or setup methods produce a finding. Calls from per-row methods are findings. |
 | 8 | Secret Handling | `@handles_secrets` | *(none)* | Return tagged SECRET (orthogonal taint dimension). SECRET reaching logger, print, persistence without hashing is a finding. |
-| 9 | Operation Semantics | `@idempotent` | *(none)* | First state-modifying call must be preceded by existence/dedup guard. |
-| 9 | | `@atomic` | *(none)* | Multiple state-modifying calls must be within transaction context. |
-| 9 | | `@compensatable(rollback=fn)` | `rollback`: reference to rollback function | Rollback function must exist with compatible signature. |
+| 9 | Operation Semantics | `@idempotent` | *(none)* | First state-modifying call not preceded by existence/dedup guard produces a finding. |
+| 9 | | `@atomic` | *(none)* | Multiple state-modifying calls outside transaction context produce a finding. |
+| 9 | | `@compensatable(rollback=fn)` | `rollback`: reference to rollback function | Scanner verifies rollback function exists with compatible signature. |
 | 10 | Failure Mode | `@fail_closed` | *(none)* | Same body restrictions as `@tier1_read`. Carries implicit `@must_propagate`. Severity lookups use AUDIT_TRAIL. |
-| 10 | | `@fail_open` | *(none)* | Explicitly permits graceful degradation patterns. Composition requirement: must carry a trust classification decorator (WARNING if alone). |
-| 10 | | `@emits_or_explains` | *(none)* | Every return/exit path must reach an emit call or an explain/logging call. |
+| 10 | | `@fail_open` | *(none)* | Explicitly permits graceful degradation patterns. Composition requirement: absence of a trust classification decorator produces a WARNING. |
+| 10 | | `@emits_or_explains` | *(none)* | Return/exit paths that do not reach an emit call or an explain/logging call produce a finding. |
 | 10 | | `@exception_boundary` | *(none)* | Authorises exception handling from high-stakes call sites. Still subject to PY-WL-005. Placement governed via `wardline.toml` (lenient/controlled/strict modes). |
-| 10 | | `@must_propagate` | *(none)* | Exceptions must propagate to an `@exception_boundary`. No intermediate catch-and-continue. |
-| 10 | | `@preserve_cause` | *(none)* | Every `raise X(...)` in `except` blocks must include `from` clause. One-hop traversal into helper calls. |
-| 11 | Data Sensitivity | `@handles_pii(fields=[...])` | `fields`: list of PII field names | Named fields must not reach logger, error messages, unprotected persistence. |
+| 10 | | `@must_propagate` | *(none)* | Exceptions that do not propagate to an `@exception_boundary` produce a finding. No intermediate catch-and-continue. |
+| 10 | | `@preserve_cause` | *(none)* | A `raise X(...)` in an `except` block without a `from` clause produces a finding. One-hop traversal into helper calls. |
+| 11 | Data Sensitivity | `@handles_pii(fields=[...])` | `fields`: list of PII field names | Named fields reaching logger, error messages, or unprotected persistence produce a finding. |
 | 11 | | `@handles_classified(level=str)` | `level`: classification level (e.g., `"PROTECTED"`) | No mixing with lower classification levels. No downgrading without `@declassifies`. |
-| 11 | | `@declassifies(from_level=str, to_level=str)` | `from_level`, `to_level`: classification levels | Body must contain rejection path. CODEOWNERS-protected. |
+| 11 | | `@declassifies(from_level=str, to_level=str)` | `from_level`, `to_level`: classification levels | Absence of rejection path in body produces a finding. CODEOWNERS-protected. |
 | 12 | Determinism | `@deterministic` | *(none)* | Body ban on non-deterministic stdlib calls (random, uuid4, datetime.now, set iteration). |
 | 12 | | `@time_dependent` | *(none)* | Suppresses `@deterministic`-style findings. |
-| 13 | Concurrency/Ordering | `@thread_safe` | *(none)* | Body must protect shared mutable state or be pure. |
-| 13 | | `@ordered_after(name)` | `name`: function name that must precede | At call sites where both functions appear, named function must lexically precede. |
+| 13 | Concurrency/Ordering | `@thread_safe` | *(none)* | Body that does not protect shared mutable state and is not pure produces a finding. |
+| 13 | | `@ordered_after(name)` | `name`: function name that is verified to precede | At call sites where both functions appear, the named function not lexically preceding produces a finding. |
 | 13 | | `@not_reentrant` | *(none)* | Call graph cycle detection through the decorated function. |
-| 14 | Access/Attribution | `@requires_identity` | *(none)* | Identity-typed parameter must appear in `@audit_writer`/`@audit_critical` call within body. |
-| 14 | | `@privileged_operation` | *(none)* | Authorisation check must precede state-modifying call. |
-| 15 | Lifecycle/Scope | `@test_only` | *(none)* | No production module may import this symbol. |
+| 14 | Access/Attribution | `@requires_identity` | *(none)* | Absence of identity-typed parameter in `@audit_writer`/`@audit_critical` call within body produces a finding. |
+| 14 | | `@privileged_operation` | *(none)* | State-modifying call not preceded by authorisation check produces a finding. |
+| 15 | Lifecycle/Scope | `@test_only` | *(none)* | Import of this symbol from a production module produces a finding. |
 | 15 | | `@deprecated_by(date=str, replacement=str)` | `date`: expiry date; `replacement`: replacement function | Post-expiry: blocking. Pre-expiry: advisory. |
 | 15 | | `@feature_gated(flag=str)` | `flag`: feature flag name | Static reference counting; stale flag detection. |
 | 16 | Generic Trust Boundary | `@trust_boundary(from_tier=N, to_tier=M)` | `from_tier`, `to_tier`: integers 1–4 | Parameterised tier transition. Promotion requires rejection path. Skip-promotions to T1 are schema-invalid. |
 | 16 | | `@data_flow(consumes=N, produces=M)` | `consumes`, `produces`: integers 1–4 | Descriptive-only documentation marker. No enforcement. Advisory if produces > consumes. |
-| 17 | Restoration Boundaries | `@restoration_boundary(...)` | `restored_tier`: int; `institutional_provenance`: str (opt); `structural_evidence`: bool; `semantic_evidence`: bool (opt); `integrity_evidence`: str (opt) | Body must satisfy WL-007. Evidence must support claimed tier per §5.3 evidence matrix. Scanner demotes effective taint state when evidence is insufficient. |
+| 17 | Restoration Boundaries | `@restoration_boundary(...)` | `restored_tier`: int; `institutional_provenance`: str (opt); `structural_evidence`: bool; `semantic_evidence`: bool (opt); `integrity_evidence`: str (opt) | Body that does not satisfy WL-007 produces a finding. Evidence that does not support the claimed tier per §5.3 evidence matrix produces a finding. Scanner demotes effective taint state when evidence is insufficient. |
 
 **Group 1 aliases and Group 16 equivalences.** Group 1 decorators are convenience aliases for common Group 16 configurations:
 
@@ -196,7 +212,7 @@ The 17 annotation groups are defined as language-agnostic semantic requirements 
 
 ##### A.4.3 Non-obvious design rationale
 
-**Why Python uses decorator stacking.** Python decorators compose naturally via stacking — `@int_data` above `@restoration_boundary` produces a function with both Group 4 body restrictions and Group 17 evidence verification. This is standard Python idiom. Each decorator sets its own `_wardline_*` metadata attributes independently. The scanner reads all attributes and applies each group's rules. No decorator needs awareness of the others in the stack.
+**Why Python uses decorator stacking.** Python decorators compose naturally via stacking — `@int_data` above `@restoration_boundary` produces a function with both Group 4 body restrictions and Group 17 evidence verification. This is standard Python idiom. Each decorator sets its own `_wardline_*` metadata attributes independently. The scanner reads all attributes and applies each group's rules. No decorator needs awareness of the others in the stack. In normative terms (§A.3), `@int_data` alone yields `UNKNOWN_RAW`; only composition with `@restoration_boundary` can restore a higher effective tier, and then only to the level supported by the declared evidence.
 
 **Which groups share decorators and why.** Groups 1 and 16 share the tier-transition concept — Group 1 decorators are aliases for common Group 16 configurations. This means `@validates_shape` and `@trust_boundary(from_tier=4, to_tier=3)` are semantically identical. The aliases exist for readability: most codebases use the Group 1 names; Group 16 exists for non-standard transitions. Groups 8 and 11 share the `sensitivity.py` module because both deal with data sensitivity (secrets vs. classification levels) and use the same taint propagation engine with different taint dimensions. Groups 9 and 10 share `operations.py` because both deal with function-level behavioural contracts.
 
@@ -204,7 +220,7 @@ The 17 annotation groups are defined as language-agnostic semantic requirements 
 
 **Metaclass and descriptor implications (from §21).** Python's descriptor protocol (`__get__`/`__set__`/`__set_name__`) provides runtime structural enforcement that complements the static analysis layer. The key design decision: `AuthoritativeField` descriptors raise on access-before-set, making fabricated defaults structurally impossible for Tier 1 data at the Python object model level. This catches violations that the AST scanner cannot reach (dynamic dispatch, cross-module indirection, generated code). The limitation: `__dict__` manipulation bypasses the descriptor's `__set__` sentinel check — a fundamental constraint of Python's descriptor protocol. Similarly, `__init_subclass__` fires at class definition time (import time) to enforce that subclass methods carry wardline decorators, but composition-based delegation (creating unannotated helper classes within annotated method bodies) bypasses this enforcement.
 
-**How `@validates_external` relates to the decomposed validators.** `@validates_external` (combined T4→T2) performs both shape and semantic validation in a single function body. The model treats this as two logical transitions (T4→T3→T2) occurring within one function. The scanner must establish that the body performs both structural and semantic checks (§5.2 invariant 3). The decomposed form (`@validates_shape` + `@validates_semantic` on separate functions) is preferred for large validators where the structural and semantic concerns are distinct. The combined form is appropriate when both checks are simple enough to co-locate without confusion. Stacking `@validates_shape` + `@validates_semantic` on the same function is contradictory (SCN-021) — use `@validates_external` for the combined case.
+**How `@validates_external` relates to the decomposed validators.** `@validates_external` (combined T4→T2) performs both shape and semantic validation in a single function body. The model treats this as two logical transitions (T4→T3→T2) occurring within one function. The scanner establishes that the body performs both structural and semantic checks (§5.2 invariant 3). The decomposed form (`@validates_shape` + `@validates_semantic` on separate functions) is preferred for large validators where the structural and semantic concerns are distinct. The combined form is appropriate when both checks are simple enough to co-locate without confusion. Stacking `@validates_shape` + `@validates_semantic` on the same function is contradictory (SCN-021) — use `@validates_external` for the combined case.
 
 **Body evaluation context for validation boundaries.** At the first analysis level, the scanner evaluates pattern rules within validation boundary bodies using the severity lookups of the **input tier** — the tier the validator operates on, not the tier it produces:
 
@@ -338,7 +354,7 @@ Deleting `wardline.fingerprint.json` resets the entire governance history. If th
 
 ##### A.7.7 Runtime structural enforcement bypass
 
-The `AuthoritativeField` descriptor stores values as `obj.__dict__["_authoritative_{name}"]`. Direct `__dict__` manipulation bypasses the descriptor's `__set__` sentinel check — a fundamental limitation of Python's descriptor protocol. Compensating controls: AST scanner rules, fingerprint baseline, and supplementary `__dict__`-access advisory findings.
+The `AuthoritativeField` descriptor stores values as `obj.__dict__["_authoritative_{name}"]`. Direct `__dict__` manipulation bypasses the descriptor's `__set__` sentinel check — a fundamental limitation of Python's descriptor protocol. Related reflective mechanisms (`setattr()`, `vars()`, and `object.__setattr__()`) create the same class of bypass when used against protected objects or fields, because they can route around the intended access path or mutate backing state without the descriptor's guard semantics. Compensating controls: AST scanner rules, fingerprint baseline, and supplementary reflective-write advisory findings (`__dict__`, `setattr`, `vars`, `object.__setattr__`) on authoritative data types.
 
 ##### A.7.8 Third-party library taint accuracy
 
@@ -397,7 +413,7 @@ class PartnerDTO:
 
 @validates_shape
 def parse_partner_response(raw: dict) -> PartnerDTO:
-    """T4 → T3. Establishes structural contract."""
+    """T4 → T3. Establishes structural guarantee."""
     required = {"partner_id", "name", "country_code", "security_classification"}
     missing = required - raw.keys()
     if missing:
@@ -446,8 +462,8 @@ class ValidatedPartner:
     classification: str
     risk_indicators: tuple[str, ...]
 
-# bounded_context declared in overlay: consumers:
-#   ["record_to_landscape", "generate_partner_report"]
+# validation_scope declared in overlay with contracts:
+#   "landscape_recording", "partner_reporting"
 @validates_semantic
 def validate_partner_semantics(dto: PartnerDTO) -> ValidatedPartner:
     """T3 → T2. Domain fitness for landscape and reporting consumers."""
