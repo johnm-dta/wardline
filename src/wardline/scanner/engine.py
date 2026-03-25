@@ -25,6 +25,12 @@ from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner._qualnames import build_qualname_map
 from wardline.scanner.context import Finding, ScanContext, WardlineAnnotation
 from wardline.scanner.discovery import discover_annotations
+from wardline.scanner.import_resolver import build_import_alias_map, resolve_call_fqn
+from wardline.scanner.rejection_path import (
+    BUILTIN_KNOWN_VALIDATORS,
+    has_rejection_path,
+)
+from wardline.scanner.rules.base import walk_skip_nested_defs
 from wardline.scanner.taint.callgraph import extract_call_edges
 from wardline.scanner.taint.callgraph_propagation import (
     TaintProvenance,
@@ -55,6 +61,16 @@ class ScanResult:
     errors: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class ProjectIndex:
+    """Pre-computed project-wide indexes built before per-file scanning."""
+
+    annotations: MappingProxyType[tuple[str, str], tuple[WardlineAnnotation, ...]]
+    module_file_map: MappingProxyType[str, str]
+    string_literal_counts: MappingProxyType[str, int]
+    rejection_path_index: frozenset[str] = frozenset()
+
+
 class ScanEngine:
     """Orchestrates file discovery → AST parsing → rule execution.
 
@@ -75,6 +91,7 @@ class ScanEngine:
         boundaries: tuple[BoundaryEntry, ...] = (),
         optional_fields: tuple[OptionalFieldEntry, ...] = (),
         analysis_level: int = 1,
+        known_validators: frozenset[str] | None = None,
     ) -> None:
         self._target_paths = target_paths
         self._exclude_paths = tuple(p.resolve() for p in exclude_paths)
@@ -83,11 +100,8 @@ class ScanEngine:
         self._boundaries = boundaries
         self._optional_fields = optional_fields
         self._analysis_level = analysis_level
-        self._project_annotations: MappingProxyType[
-            tuple[str, str], tuple[WardlineAnnotation, ...]
-        ] | None = None
-        self._module_file_map: MappingProxyType[str, str] | None = None
-        self._string_literal_counts: MappingProxyType[str, int] | None = None
+        self._known_validators = known_validators if known_validators is not None else BUILTIN_KNOWN_VALIDATORS
+        self._project_index: ProjectIndex | None = None
 
     def scan(self) -> ScanResult:
         """Run a full scan across all target paths.
@@ -95,11 +109,7 @@ class ScanEngine:
         Returns a ``ScanResult`` with all findings, counts, and errors.
         """
         result = ScanResult()
-        (
-            self._project_annotations,
-            self._module_file_map,
-            self._string_literal_counts,
-        ) = self._build_project_indexes()
+        self._project_index = self._build_project_indexes()
 
         for target in self._target_paths:
             resolved_target = target.resolve()
@@ -211,6 +221,10 @@ class ScanEngine:
                 file_path, result,
             )
 
+        # Build per-file import alias map for two-hop rejection path resolution
+        import_alias_map = build_import_alias_map(tree)
+
+        assert self._project_index is not None  # set in scan() before _scan_file
         ctx = ScanContext(
             file_path=str(file_path),
             function_level_taint_map=body_taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
@@ -219,14 +233,16 @@ class ScanEngine:
                 for (ann_path, qualname), found in annotations.items()
                 if ann_path == str(file_path)
             },
-            project_annotations_map=self._project_annotations,
-            module_file_map=self._module_file_map,
-            string_literal_counts=self._string_literal_counts,
+            project_annotations_map=self._project_index.annotations,
+            module_file_map=self._project_index.module_file_map,
+            string_literal_counts=self._project_index.string_literal_counts,
             boundaries=self._boundaries,
             optional_fields=self._optional_fields,
             variable_taint_map=variable_taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
             analysis_level=self._analysis_level,
             taint_provenance=taint_provenance,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
+            rejection_path_index=self._project_index.rejection_path_index,
+            import_alias_map=import_alias_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType
         )
 
         # Pass 2: Run rules with context
@@ -234,22 +250,26 @@ class ScanEngine:
             rule.set_context(ctx)
             self._run_rule(rule, tree, file_path, result)
 
-    def _build_project_indexes(
-        self,
-    ) -> tuple[
-        MappingProxyType[tuple[str, str], tuple[WardlineAnnotation, ...]],
-        MappingProxyType[str, str],
-        MappingProxyType[str, int],
-    ]:
+    def _build_project_indexes(self) -> ProjectIndex:
         """Build project-wide discovery indexes before rule execution.
 
         This keeps cross-file rules deterministic regardless of scan order.
         Files that cannot be read or parsed are skipped here; the main scan pass
         still reports those errors authoritatively.
+
+        Also computes the rejection path index for two-hop resolution:
+        1. Seed: project functions with direct rejection paths + known_validators
+        2. Expand: one round — any project function calling a seed entry enters the index
         """
         all_annotations: dict[tuple[str, str], tuple[WardlineAnnotation, ...]] = {}
         module_file_map: dict[str, str] = {}
         string_literal_counts: dict[str, int] = {}
+
+        # Per-file data retained for the expansion step
+        _FileData = tuple[ast.Module, dict[str, str], dict[int, str], str]
+        file_data: list[_FileData] = []  # (tree, alias_map, qualname_map, module_name)
+
+        rejection_seed: set[str] = set()
 
         for root in self._target_paths:
             resolved_root = root.resolve()
@@ -279,10 +299,60 @@ class ScanEngine:
                 for key, value in discovered.items():
                     all_annotations[key] = tuple(value)
 
-        return (
-            MappingProxyType(all_annotations),
-            MappingProxyType(module_file_map),
-            MappingProxyType(string_literal_counts),
+                # Rejection path seeding: check each function for direct rejection
+                if module_name is not None:
+                    qualname_map = build_qualname_map(tree)
+                    alias_map = build_import_alias_map(tree)
+                    file_data.append((tree, alias_map, qualname_map, module_name))
+                    for node in ast.walk(tree):
+                        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            continue
+                        qualname = qualname_map.get(id(node))
+                        if qualname is None:
+                            continue
+                        fqn = f"{module_name}.{qualname}"
+                        try:
+                            if has_rejection_path(node):
+                                rejection_seed.add(fqn)
+                        except Exception:
+                            logger.debug(
+                                "Rejection path check failed for %s in %s",
+                                fqn, file_path,
+                            )
+
+        # Add known validators to the seed
+        rejection_seed.update(self._known_validators)
+
+        # Expansion: one round — functions calling a seed entry also enter the index
+        expanded: set[str] = set()
+        for tree, alias_map, qualname_map, module_name in file_data:
+            local_fqns = frozenset(
+                f"{module_name}.{qn}" for qn in qualname_map.values()
+            )
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                qualname = qualname_map.get(id(node))
+                if qualname is None:
+                    continue
+                fqn = f"{module_name}.{qualname}"
+                if fqn in rejection_seed:
+                    continue  # already in seed
+                for child in walk_skip_nested_defs(node):
+                    if not isinstance(child, ast.Call):
+                        continue
+                    callee_fqn = resolve_call_fqn(
+                        child, alias_map, local_fqns, module_name
+                    )
+                    if callee_fqn is not None and callee_fqn in rejection_seed:
+                        expanded.add(fqn)
+                        break
+
+        return ProjectIndex(
+            annotations=MappingProxyType(all_annotations),
+            module_file_map=MappingProxyType(module_file_map),
+            string_literal_counts=MappingProxyType(string_literal_counts),
+            rejection_path_index=frozenset(rejection_seed | expanded),
         )
 
     def _iter_python_files(self, root: Path) -> list[Path]:

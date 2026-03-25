@@ -59,6 +59,7 @@ _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
     RuleId.GOVERNANCE_EXCEPTION_TAINT_DRIFT: "Exception taint state no longer matches function's effective taint",
     RuleId.GOVERNANCE_EXCEPTION_LEVEL_STALE: "Exception granted at lower analysis level than active scan",
     RuleId.GOVERNANCE_EXCEPTION_SEVERITY_DRIFT: "Exception severity_at_grant differs from current finding severity",
+    RuleId.GOVERNANCE_CUSTOM_KNOWN_VALIDATOR: "Custom known_validators entry (governance)",
     RuleId.L3_LOW_RESOLUTION: "L3 call-graph taint based on minority of call edges (>70% unresolved)",
     RuleId.L3_CONVERGENCE_BOUND: "L3 propagation hit iteration safety bound — results may be incomplete",
 }
@@ -81,6 +82,7 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
         RuleId.GOVERNANCE_EXCEPTION_TAINT_DRIFT,
         RuleId.GOVERNANCE_EXCEPTION_LEVEL_STALE,
         RuleId.GOVERNANCE_EXCEPTION_SEVERITY_DRIFT,
+        RuleId.GOVERNANCE_CUSTOM_KNOWN_VALIDATOR,
         RuleId.L3_LOW_RESOLUTION,
         RuleId.L3_CONVERGENCE_BOUND,
     }
