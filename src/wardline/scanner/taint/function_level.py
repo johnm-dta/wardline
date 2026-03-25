@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import ast
 import logging
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 from wardline.core.taints import TaintState
 
@@ -29,6 +29,17 @@ if TYPE_CHECKING:
     from wardline.scanner.context import WardlineAnnotation
 
 TaintSource = Literal["decorator", "module_default", "fallback"]
+
+
+class TaintConflict(NamedTuple):
+    """Diagnostic emitted when a function has conflicting taint decorators."""
+
+    qualname: str
+    file_path: str
+    used_decorator: str
+    used_taint: TaintState
+    ignored_decorator: str
+    ignored_taint: TaintState
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +94,7 @@ def assign_function_taints(
     file_path: Path | str,
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
     manifest: WardlineManifest | None = None,
-) -> tuple[dict[str, TaintState], dict[str, TaintState], dict[str, TaintSource]]:
+) -> tuple[dict[str, TaintState], dict[str, TaintState], dict[str, TaintSource], list[TaintConflict]]:
     """Assign taint states to every function in a parsed module.
 
     Args:
@@ -95,7 +106,7 @@ def assign_function_taints(
             ``UNKNOWN_RAW``.
 
     Returns:
-        Tuple of (body_taint_map, return_taint_map, taint_sources) where:
+        Tuple of (body_taint_map, return_taint_map, taint_sources, taint_conflicts):
         - body_taint_map: dict mapping qualname → ``TaintState`` for rule
           evaluation inside function bodies (INPUT tier).
         - return_taint_map: dict mapping qualname → ``TaintState`` for
@@ -103,20 +114,24 @@ def assign_function_taints(
         - taint_sources: dict mapping qualname → ``TaintSource``
           indicating which branch assigned the taint ("decorator",
           "module_default", or "fallback").
+        - taint_conflicts: list of ``TaintConflict`` diagnostics for
+          functions with conflicting taint decorators.
     """
     path_str = str(file_path)
     module_default = resolve_module_default(path_str, manifest)
     body_taint_map: dict[str, TaintState] = {}
     return_taint_map: dict[str, TaintState] = {}
     taint_sources: dict[str, TaintSource] = {}
+    taint_conflicts: list[TaintConflict] = []
 
     _walk_and_assign(
         tree, path_str, annotations, module_default,
         body_taint_map, return_taint_map, taint_sources,
+        taint_conflicts,
         scope="",
     )
 
-    return body_taint_map, return_taint_map, taint_sources
+    return body_taint_map, return_taint_map, taint_sources, taint_conflicts
 
 
 # ── Internal helpers ─────────────────────────────────────────────
@@ -174,15 +189,19 @@ def taint_from_annotations(
     qualname: str,
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
     decorator_map: dict[str, TaintState] | None = None,
+    conflicts: list[TaintConflict] | None = None,
 ) -> TaintState | None:
     """Resolve taint from decorator annotations.
 
     If multiple taint-assigning decorators are present, returns the
-    first one found and logs a warning about the conflict.
+    first one found, logs a warning, and appends a ``TaintConflict``
+    to *conflicts* (if provided) so the engine can emit a SARIF finding.
 
     Args:
         decorator_map: Which decorator-name→taint mapping to use.
             Defaults to ``BODY_EVAL_TAINT`` (input tier).
+        conflicts: Mutable list to collect conflict diagnostics.
+            Pass ``None`` to skip collection (e.g. from ``explain``).
     """
     if decorator_map is None:
         decorator_map = BODY_EVAL_TAINT
@@ -207,6 +226,15 @@ def taint_from_annotations(
                     first_name, first_taint,
                     ann.canonical_name, taint,
                 )
+                if conflicts is not None:
+                    conflicts.append(TaintConflict(
+                        qualname=qualname,
+                        file_path=file_path,
+                        used_decorator=first_name,  # type: ignore[arg-type]  # always set when first_taint is set
+                        used_taint=first_taint,
+                        ignored_decorator=ann.canonical_name,
+                        ignored_taint=taint,
+                    ))
 
     return first_taint
 
@@ -219,6 +247,7 @@ def _walk_and_assign(
     body_taint_map: dict[str, TaintState],
     return_taint_map: dict[str, TaintState],
     taint_sources: dict[str, TaintSource],
+    taint_conflicts: list[TaintConflict],
     scope: str,
 ) -> None:
     """Recursively walk AST nodes, assigning taint to each function."""
@@ -228,12 +257,16 @@ def _walk_and_assign(
 
             # Precedence: decorator > module_tiers > UNKNOWN_RAW
             body_taint = taint_from_annotations(
-                file_path, qualname, annotations, decorator_map=BODY_EVAL_TAINT,
+                file_path, qualname, annotations,
+                decorator_map=BODY_EVAL_TAINT,
+                conflicts=taint_conflicts,
             )
             if body_taint is not None:
                 source: TaintSource = "decorator"
                 ret_taint = taint_from_annotations(
-                    file_path, qualname, annotations, decorator_map=RETURN_TAINT,
+                    file_path, qualname, annotations,
+                    decorator_map=RETURN_TAINT,
+                    conflicts=taint_conflicts,
                 )
                 # Fallback: if decorator is in BODY_EVAL_TAINT but not
                 # RETURN_TAINT, use body taint for return too.
@@ -256,6 +289,7 @@ def _walk_and_assign(
             _walk_and_assign(
                 child, file_path, annotations, module_default,
                 body_taint_map, return_taint_map, taint_sources,
+                taint_conflicts,
                 scope=qualname,
             )
         elif isinstance(child, ast.ClassDef):
@@ -265,11 +299,13 @@ def _walk_and_assign(
             _walk_and_assign(
                 child, file_path, annotations, module_default,
                 body_taint_map, return_taint_map, taint_sources,
+                taint_conflicts,
                 scope=class_scope,
             )
         else:
             _walk_and_assign(
                 child, file_path, annotations, module_default,
                 body_taint_map, return_taint_map, taint_sources,
+                taint_conflicts,
                 scope=scope,
             )

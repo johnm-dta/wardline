@@ -272,7 +272,7 @@ class ScanEngine:
         # Pass 1: Discovery + taint assignment (fault-tolerant)
         try:
             annotations = discover_annotations(tree, file_path)
-            body_taint_map, return_taint_map, taint_sources = assign_function_taints(
+            body_taint_map, return_taint_map, taint_sources, taint_conflicts = assign_function_taints(
                 tree, file_path, annotations, self._manifest
             )
         except Exception as exc:
@@ -303,6 +303,31 @@ class ScanEngine:
             )
             annotations = {}
             body_taint_map, return_taint_map, taint_sources = {}, {}, {}
+            taint_conflicts = []
+
+        # Emit GOVERNANCE findings for conflicting taint decorators
+        for conflict in taint_conflicts:
+            result.findings.append(
+                Finding(
+                    rule_id=RuleId.GOVERNANCE_TAINT_CONFLICT,
+                    file_path=conflict.file_path,
+                    line=1,
+                    col=0,
+                    end_line=None,
+                    end_col=None,
+                    message=(
+                        f"Conflicting taint decorators on {conflict.qualname}: "
+                        f"using @{conflict.used_decorator} ({conflict.used_taint}), "
+                        f"ignoring @{conflict.ignored_decorator} ({conflict.ignored_taint})"
+                    ),
+                    severity=Severity.WARNING,
+                    exceptionability=Exceptionability.UNCONDITIONAL,
+                    taint_state=conflict.used_taint,
+                    analysis_level=self._analysis_level,
+                    source_snippet=None,
+                    qualname=conflict.qualname,
+                )
+            )
 
         # Taint map hit rate: warn if every function in the file fell back
         # to UNKNOWN_RAW (no decorator, no module_tiers match).  This catches

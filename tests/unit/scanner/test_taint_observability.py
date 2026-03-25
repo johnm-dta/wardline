@@ -4,6 +4,7 @@ Covers:
 - Debug log on taint map miss in _get_function_taint()
 - Debug log on PY-WL-003 boundary suppression
 - Warning on 0% taint map hit rate in engine
+- GOVERNANCE_TAINT_CONFLICT finding for conflicting taint decorators
 """
 
 from __future__ import annotations
@@ -225,4 +226,63 @@ class TestTaintHitRateWarning:
 
         assert not any(
             "Taint map hit rate 0%" in r.message for r in caplog.records
+        )
+
+
+# ---------------------------------------------------------------------------
+# Taint conflict SARIF finding
+# ---------------------------------------------------------------------------
+
+class TestTaintConflictFinding:
+    """Conflicting taint decorators emit a GOVERNANCE_TAINT_CONFLICT finding."""
+
+    def test_conflicting_decorators_emit_finding(self, tmp_path: Path) -> None:
+        from wardline.core.severity import RuleId as _RuleId
+        from wardline.scanner.engine import ScanEngine
+
+        py_file = tmp_path / "conflict.py"
+        py_file.write_text(
+            "from wardline.decorators import external_boundary, tier1_read\n"
+            "@external_boundary\n"
+            "@tier1_read\n"
+            "def mixed():\n"
+            "    pass\n"
+        )
+
+        engine = ScanEngine(
+            target_paths=(tmp_path,),
+            rules=(),
+        )
+        result = engine.scan()
+
+        conflict_findings = [
+            f for f in result.findings
+            if f.rule_id == _RuleId.GOVERNANCE_TAINT_CONFLICT
+        ]
+        assert len(conflict_findings) >= 1
+        f = conflict_findings[0]
+        assert "mixed" in f.message
+        assert f.qualname == "mixed"
+
+    def test_no_conflict_no_finding(self, tmp_path: Path) -> None:
+        from wardline.core.severity import RuleId as _RuleId
+        from wardline.scanner.engine import ScanEngine
+
+        py_file = tmp_path / "clean.py"
+        py_file.write_text(
+            "from wardline.decorators import external_boundary\n"
+            "@external_boundary\n"
+            "def single():\n"
+            "    pass\n"
+        )
+
+        engine = ScanEngine(
+            target_paths=(tmp_path,),
+            rules=(),
+        )
+        result = engine.scan()
+
+        assert not any(
+            f.rule_id == _RuleId.GOVERNANCE_TAINT_CONFLICT
+            for f in result.findings
         )
