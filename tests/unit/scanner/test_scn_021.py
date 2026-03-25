@@ -6,7 +6,7 @@ import pytest
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner.context import ScanContext, WardlineAnnotation
-from wardline.scanner.rules.scn_021 import RuleScn021, _COMBINATIONS
+from wardline.scanner.rules.scn_021 import _COMBINATIONS, RuleScn021
 
 from .conftest import parse_module_source
 
@@ -180,7 +180,7 @@ class TestNegativeCombinations:
             ("test_only", "deprecated_by"),
             ("handles_secrets", "thread_safe"),
         ],
-        ids=[f"{l}+{r}" for l, r in [
+        ids=[f"{left}+{right}" for left, right in [
             ("fail_closed", "deterministic"),
             ("atomic", "fail_closed"),
             ("handles_pii", "tier1_read"),
