@@ -308,7 +308,11 @@ class ScannerConfig:
                 ) from None
 
         analysis_level = wardline_section.get("analysis_level", 1)
-        if isinstance(analysis_level, bool) or not isinstance(analysis_level, int) or analysis_level < 1 or analysis_level > 3:
+        if isinstance(analysis_level, bool) or not isinstance(analysis_level, int):
+            raise ScannerConfigError(
+                f"analysis_level must be 1, 2, or 3, got {analysis_level!r}"
+            )
+        if not (1 <= analysis_level <= 3):
             raise ScannerConfigError(
                 f"analysis_level must be 1, 2, or 3, got {analysis_level!r}"
             )

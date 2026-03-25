@@ -106,6 +106,7 @@ class TestPop:
         rule = _run_rule('d.pop("key", [])\n')
 
         assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_001
 
     def test_pop_one_arg_silent(self) -> None:
         """pop with only key arg raises KeyError on miss — no fabrication."""

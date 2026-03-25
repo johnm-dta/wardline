@@ -21,7 +21,6 @@ from wardline.cli.scan import EXIT_CONFIG_ERROR
 _EXIT_CLEAN = 0
 _EXIT_GATE_FAILURE = 1
 
-_error = cli_error  # backward-compat alias used throughout this module
 
 
 def _load_and_validate_baseline(
@@ -41,7 +40,7 @@ def _load_and_validate_baseline(
         raw = baseline_path.read_text(encoding="utf-8")
         data = json_mod.loads(raw)
     except (OSError, json_mod.JSONDecodeError) as exc:
-        _error(f"malformed baseline: {exc}")
+        cli_error(f"malformed baseline: {exc}")
         sys.exit(EXIT_CONFIG_ERROR)
 
     # --- Backward compat: normalise old field names ---
@@ -71,10 +70,10 @@ def _load_and_validate_baseline(
         schema = json_mod.loads(schema_path.read_text(encoding="utf-8"))
         jsonschema.validate(instance=data, schema=schema)
     except jsonschema.ValidationError as exc:
-        _error(f"baseline schema validation failed: {exc.message}")
+        cli_error(f"baseline schema validation failed: {exc.message}")
         sys.exit(EXIT_CONFIG_ERROR)
     except (OSError, json_mod.JSONDecodeError) as exc:
-        _error(f"cannot load fingerprint schema: {exc}")
+        cli_error(f"cannot load fingerprint schema: {exc}")
         sys.exit(EXIT_CONFIG_ERROR)
 
     result: dict[str, Any] = data
@@ -139,13 +138,13 @@ def update(
     # --- Load manifest ---
     manifest_path = Path(manifest_file)
     if not manifest_path.exists():
-        _error(f"manifest not found: {manifest_file}")
+        cli_error(f"manifest not found: {manifest_file}")
         sys.exit(EXIT_CONFIG_ERROR)
 
     try:
         manifest_model = load_manifest(manifest_path)
     except (WardlineYAMLError, yaml.YAMLError, ManifestLoadError) as exc:
-        _error(f"malformed manifest: {exc}")
+        cli_error(f"malformed manifest: {exc}")
         sys.exit(EXIT_CONFIG_ERROR)
 
     # --- Compute fingerprints ---
@@ -245,13 +244,13 @@ def diff(
     # --- Load manifest ---
     manifest_path = Path(manifest_file)
     if not manifest_path.exists():
-        _error(f"manifest not found: {manifest_file}")
+        cli_error(f"manifest not found: {manifest_file}")
         sys.exit(EXIT_CONFIG_ERROR)
 
     try:
         manifest_model = load_manifest(manifest_path)
     except (WardlineYAMLError, yaml.YAMLError, ManifestLoadError) as exc:
-        _error(f"malformed manifest: {exc}")
+        cli_error(f"malformed manifest: {exc}")
         sys.exit(EXIT_CONFIG_ERROR)
 
     # --- Load baseline ---

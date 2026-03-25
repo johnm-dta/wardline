@@ -45,7 +45,6 @@ EXIT_CONFIG_ERROR = 2
 EXIT_TOOL_ERROR = 3
 
 
-_error = cli_error  # backward-compat alias used throughout this module
 
 
 def _compute_manifest_hash(manifest_path: Path) -> str | None:
@@ -318,7 +317,7 @@ def scan(
             )
         else:
             for mm in mismatches:
-                _error(f"registry sync failed: {mm}")
+                cli_error(f"registry sync failed: {mm}")
             sys.exit(EXIT_CONFIG_ERROR)
 
     # --- GOVERNANCE: disabled rules ---
@@ -413,7 +412,7 @@ def scan(
     try:
         exceptions = load_exceptions(manifest_path.parent)
     except ManifestLoadError as exc:
-        _error(f"exception register failed: {exc}")
+        cli_error(f"exception register failed: {exc}")
         sys.exit(EXIT_CONFIG_ERROR)
     active_exception_count = 0
     stale_exception_count = 0
@@ -506,7 +505,7 @@ def scan(
             try:
                 Path(output).write_text(report_text, encoding="utf-8")
             except OSError as exc:
-                cli_error(f"cannot write to '{output}': {exc}")
+                clicli_error(f"cannot write to '{output}': {exc}")
                 sys.exit(EXIT_CONFIG_ERROR)
         else:
             click.echo(report_text, nl=False)
@@ -555,7 +554,7 @@ def scan(
         try:
             Path(output).write_text(sarif_text, encoding="utf-8")
         except OSError as exc:
-            cli_error(f"cannot write to '{output}': {exc}")
+            clicli_error(f"cannot write to '{output}': {exc}")
             sys.exit(EXIT_CONFIG_ERROR)
     else:
         click.echo(sarif_text, nl=False)
@@ -644,7 +643,7 @@ def _load_manifest(
     else:
         manifest_path = discover_manifest(Path.cwd())
         if manifest_path is None:
-            _error(
+            cli_error(
                 "no wardline.yaml found (searched upward from "
                 f"{Path.cwd()})"
             )
@@ -653,10 +652,10 @@ def _load_manifest(
     try:
         result = load_manifest(manifest_path)
     except (WardlineYAMLError, yaml.YAMLError) as exc:
-        _error(f"manifest schema invalid: {exc}")
+        cli_error(f"manifest schema invalid: {exc}")
         return None
     except ManifestLoadError as exc:
-        _error(f"manifest validation failed: {exc}")
+        cli_error(f"manifest validation failed: {exc}")
         return None
 
     logger.info("Loaded manifest: %s", manifest_path)
@@ -677,19 +676,19 @@ def _load_config(config_arg: str | None) -> ScannerConfig | None | _ConfigError:
 
     config_path = Path(config_arg)
     if not config_path.exists():
-        _error(f"config not found: {config_arg}")
+        cli_error(f"config not found: {config_arg}")
         return _CONFIG_ERROR
     if config_path.is_dir():
-        _error(f"config path is a directory, not a file: {config_arg}")
+        cli_error(f"config path is a directory, not a file: {config_arg}")
         return _CONFIG_ERROR
 
     try:
         return ScannerConfig.from_toml(config_path)
     except ScannerConfigError as exc:
-        _error(f"config error: {exc}")
+        cli_error(f"config error: {exc}")
         return _CONFIG_ERROR
     except Exception as exc:
-        _error(f"config load error: {exc}")
+        cli_error(f"config load error: {exc}")
         return _CONFIG_ERROR
 
 
@@ -716,7 +715,7 @@ def _load_resolved(
         # F6: format_version validation
         version = data.get("format_version")
         if version != "0.1":
-            _error(f"unsupported resolved manifest version: {version}")
+            cli_error(f"unsupported resolved manifest version: {version}")
             return None
 
         # F4: manifest_hash verification
@@ -768,5 +767,5 @@ def _load_resolved(
 
         return boundaries, rule_overrides, optional_fields
     except (json.JSONDecodeError, KeyError, TypeError, OSError) as exc:
-        _error(f"resolved manifest invalid: {exc}")
+        cli_error(f"resolved manifest invalid: {exc}")
         return None

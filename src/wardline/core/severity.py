@@ -70,6 +70,6 @@ class RuleId(StrEnum):
     L3_LOW_RESOLUTION = "L3-LOW-RESOLUTION"
     L3_CONVERGENCE_BOUND = "L3-CONVERGENCE-BOUND"
 
-    # Test-only pseudo-rule-ID — used by test stubs to avoid conflating
-    # test infrastructure with real diagnostic signal (TOOL-ERROR).
+    # Test-only pseudo-rule-ID — replaces prior use of TOOL_ERROR in test
+    # stubs so test infrastructure cannot be conflated with real diagnostics.
     TEST_STUB = "TEST-STUB"

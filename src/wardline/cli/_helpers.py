@@ -10,6 +10,7 @@ import click
 if TYPE_CHECKING:
     from pathlib import Path
 
+
 def cli_error(msg: str) -> None:
     """Print structured error to stderr with consistent 'error:' prefix."""
     click.echo(f"error: {msg}", err=True)

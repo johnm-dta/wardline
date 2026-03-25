@@ -14,9 +14,7 @@ from typing import Any
 
 import click
 
-from wardline.cli._helpers import cli_error
-
-from wardline.cli._helpers import COHERENCE_SEVERITY_MAP as _COHERENCE_SEVERITY_MAP
+from wardline.cli._helpers import COHERENCE_SEVERITY_MAP as _COHERENCE_SEVERITY_MAP, cli_error
 from wardline.cli.scan import EXIT_CONFIG_ERROR
 
 # ---------------------------------------------------------------------------
