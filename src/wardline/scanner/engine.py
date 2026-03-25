@@ -23,6 +23,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
+from wardline.core.taints import TaintState
 from wardline.scanner._qualnames import build_qualname_map
 from wardline.scanner.context import Finding, ScanContext, WardlineAnnotation
 from wardline.scanner.discovery import _detect_dynamic_imports, discover_annotations
@@ -43,7 +44,6 @@ from wardline.scanner.taint.variable_level import compute_variable_taints
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from wardline.core.taints import TaintState
     from wardline.core.taints import TaintState as _TS
     from wardline.manifest.models import BoundaryEntry, OptionalFieldEntry, WardlineManifest
     from wardline.scanner.rules.base import RuleBase
@@ -340,6 +340,80 @@ class ScanEngine:
                 "(%d functions, all fallback to UNKNOWN_RAW)",
                 file_path, len(taint_sources),
             )
+
+        # Module-tiers auditability: detect blanket suppression and
+        # high-trust taint without decorator evidence.
+        _HIGH_TRUST_TAINTS = frozenset({
+            TaintState.AUDIT_TRAIL, TaintState.PIPELINE,
+        })
+        _MIN_FUNCTIONS_FOR_BLANKET = 5
+        _BLANKET_THRESHOLD = 0.80
+
+        if taint_sources:
+            total = len(taint_sources)
+            module_default_count = sum(
+                1 for src in taint_sources.values() if src == "module_default"
+            )
+            decorator_count = sum(
+                1 for src in taint_sources.values() if src == "decorator"
+            )
+
+            # Check 1: >80% of functions governed by module_tiers alone
+            if (
+                total >= _MIN_FUNCTIONS_FOR_BLANKET
+                and module_default_count / total > _BLANKET_THRESHOLD
+            ):
+                pct = int(module_default_count / total * 100)
+                result.findings.append(
+                    Finding(
+                        rule_id=RuleId.GOVERNANCE_MODULE_TIERS_BLANKET,
+                        file_path=str(file_path),
+                        line=1,
+                        col=0,
+                        end_line=None,
+                        end_col=None,
+                        message=(
+                            f"Module-level taint default covers {pct}% of "
+                            f"functions ({module_default_count}/{total}) with "
+                            f"no per-function decorator evidence"
+                        ),
+                        severity=Severity.WARNING,
+                        exceptionability=Exceptionability.UNCONDITIONAL,
+                        taint_state=None,
+                        analysis_level=self._analysis_level,
+                        source_snippet=None,
+                        qualname=None,
+                    )
+                )
+
+            # Check 2: high-trust module_tiers with zero decorator usage
+            if decorator_count == 0 and body_taint_map:
+                sample_taint = next(iter(body_taint_map.values()), None)
+                if (
+                    sample_taint in _HIGH_TRUST_TAINTS
+                    and module_default_count > 0
+                ):
+                    result.findings.append(
+                        Finding(
+                            rule_id=RuleId.GOVERNANCE_MODULE_TIERS_UNDECORATED,
+                            file_path=str(file_path),
+                            line=1,
+                            col=0,
+                            end_line=None,
+                            end_col=None,
+                            message=(
+                                f"module_tiers assigns {sample_taint} to "
+                                f"{total} functions but file has zero wardline "
+                                f"decorator annotations"
+                            ),
+                            severity=Severity.WARNING,
+                            exceptionability=Exceptionability.UNCONDITIONAL,
+                            taint_state=sample_taint,
+                            analysis_level=self._analysis_level,
+                            source_snippet=None,
+                            qualname=None,
+                        )
+                    )
 
         # Pass 1.5: Level 3 call-graph taint (when analysis_level >= 3)
         # L3 refines body_taint_map using callgraph analysis. The refined map

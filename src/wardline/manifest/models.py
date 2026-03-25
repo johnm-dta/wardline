@@ -214,6 +214,7 @@ _KNOWN_KEYS: frozenset[str] = frozenset({
     "known_validators",
     "known_validators_extra",
     "max_expansion_rounds",
+    "strict_governance",
 })
 
 
@@ -240,6 +241,7 @@ class ScannerConfig:
     known_validators: tuple[str, ...] | None = None
     known_validators_extra: tuple[str, ...] = ()
     max_expansion_rounds: int = 1
+    strict_governance: bool = False
 
     @classmethod
     def from_toml(cls, path: Path) -> ScannerConfig:
@@ -369,4 +371,7 @@ class ScannerConfig:
             known_validators=known_validators,
             known_validators_extra=known_validators_extra,
             max_expansion_rounds=max_expansion_rounds,
+            strict_governance=bool(
+                wardline_section.get("strict_governance", False)
+            ),
         )

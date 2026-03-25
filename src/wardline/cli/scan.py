@@ -245,6 +245,8 @@ def _custom_known_validator_findings(
               help="Output Phase 2 migration impact report (JSON) instead of SARIF.")
 @click.option("--resolved", default=None, type=click.Path(exists=True),
               help="Pre-resolved manifest (wardline.resolved.json)")
+@click.option("--strict-governance", is_flag=True, default=False,
+              help="Treat GOVERNANCE findings as scan failures (exit 1).")
 def scan(
     path: str,
     manifest: str | None,
@@ -258,6 +260,7 @@ def scan(
     allow_permissive_distribution: bool,
     preview_phase2: bool,
     resolved: str | None,
+    strict_governance: bool,
 ) -> None:
     """Scan Python files for boundary violations."""
     _setup_logging(verbose=verbose, debug=debug)
@@ -278,6 +281,7 @@ def scan(
     effective_max_pct = max_unknown_raw_percent
     effective_allow_mismatch = allow_registry_mismatch
     effective_allow_permissive = allow_permissive_distribution
+    effective_strict_governance = strict_governance
 
     if cfg is not None:
         if effective_max_pct is None:
@@ -286,6 +290,8 @@ def scan(
             effective_allow_mismatch = cfg.allow_registry_mismatch
         if not effective_allow_permissive:
             effective_allow_permissive = cfg.allow_permissive_distribution
+        if not effective_strict_governance:
+            effective_strict_governance = cfg.strict_governance
 
     # --- Create rules ---
     all_rules = make_rules()
@@ -572,18 +578,19 @@ def scan(
     #   EXIT_TOOL_ERROR (3) — a rule or scanner component raised an
     #       unhandled exception; signals infrastructure failure.
     #   EXIT_FINDINGS   (1) — at least one scan finding exists, or the
-    #       max_unknown_raw_percent ceiling was exceeded.
+    #       max_unknown_raw_percent ceiling was exceeded, or
+    #       --strict-governance is set and GOVERNANCE findings exist.
     #   EXIT_CLEAN      (0) — no findings, no errors.
-    #
-    # GOVERNANCE findings are diagnostic metadata in SARIF; they do NOT
-    # drive the exit code. Only scan findings + max_pct ceiling matter.
     has_tool_error = any(
         f.rule_id == RuleId.TOOL_ERROR for f in result.findings
+    )
+    has_governance_findings = effective_strict_governance and any(
+        str(f.rule_id).startswith("GOVERNANCE-") for f in all_findings
     )
 
     if has_tool_error:
         sys.exit(EXIT_TOOL_ERROR)
-    elif exceeded_pct or scan_finding_count > 0:
+    elif exceeded_pct or scan_finding_count > 0 or has_governance_findings:
         sys.exit(EXIT_FINDINGS)
     else:
         sys.exit(EXIT_CLEAN)
