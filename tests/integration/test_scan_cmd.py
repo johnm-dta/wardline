@@ -202,7 +202,7 @@ class TestRegistrySync:
         # Patch make_rules to return only a subset, creating a mismatch
         # with the canonical registry (which has all 9 rules).
         with patch(
-            "wardline.scanner.rules.make_rules",
+            "wardline.cli.scan.make_rules",
             return_value=(),
         ):
             result = runner.invoke(cli, [
@@ -222,7 +222,7 @@ class TestRegistrySync:
         runner = CliRunner()
         # Patch make_rules to return only a subset, creating a mismatch
         with patch(
-            "wardline.scanner.rules.make_rules",
+            "wardline.cli.scan.make_rules",
             return_value=(),
         ):
             result = runner.invoke(cli, [

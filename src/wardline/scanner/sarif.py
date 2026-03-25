@@ -114,23 +114,23 @@ def _make_region(finding: Finding) -> dict[str, Any]:
 
 def _make_result(finding: Finding) -> dict[str, Any]:
     """Convert a single Finding to a SARIF result entry."""
-    properties = _clean_none(
-        {
-            "wardline.rule": str(finding.rule_id),
-            # Defensive fallback: canonical rules always carry taint, but
-            # keeping the property present avoids fragile downstream handling.
-            "wardline.taintState": (
-                str(finding.taint_state)
-                if finding.taint_state is not None
-                else "UNKNOWN_RAW"
-            ),
-            "wardline.severity": str(finding.severity),
-            "wardline.exceptionability": str(finding.exceptionability),
-            "wardline.analysisLevel": finding.analysis_level,
-            "wardline.qualname": finding.qualname,
-            "wardline.sourceSnippet": finding.source_snippet,
-        }
-    )
+    # Mandatory properties (§A.3) — always present, never filtered by _clean_none.
+    properties: dict[str, Any] = {
+        "wardline.rule": str(finding.rule_id),
+        "wardline.taintState": (
+            str(finding.taint_state)
+            if finding.taint_state is not None
+            else "UNKNOWN"
+        ),
+        "wardline.severity": str(finding.severity),
+        "wardline.exceptionability": str(finding.exceptionability),
+        "wardline.analysisLevel": finding.analysis_level,
+    }
+    # Optional properties — omit when None.
+    properties.update(_clean_none({
+        "wardline.qualname": finding.qualname,
+        "wardline.sourceSnippet": finding.source_snippet,
+    }))
     if finding.exception_id is not None:
         properties["wardline.exceptionId"] = finding.exception_id
     if finding.exception_expires is not None:

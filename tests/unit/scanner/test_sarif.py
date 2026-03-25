@@ -107,7 +107,23 @@ class TestSarifResults:
         report = SarifReport(findings=[_make_finding(taint_state=None)])
         result = report.to_dict()["runs"][0]["results"][0]
         props = result["properties"]
-        assert props["wardline.taintState"] == "UNKNOWN_RAW"
+        assert props["wardline.taintState"] == "UNKNOWN"
+
+    def test_mandatory_properties_never_omitted(self) -> None:
+        """All 5 mandatory properties (§A.3) present even when taint_state is None."""
+        report = SarifReport(findings=[_make_finding(taint_state=None)])
+        result = report.to_dict()["runs"][0]["results"][0]
+        props = result["properties"]
+        mandatory = [
+            "wardline.rule",
+            "wardline.taintState",
+            "wardline.severity",
+            "wardline.exceptionability",
+            "wardline.analysisLevel",
+        ]
+        for key in mandatory:
+            assert key in props, f"mandatory key {key!r} missing from properties"
+            assert props[key] is not None, f"mandatory key {key!r} is None"
 
     def test_result_property_bag_qualname_and_snippet(self) -> None:
         """wardline.qualname and wardline.sourceSnippet appear when set."""

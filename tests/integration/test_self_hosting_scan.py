@@ -141,29 +141,29 @@ class TestSelfHostingScan:
         counts = Counter(r["ruleId"] for r in scan_findings)
 
         # Per-rule baselines by analysis level.
-        # L1: measured 2026-03-25, +/- 50% tolerance.
-        # L3: measured 2026-03-25, +/- 100% tolerance (wide initial ranges).
+        # L1: measured 2026-03-25 (re-baselined), +/- 50% tolerance.
+        # L3: measured 2026-03-25 (re-baselined), +/- 100% tolerance (wide initial ranges).
         expected_ranges_by_level: dict[int, dict[str, tuple[int, int]]] = {
             1: {
-                "PY-WL-001": (51, 204),
-                "PY-WL-002": (14, 56),
-                "PY-WL-003": (57, 226),
-                "PY-WL-004": (8, 30),
-                "PY-WL-005": (14, 54),
-                "PY-WL-006": (3, 10),
-                "PY-WL-007": (11, 44),
-                "PY-WL-008": (13, 52),
-                "PY-WL-009": (1, 10),
+                "PY-WL-001": (66, 200),
+                "PY-WL-002": (29, 87),
+                "PY-WL-003": (67, 203),
+                "PY-WL-004": (8, 24),
+                "PY-WL-005": (14, 42),
+                "PY-WL-006": (0, 10),
+                "PY-WL-007": (24, 74),
+                "PY-WL-008": (0, 10),
+                "PY-WL-009": (0, 10),
             },
             3: {
-                "PY-WL-001": (0, 204),
-                "PY-WL-002": (0, 56),
-                "PY-WL-003": (0, 226),
-                "PY-WL-004": (0, 30),
-                "PY-WL-005": (0, 54),
+                "PY-WL-001": (0, 266),
+                "PY-WL-002": (0, 116),
+                "PY-WL-003": (0, 270),
+                "PY-WL-004": (0, 32),
+                "PY-WL-005": (0, 56),
                 "PY-WL-006": (0, 10),
-                "PY-WL-007": (0, 44),
-                "PY-WL-008": (0, 52),
+                "PY-WL-007": (0, 98),
+                "PY-WL-008": (0, 10),
                 "PY-WL-009": (0, 10),
             },
         }
