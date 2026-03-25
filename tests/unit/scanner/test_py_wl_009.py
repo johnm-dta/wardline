@@ -121,7 +121,25 @@ if data["amount"] > 100:
 class TestLocalShapeEvidence:
     """Local shape-validation evidence still suppresses within semantic boundaries."""
 
-    def test_isinstance_before_semantic_check_silent(self) -> None:
+    def test_isinstance_in_conditional_before_semantic_check_silent(self) -> None:
+        rule = _run_rule(
+            """\
+if not isinstance(data, dict):
+    raise TypeError("expected dict")
+if data["amount"] > MAX_AMOUNT:
+    raise ValueError("too large")
+""",
+            boundaries=(_boundary(),),
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_bare_isinstance_expression_does_not_suppress(self) -> None:
+        """A bare isinstance() whose result is discarded is not shape evidence.
+
+        This prevents evasion by placing `isinstance(data, object)` as a
+        standalone expression before semantic checks.
+        """
         rule = _run_rule(
             """\
 isinstance(data, dict)
@@ -131,7 +149,7 @@ if data["amount"] > MAX_AMOUNT:
             boundaries=(_boundary(),),
         )
 
-        assert len(rule.findings) == 0
+        assert len(rule.findings) >= 1
 
     def test_validate_schema_call_before_silent(self) -> None:
         rule = _run_rule(

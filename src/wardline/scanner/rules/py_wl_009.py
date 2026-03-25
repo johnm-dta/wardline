@@ -53,16 +53,37 @@ def _has_shape_check_before(
     """Check if any statement before *stop_line* is a shape validation.
 
     Shape validations include:
-    - isinstance(...) calls
-    - hasattr(...) calls
+    - isinstance(...) calls whose result is consumed (in a conditional,
+      assignment, or boolean expression — NOT a bare expression statement)
+    - hasattr(...) calls (same consumption requirement)
     - ``"key" in data`` / ``key in data`` comparisons
     - Calls to functions with shape-validation names
+
+    A bare ``isinstance(data, object)`` as an expression statement (result
+    discarded) does NOT count — it performs no actual gating and can be
+    used to trivially satisfy this check without providing real validation.
     """
-    for node in walk_skip_nested_defs(ast.Module(body=stmts, type_ignores=[])):
+    # Collect ids of boolean-returning shape calls (isinstance, hasattr) that
+    # appear as bare expression statements (result discarded). These return
+    # True/False but don't gate anything when the result is thrown away.
+    # Contrast with validate_schema(data) which raises on failure — calling
+    # it as a bare statement IS the gating mechanism.
+    bare_expr_calls: set[int] = set()
+    module = ast.Module(body=stmts, type_ignores=[])
+    for node in walk_skip_nested_defs(module):
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Name)
+            and node.value.func.id in ("isinstance", "hasattr")
+        ):
+            bare_expr_calls.add(id(node.value))
+
+    for node in walk_skip_nested_defs(module):
         if getattr(node, "lineno", 0) >= stop_line:
             continue
         if isinstance(node, ast.Call):
-            if _is_shape_validation_call(node):
+            if id(node) not in bare_expr_calls and _is_shape_validation_call(node):
                 return True
         elif isinstance(node, ast.Compare) and _is_membership_test(node):
             return True
