@@ -56,10 +56,9 @@ def resolve_call_fqn(
             return local_candidate
         return alias_map.get(bare_name)
 
-    if isinstance(call.func, ast.Attribute):
-        if isinstance(call.func.value, ast.Name):
-            prefix_fqn = alias_map.get(call.func.value.id)
-            if prefix_fqn is not None:
-                return f"{prefix_fqn}.{call.func.attr}"
+    if isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name):
+        prefix_fqn = alias_map.get(call.func.value.id)
+        if prefix_fqn is not None:
+            return f"{prefix_fqn}.{call.func.attr}"
 
     return None

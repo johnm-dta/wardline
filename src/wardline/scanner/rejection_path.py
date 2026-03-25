@@ -105,9 +105,8 @@ def _has_rejection_path(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     is not counted as a rejection path per spec S7.2.
     """
     for child in walk_skip_nested_defs(node):
-        if isinstance(child, ast.Raise):
-            if not _is_inside_dead_branch(child, node):
-                return True
+        if isinstance(child, ast.Raise) and not _is_inside_dead_branch(child, node):
+            return True
         if not isinstance(child, ast.If):
             continue
         if _is_constant_false(child.test):
