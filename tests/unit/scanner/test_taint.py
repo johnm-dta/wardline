@@ -30,6 +30,15 @@ def _ann(canonical_name: str, group: int = 1) -> WardlineAnnotation:
     )
 
 
+def _ann_with_attrs(canonical_name: str, group: int, attrs: dict) -> WardlineAnnotation:
+    """Build a WardlineAnnotation with custom attrs."""
+    return WardlineAnnotation(
+        canonical_name=canonical_name,
+        group=group,
+        attrs=MappingProxyType(attrs),
+    )
+
+
 # ── Source 1: Decorator taint ────────────────────────────────────
 
 
@@ -496,3 +505,72 @@ class TestTaintConflictDetection:
         )
         assert len(conflicts) >= 1
         assert conflicts[0].qualname == "mixed"
+
+
+# ── Restoration boundary evidence-based taint ────────────────────
+
+
+class TestRestorationTaintAssignment:
+    """Taint assignment for @restoration_boundary with evidence."""
+
+    def test_int_data_alone_unknown_raw(self) -> None:
+        """@int_data without @restoration_boundary -> UNKNOWN_RAW (fallback)."""
+        tree = _parse("def restore(): pass\n")
+        annotations = {
+            ("test.py", "restore"): [_ann("int_data", group=4)],
+        }
+        result, _ret, _src, _conflicts = assign_function_taints(tree, "test.py", annotations)
+        assert result["restore"] == TaintState.UNKNOWN_RAW
+
+    def test_restoration_full_evidence_audit_trail(self) -> None:
+        """@restoration_boundary(full evidence) -> AUDIT_TRAIL."""
+        tree = _parse("def restore(): pass\n")
+        annotations = {
+            ("test.py", "restore"): [_ann_with_attrs("restoration_boundary", 17, {
+                "structural_evidence": True,
+                "semantic_evidence": True,
+                "integrity_evidence": "hmac",
+                "institutional_provenance": "org-db",
+            })],
+        }
+        result, ret, src, _conflicts = assign_function_taints(tree, "test.py", annotations)
+        assert result["restore"] == TaintState.AUDIT_TRAIL
+        assert ret["restore"] == TaintState.AUDIT_TRAIL
+        assert src["restore"] == "decorator"
+
+    def test_restoration_structural_only_unknown_shape(self) -> None:
+        """@restoration_boundary(structural only) -> UNKNOWN_SHAPE_VALIDATED."""
+        tree = _parse("def restore(): pass\n")
+        annotations = {
+            ("test.py", "restore"): [_ann_with_attrs("restoration_boundary", 17, {
+                "structural_evidence": True,
+            })],
+        }
+        result, _, _, _ = assign_function_taints(tree, "test.py", annotations)
+        assert result["restore"] == TaintState.UNKNOWN_SHAPE_VALIDATED
+
+    def test_restoration_no_evidence_unknown_raw(self) -> None:
+        """@restoration_boundary(no evidence) -> UNKNOWN_RAW."""
+        tree = _parse("def restore(): pass\n")
+        annotations = {
+            ("test.py", "restore"): [_ann_with_attrs("restoration_boundary", 17, {})],
+        }
+        result, _, _, _ = assign_function_taints(tree, "test.py", annotations)
+        assert result["restore"] == TaintState.UNKNOWN_RAW
+
+    def test_int_data_plus_restoration_full_audit_trail(self) -> None:
+        """@int_data + @restoration_boundary(full) -> AUDIT_TRAIL."""
+        tree = _parse("def restore(): pass\n")
+        annotations = {
+            ("test.py", "restore"): [
+                _ann("int_data", group=4),
+                _ann_with_attrs("restoration_boundary", 17, {
+                    "structural_evidence": True,
+                    "semantic_evidence": True,
+                    "integrity_evidence": "hmac",
+                    "institutional_provenance": "org-db",
+                }),
+            ],
+        }
+        result, _, _, _ = assign_function_taints(tree, "test.py", annotations)
+        assert result["restore"] == TaintState.AUDIT_TRAIL

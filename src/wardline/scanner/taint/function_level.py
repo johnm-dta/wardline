@@ -241,6 +241,35 @@ def taint_from_annotations(
     return first_taint
 
 
+def _restoration_taint_from_annotations(
+    file_path: str,
+    qualname: str,
+    annotations: dict[tuple[str, str], list[WardlineAnnotation]],
+) -> TaintState | None:
+    """Resolve taint for restoration_boundary via §5.3 evidence matrix.
+
+    Returns the evidence-derived taint state if the function has a
+    restoration_boundary annotation, or None if it does not.
+    """
+    from wardline.core.evidence import max_restorable_tier
+
+    key = (file_path, qualname)
+    anns = annotations.get(key)
+    if not anns:
+        return None
+
+    for ann in anns:
+        if ann.canonical_name == "restoration_boundary":
+            structural = bool(ann.attrs.get("structural_evidence", False))
+            semantic = bool(ann.attrs.get("semantic_evidence", False))
+            integrity = bool(ann.attrs.get("integrity_evidence"))
+            institutional = bool(ann.attrs.get("institutional_provenance"))
+            return max_restorable_tier(
+                structural, semantic, integrity, institutional,
+            )
+    return None
+
+
 def _walk_and_assign(
     node: ast.AST,
     file_path: str,
@@ -263,6 +292,13 @@ def _walk_and_assign(
                 decorator_map=BODY_EVAL_TAINT,
                 conflicts=taint_conflicts,
             )
+            # restoration_boundary uses evidence-based taint, not static map
+            if body_taint is None:
+                body_taint = _restoration_taint_from_annotations(
+                    file_path, qualname, annotations,
+                )
+                if body_taint is not None:
+                    ret_taint = body_taint
             if body_taint is not None:
                 source: TaintSource = "decorator"
                 ret_taint = taint_from_annotations(
