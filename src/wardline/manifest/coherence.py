@@ -11,6 +11,8 @@ Detects multiple classes of inconsistency:
   non-existent functions.
 - **Tier-topology consistency**: tier assignments consistent with declared
   data-flow topology.
+- **Missing validation_scope**: Tier 2 boundaries that require a
+  validation_scope declaration but lack one.
 - **Governance anomalies**: tier distribution, tier downgrades, upgrade without
   evidence, agent-originated policy changes, expired exceptions, and first-scan
   perimeter detection.
@@ -640,4 +642,46 @@ def check_tier_topology_consistency(
                         )
                     break  # First match is sufficient
 
+    return issues
+
+
+def check_validation_scope_presence(
+    boundaries: tuple[BoundaryEntry, ...],
+) -> list[CoherenceIssue]:
+    """Check that Tier 2 boundaries declare their ``validation_scope``.
+
+    A boundary needs ``validation_scope`` when its ``transition`` is
+    ``"semantic_validation"`` or ``"combined_validation"``, or when it is
+    a ``"restoration"`` with semantic provenance.
+
+    Args:
+        boundaries: All boundary entries from loaded overlays.
+
+    Returns:
+        One ``CoherenceIssue`` per missing declaration (kind
+        ``"missing_validation_scope"``).
+    """
+    issues: list[CoherenceIssue] = []
+    for boundary in boundaries:
+        needs_scope = boundary.transition in (
+            "semantic_validation",
+            "combined_validation",
+        ) or (
+            boundary.transition == "restoration"
+            and boundary.provenance is not None
+            and boundary.provenance.get("semantic") is True
+        )
+        if needs_scope and boundary.validation_scope is None:
+            issues.append(
+                CoherenceIssue(
+                    kind="missing_validation_scope",
+                    function=boundary.function,
+                    file_path=boundary.overlay_path,
+                    detail=(
+                        f"Boundary '{boundary.function}' claims Tier 2 semantics "
+                        f"(transition={boundary.transition}) but has no "
+                        f"validation_scope declaration (\u00a713.1.2)."
+                    ),
+                )
+            )
     return issues

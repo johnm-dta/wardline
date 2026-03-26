@@ -19,6 +19,7 @@ from wardline.manifest.coherence import (
     check_tier_upgrade_without_evidence,
     check_undeclared_boundaries,
     check_unmatched_contracts,
+    check_validation_scope_presence,
 )
 from wardline.manifest.models import (
     BoundaryEntry,
@@ -661,6 +662,25 @@ class TestUnmatchedContracts:
         issues = check_unmatched_contracts({}, ())
         assert issues == []
 
+    def test_validation_scope_field_read_correctly(self) -> None:
+        """Regression: renamed attribute validation_scope is read correctly."""
+        annotations = {
+            ("src/api.py", "handle_request"): [_annot("external_boundary")],
+        }
+        boundaries = (
+            BoundaryEntry(
+                function="handle_request",
+                transition="semantic_validation",
+                validation_scope={
+                    "contracts": [
+                        {"name": "SomeContract", "data_tier": 2, "direction": "inbound"},
+                    ]
+                },
+            ),
+        )
+        issues = check_unmatched_contracts(annotations, boundaries)
+        assert issues == []
+
 
 # ── Stale contract binding tests ─────────────────────────────────
 
@@ -848,3 +868,141 @@ class TestTierTopologyConsistency:
         assert len(issues) == 2
         kinds = {i.kind for i in issues}
         assert kinds == {"tier_topology_inconsistency"}
+
+
+# ── Validation scope presence tests ──────────────────────────────
+
+
+class TestValidationScopePresence:
+    """Tests for check_validation_scope_presence."""
+
+    def test_empty_boundaries(self) -> None:
+        """Empty boundaries tuple produces no issues."""
+        issues = check_validation_scope_presence(())
+        assert issues == []
+
+    def test_semantic_validation_without_scope(self) -> None:
+        """semantic_validation without validation_scope is flagged."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.validate",
+                transition="semantic_validation",
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "missing_validation_scope"
+        assert issues[0].function == "mymod.validate"
+        assert "semantic_validation" in issues[0].detail
+
+    def test_combined_validation_without_scope(self) -> None:
+        """combined_validation without validation_scope is flagged."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.combo",
+                transition="combined_validation",
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "missing_validation_scope"
+        assert "combined_validation" in issues[0].detail
+
+    def test_restoration_semantic_true_without_scope(self) -> None:
+        """restoration + provenance.semantic=True without scope is flagged."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                provenance={"structural": True, "semantic": True},
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "missing_validation_scope"
+        assert "restoration" in issues[0].detail
+
+    def test_restoration_semantic_false_without_scope(self) -> None:
+        """restoration + provenance.semantic=False without scope is clean."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                provenance={"structural": True, "semantic": False},
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert issues == []
+
+    def test_restoration_provenance_none_without_scope(self) -> None:
+        """restoration + provenance=None without scope is clean."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                provenance=None,
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert issues == []
+
+    def test_shape_validation_without_scope(self) -> None:
+        """shape_validation without validation_scope is clean."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.shape",
+                transition="shape_validation",
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert issues == []
+
+    def test_semantic_validation_with_scope(self) -> None:
+        """semantic_validation with validation_scope present is clean."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.validate",
+                transition="semantic_validation",
+                validation_scope={
+                    "contracts": [
+                        {"name": "foo", "data_tier": 2, "direction": "inbound"},
+                    ]
+                },
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert issues == []
+
+    def test_combined_validation_with_scope(self) -> None:
+        """combined_validation with validation_scope present is clean."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.combo",
+                transition="combined_validation",
+                validation_scope={
+                    "contracts": [
+                        {"name": "bar", "data_tier": 2, "direction": "outbound"},
+                    ]
+                },
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert issues == []
+
+    def test_mixed_boundaries(self) -> None:
+        """Only the boundary missing scope is flagged in a mixed list."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.validate",
+                transition="semantic_validation",
+                # no validation_scope — should be flagged
+            ),
+            BoundaryEntry(
+                function="mymod.shape",
+                transition="shape_validation",
+                # no validation_scope — but not required
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].function == "mymod.validate"

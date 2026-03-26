@@ -33,6 +33,7 @@ COHERENCE_SEVERITY_MAP: dict[str, str] = {
     "agent_originated_exception": "WARNING",
     "expired_exception": "WARNING",
     "first_scan_perimeter": "WARNING",
+    "missing_validation_scope": "ERROR",
 }
 
 
