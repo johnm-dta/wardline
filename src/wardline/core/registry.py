@@ -187,6 +187,7 @@ REGISTRY: MappingProxyType[str, RegistryEntry] = MappingProxyType({
             "_wardline_feature_flag": str,
         },
     ),
+    # --- Group 16: Generic Trust Boundary (data_flow) — not yet implemented ---
     # --- Group 17: Restoration Boundaries ---
     "restoration_boundary": RegistryEntry(
         canonical_name="restoration_boundary",

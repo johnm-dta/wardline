@@ -292,24 +292,28 @@ def _walk_and_assign(
                 decorator_map=BODY_EVAL_TAINT,
                 conflicts=taint_conflicts,
             )
-            # restoration_boundary uses evidence-based taint, not static map
+            # Restoration boundaries use evidence-based taint, not static maps.
+            # Short-circuit: set both body and return taint, skip RETURN_TAINT lookup.
+            restoration_taint = None
             if body_taint is None:
-                body_taint = _restoration_taint_from_annotations(
+                restoration_taint = _restoration_taint_from_annotations(
                     file_path, qualname, annotations,
                 )
-                if body_taint is not None:
-                    ret_taint = body_taint
+                body_taint = restoration_taint
+
             if body_taint is not None:
                 source: TaintSource = "decorator"
-                ret_taint = taint_from_annotations(
-                    file_path, qualname, annotations,
-                    decorator_map=RETURN_TAINT,
-                    conflicts=taint_conflicts,
-                )
-                # Fallback: if decorator is in BODY_EVAL_TAINT but not
-                # RETURN_TAINT, use body taint for return too.
-                if ret_taint is None:
-                    ret_taint = body_taint
+                if restoration_taint is not None:
+                    # Evidence-derived: body and return taint are the same.
+                    ret_taint = restoration_taint
+                else:
+                    ret_taint = taint_from_annotations(
+                        file_path, qualname, annotations,
+                        decorator_map=RETURN_TAINT,
+                        conflicts=taint_conflicts,
+                    )
+                    if ret_taint is None:
+                        ret_taint = body_taint
             elif module_default is not None:
                 body_taint = module_default
                 ret_taint = module_default

@@ -330,3 +330,40 @@ class TestCoherenceAllChecksAggregate:
         assert m is not None
         count = int(m.group(1))
         assert count >= 3, f"Expected >=3 issues, got {count}. Output: {result.output}"
+
+
+class TestCoherenceRestorationEvidenceGate:
+    """--gate + restoration overclaim -> exit 1 with insufficient_restoration_evidence."""
+
+    def test_restoration_overclaim_gates(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Restoration boundary that overclaims tier (structural only → tier 1) fails gate."""
+        manifest_yaml = _write_minimal_manifest(tmp_path)
+        # Create overlay with a restoration boundary that overclaims
+        overlay_dir = tmp_path / "src"
+        overlay_dir.mkdir(exist_ok=True)
+        (overlay_dir / "__init__.py").write_text("")
+        (overlay_dir / "wardline.overlay.yaml").write_text(
+            '$id: "https://wardline.dev/schemas/0.1/overlay.schema.json"\n'
+            'overlay_for: "src/"\n'
+            "boundaries:\n"
+            '  - function: "do_restore"\n'
+            '    transition: "restoration"\n'
+            "    restored_tier: 1\n"
+            "    provenance:\n"
+            "      structural: true\n"
+            "      semantic: false\n"
+            "      integrity: null\n"
+            "      institutional: null\n"
+        )
+        (tmp_path / "wardline.perimeter.baseline.json").write_text(
+            '{"version":"1","module_paths":["src/"]}\n'
+        )
+
+        result = _invoke(
+            runner,
+            "--gate",
+            manifest=str(manifest_yaml),
+            path=str(overlay_dir),
+        )
+        assert result.exit_code == 1, f"Expected exit 1, got {result.exit_code}. Output: {result.output}"
+        assert "insufficient_restoration_evidence" in result.output

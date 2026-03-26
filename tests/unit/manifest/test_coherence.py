@@ -1127,7 +1127,7 @@ class TestRestorationEvidence:
         assert issues == []
 
     def test_provenance_none_skipped(self) -> None:
-        """provenance=None is skipped."""
+        """provenance=None with restored_tier → ERROR (null provenance)."""
         boundaries = (
             BoundaryEntry(
                 function="mymod.restore",
@@ -1137,7 +1137,9 @@ class TestRestorationEvidence:
             ),
         )
         issues = check_restoration_evidence(boundaries)
-        assert issues == []
+        assert len(issues) == 1
+        assert issues[0].kind == "insufficient_restoration_evidence"
+        assert "no provenance" in issues[0].detail
 
     def test_exact_ceiling_passes(self) -> None:
         """restored_tier exactly equals evidence ceiling — no issue."""
@@ -1195,6 +1197,61 @@ class TestRestorationEvidence:
         """Empty boundaries tuple produces no issues."""
         issues = check_restoration_evidence(())
         assert issues == []
+
+    def test_no_institutional_provenance_rejects_any_tier_claim(self) -> None:
+        """structural+semantic but no institutional → ERROR (UNKNOWN family)."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=3,
+                provenance={
+                    "structural": True,
+                    "semantic": True,
+                    "integrity": False,
+                    "institutional": False,
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "insufficient_restoration_evidence"
+        assert "UNKNOWN_SEM_VALIDATED" in issues[0].detail
+
+    def test_unknown_raw_rejects_tier_claim(self) -> None:
+        """No evidence at all → ERROR (UNKNOWN_RAW)."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=4,
+                provenance={
+                    "structural": False,
+                    "semantic": False,
+                    "integrity": False,
+                    "institutional": False,
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "insufficient_restoration_evidence"
+        assert "UNKNOWN_RAW" in issues[0].detail
+
+    def test_null_provenance_with_restored_tier_fails(self) -> None:
+        """transition=restoration, restored_tier=2, provenance=None → ERROR."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=2,
+                provenance=None,
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "insufficient_restoration_evidence"
+        assert "no provenance" in issues[0].detail
 
 
 # ── Restoration evidence consistency tests ────────────────────────

@@ -26,6 +26,8 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from wardline.core.taints import TaintState
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -690,6 +692,13 @@ def check_validation_scope_presence(
     return issues
 
 
+_UNKNOWN_FAMILY = frozenset({
+    TaintState.UNKNOWN_SEM_VALIDATED,
+    TaintState.UNKNOWN_SHAPE_VALIDATED,
+    TaintState.UNKNOWN_RAW,
+})
+
+
 def check_restoration_evidence(
     boundaries: tuple[BoundaryEntry, ...],
 ) -> list[CoherenceIssue]:
@@ -706,7 +715,23 @@ def check_restoration_evidence(
     for boundary in boundaries:
         if boundary.transition != "restoration":
             continue
-        if boundary.restored_tier is None or boundary.provenance is None:
+        if boundary.restored_tier is None:
+            continue
+        if boundary.provenance is None:
+            issues.append(
+                CoherenceIssue(
+                    kind="insufficient_restoration_evidence",
+                    function=boundary.function,
+                    file_path=boundary.overlay_path,
+                    detail=(
+                        f"Boundary '{boundary.function}' declares "
+                        f"transition='restoration' with restored_tier="
+                        f"{boundary.restored_tier} but has no provenance "
+                        f"declaration. Restoration boundaries require "
+                        f"provenance evidence (§5.3)."
+                    ),
+                )
+            )
             continue
 
         structural = bool(boundary.provenance.get("structural"))
@@ -715,6 +740,26 @@ def check_restoration_evidence(
         institutional = bool(boundary.provenance.get("institutional"))
 
         ceiling_taint = max_restorable_tier(structural, semantic, integrity, institutional)
+
+        # If evidence only supports an UNKNOWN-family state, no numeric tier claim
+        # is valid — UNKNOWN states are outside the T1-T4 tier ladder (§5.3).
+        if ceiling_taint in _UNKNOWN_FAMILY:
+            issues.append(
+                CoherenceIssue(
+                    kind="insufficient_restoration_evidence",
+                    function=boundary.function,
+                    file_path=boundary.overlay_path,
+                    detail=(
+                        f"Boundary '{boundary.function}' claims "
+                        f"restored_tier={boundary.restored_tier} but evidence "
+                        f"supports only {ceiling_taint.value} (no institutional "
+                        f"provenance — numeric tier restoration requires "
+                        f"institutional provenance, §5.3)."
+                    ),
+                )
+            )
+            continue
+
         ceiling_tier = TAINT_TO_TIER[ceiling_taint].value
 
         if boundary.restored_tier < ceiling_tier:

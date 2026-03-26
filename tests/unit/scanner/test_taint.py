@@ -574,3 +574,52 @@ class TestRestorationTaintAssignment:
         }
         result, _, _, _ = assign_function_taints(tree, "test.py", annotations)
         assert result["restore"] == TaintState.AUDIT_TRAIL
+
+    def test_restoration_semantic_without_structural_unknown_raw(self) -> None:
+        """semantic+institutional but no structural → UNKNOWN_RAW (structural gate)."""
+        tree = _parse("def restore(): pass\n")
+        annotations = {
+            ("test.py", "restore"): [_ann_with_attrs("restoration_boundary", 17, {
+                "semantic_evidence": True,
+                "institutional_provenance": "org",
+            })],
+        }
+        result, _, _, _ = assign_function_taints(tree, "test.py", annotations)
+        assert result["restore"] == TaintState.UNKNOWN_RAW
+
+    def test_restoration_return_taint_matches_body(self) -> None:
+        """Return taint matches body taint for restoration boundaries."""
+        # Full evidence case
+        tree = _parse("def restore(): pass\n")
+        annotations = {
+            ("test.py", "restore"): [_ann_with_attrs("restoration_boundary", 17, {
+                "structural_evidence": True,
+                "semantic_evidence": True,
+                "integrity_evidence": "hmac",
+                "institutional_provenance": "org-db",
+            })],
+        }
+        body, ret, _, _ = assign_function_taints(tree, "test.py", annotations)
+        assert ret["restore"] == body["restore"]
+
+        # Structural-only case
+        tree2 = _parse("def restore(): pass\n")
+        annotations2 = {
+            ("test.py", "restore"): [_ann_with_attrs("restoration_boundary", 17, {
+                "structural_evidence": True,
+            })],
+        }
+        body2, ret2, _, _ = assign_function_taints(tree2, "test.py", annotations2)
+        assert ret2["restore"] == body2["restore"]
+
+    def test_restoration_no_institutional_unknown_sem(self) -> None:
+        """structural+semantic but no institutional → UNKNOWN_SEM_VALIDATED."""
+        tree = _parse("def restore(): pass\n")
+        annotations = {
+            ("test.py", "restore"): [_ann_with_attrs("restoration_boundary", 17, {
+                "structural_evidence": True,
+                "semantic_evidence": True,
+            })],
+        }
+        result, _, _, _ = assign_function_taints(tree, "test.py", annotations)
+        assert result["restore"] == TaintState.UNKNOWN_SEM_VALIDATED
