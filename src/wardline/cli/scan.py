@@ -633,6 +633,31 @@ def scan(
     manifest_hash = _compute_manifest_hash(manifest_path)
     if manifest_hash is None:
         logger.warning("Manifest hash unavailable — SARIF report has no policy binding")
+
+    # --- Compute run identity properties (§10.1) ---
+    overlay_hashes = _compute_overlay_hashes(
+        consumed_overlay_paths, manifest_path.parent
+    )
+    coverage_ratio = _read_coverage_ratio(manifest_path)
+
+    # inputHash — hard failure if a scanned file becomes unreadable
+    project_root = manifest_path.parent
+    try:
+        input_hash, input_files = _compute_input_hash(
+            result.scanned_file_paths, project_root
+        )
+    except OSError as exc:
+        logger.error("inputHash computation failed: %s", exc)
+        all_findings.append(
+            _make_governance_finding(
+                RuleId.TOOL_ERROR,
+                f"inputHash computation failed — scanned file unreadable: {exc}",
+                Severity.ERROR,
+            )
+        )
+        input_hash = ""
+        input_files = 0
+
     import wardline as _wardline_pkg
 
     sarif_report = SarifReport(
@@ -652,6 +677,10 @@ def scan(
         manifest_hash=manifest_hash,
         scan_timestamp=_utc_timestamp(),
         commit_ref=_git_head_ref(),
+        input_hash=input_hash,
+        input_files=input_files,
+        overlay_hashes=overlay_hashes,
+        coverage_ratio=coverage_ratio,
     )
 
     sarif_text = sarif_report.to_json_string() + "\n"
