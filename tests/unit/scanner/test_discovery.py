@@ -525,3 +525,39 @@ class TestResolveDecoratorDepthLimit:
         import_table = {"external_boundary": "external_boundary"}
         result = _resolve_decorator(inner, import_table)
         assert result == "external_boundary"
+
+
+# ── Keyword arg extraction via discovery ─────────────────────────
+
+
+class TestRestorationBoundaryKeywordExtraction:
+    """Verify _extract_decorator_attrs extracts all keyword args from
+    @restoration_boundary(...) through the full discovery pipeline."""
+
+    def test_restoration_boundary_keyword_args_extracted(self) -> None:
+        """All 5 keyword args on @restoration_boundary are captured in attrs."""
+        tree = _parse("""\
+            from wardline import restoration_boundary
+            @restoration_boundary(
+                restored_tier=1,
+                structural_evidence=True,
+                semantic_evidence=True,
+                integrity_evidence="hmac",
+                institutional_provenance="org-db",
+            )
+            def restore_record(): pass
+        """)
+        result = discover_annotations(tree, "test.py")
+
+        key = ("test.py", "restore_record")
+        assert key in result
+        annotations = result[key]
+        assert len(annotations) == 1
+        ann = annotations[0]
+        assert ann.canonical_name == "restoration_boundary"
+        assert ann.group == 17
+        assert ann.attrs["restored_tier"] == 1
+        assert ann.attrs["structural_evidence"] is True
+        assert ann.attrs["semantic_evidence"] is True
+        assert ann.attrs["integrity_evidence"] == "hmac"
+        assert ann.attrs["institutional_provenance"] == "org-db"
