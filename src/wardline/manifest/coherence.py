@@ -817,9 +817,13 @@ def check_restoration_evidence_consistency(
             ("institutional_provenance", "institutional"),
         ]
         for dec_key, overlay_key in evidence_keys:
-            dec_value = bool(matching_ann.attrs.get(dec_key))
-            overlay_value = bool(boundary.provenance.get(overlay_key))
+            dec_raw = matching_ann.attrs.get(dec_key)
+            overlay_raw = boundary.provenance.get(overlay_key)
+            dec_value = bool(dec_raw)
+            overlay_value = bool(overlay_raw)
+
             if dec_value and not overlay_value:
+                # Presence divergence: decorator claims evidence overlay doesn't
                 issues.append(
                     CoherenceIssue(
                         kind="restoration_evidence_divergence",
@@ -827,9 +831,28 @@ def check_restoration_evidence_consistency(
                         file_path=boundary.overlay_path,
                         detail=(
                             f"Boundary '{boundary.function}' decorator claims "
-                            f"{dec_key}={dec_value} but overlay provenance "
-                            f"has {overlay_key}={overlay_value}. The overlay "
+                            f"{dec_key}={dec_raw!r} but overlay provenance "
+                            f"has {overlay_key}={overlay_raw!r}. The overlay "
                             f"is the governance source of truth."
+                        ),
+                    )
+                )
+            elif (
+                dec_value and overlay_value
+                and isinstance(dec_raw, str) and isinstance(overlay_raw, str)
+                and dec_raw != overlay_raw
+            ):
+                # Value divergence: both truthy but different mechanism/attestation
+                issues.append(
+                    CoherenceIssue(
+                        kind="restoration_evidence_divergence",
+                        function=boundary.function,
+                        file_path=boundary.overlay_path,
+                        detail=(
+                            f"Boundary '{boundary.function}' decorator has "
+                            f"{dec_key}={dec_raw!r} but overlay provenance "
+                            f"has {overlay_key}={overlay_raw!r}. Evidence "
+                            f"mechanism mismatch."
                         ),
                     )
                 )

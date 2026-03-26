@@ -1333,3 +1333,74 @@ class TestRestorationEvidenceConsistency:
         )
         annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
         assert check_restoration_evidence_consistency((boundary,), annotations) == []
+
+    def test_integrity_mechanism_mismatch_warning(self) -> None:
+        """Decorator says hmac, overlay says checksum → value divergence."""
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=1,
+            provenance={
+                "structural": True,
+                "semantic": True,
+                "integrity": "checksum",
+                "institutional": "org-db",
+            },
+        )
+        annotations = {
+            ("test.py", "mymod.restore"): [self._make_ann({
+                "structural_evidence": True,
+                "semantic_evidence": True,
+                "integrity_evidence": "hmac",
+                "institutional_provenance": "org-db",
+            })],
+        }
+        issues = check_restoration_evidence_consistency((boundary,), annotations)
+        assert len(issues) == 1
+        assert "mechanism mismatch" in issues[0].detail
+
+    def test_institutional_string_mismatch_warning(self) -> None:
+        """Different institutional attestation strings → value divergence."""
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=2,
+            provenance={
+                "structural": True,
+                "semantic": True,
+                "institutional": "soc2",
+            },
+        )
+        annotations = {
+            ("test.py", "mymod.restore"): [self._make_ann({
+                "structural_evidence": True,
+                "semantic_evidence": True,
+                "institutional_provenance": "irap",
+            })],
+        }
+        issues = check_restoration_evidence_consistency((boundary,), annotations)
+        assert len(issues) == 1
+        assert "mechanism mismatch" in issues[0].detail
+
+    def test_matching_string_values_no_issue(self) -> None:
+        """Same integrity mechanism string → no issue."""
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=1,
+            provenance={
+                "structural": True,
+                "semantic": True,
+                "integrity": "hmac",
+                "institutional": "org-db",
+            },
+        )
+        annotations = {
+            ("test.py", "mymod.restore"): [self._make_ann({
+                "structural_evidence": True,
+                "semantic_evidence": True,
+                "integrity_evidence": "hmac",
+                "institutional_provenance": "org-db",
+            })],
+        }
+        assert check_restoration_evidence_consistency((boundary,), annotations) == []
