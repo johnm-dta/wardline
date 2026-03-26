@@ -745,7 +745,7 @@ def _load_resolved(
                 to_tier=b.get("to_tier"),
                 restored_tier=b.get("restored_tier"),
                 provenance=b.get("provenance"),
-                bounded_context=b.get("bounded_context"),
+                validation_scope=b.get("validation_scope"),
                 overlay_scope=str(
                     (project_root / b.get("overlay_scope", "")).resolve()
                 ),

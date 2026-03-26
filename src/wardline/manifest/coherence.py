@@ -5,12 +5,14 @@ Detects multiple classes of inconsistency:
   matching boundary declaration in any overlay.
 - **Undeclared boundaries**: overlay boundary entries whose function name does
   not appear as a decorated function in code.
-- **Unmatched contracts**: bounded_context contract declarations that don't
+- **Unmatched contracts**: validation_scope contract declarations that don't
   match any code-level annotation.
 - **Stale contract bindings**: contract_bindings entries pointing to
   non-existent functions.
 - **Tier-topology consistency**: tier assignments consistent with declared
   data-flow topology.
+- **Missing validation_scope**: Tier 2 boundaries that require a
+  validation_scope declaration but lack one.
 - **Governance anomalies**: tier distribution, tier downgrades, upgrade without
   evidence, agent-originated policy changes, expired exceptions, and first-scan
   perimeter detection.
@@ -453,9 +455,9 @@ def check_unmatched_contracts(
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
     boundaries: tuple[BoundaryEntry, ...],
 ) -> list[CoherenceIssue]:
-    """Find contract declarations in bounded_contexts with no matching annotation.
+    """Find contract declarations in validation_scopes with no matching annotation.
 
-    For each boundary that declares a ``bounded_context`` with ``contracts``,
+    For each boundary that declares a ``validation_scope`` with ``contracts``,
     verify the boundary's function has a matching annotation in code.  A
     contract declaration without a corresponding code-level annotation
     indicates a specification/implementation mismatch.
@@ -473,10 +475,10 @@ def check_unmatched_contracts(
     issues: list[CoherenceIssue] = []
 
     for boundary in boundaries:
-        if boundary.bounded_context is None:
+        if boundary.validation_scope is None:
             continue
 
-        contracts = boundary.bounded_context.get("contracts")
+        contracts = boundary.validation_scope.get("contracts")
         if not contracts:
             continue
 
@@ -491,7 +493,7 @@ def check_unmatched_contracts(
                     file_path=boundary.overlay_path,
                     detail=(
                         f"Boundary '{boundary.function}' declares contracts "
-                        f"({contract_names}) in bounded_context but has no "
+                        f"({contract_names}) in validation_scope but has no "
                         f"matching wardline-decorated function in code."
                     ),
                 )
@@ -640,4 +642,46 @@ def check_tier_topology_consistency(
                         )
                     break  # First match is sufficient
 
+    return issues
+
+
+def check_validation_scope_presence(
+    boundaries: tuple[BoundaryEntry, ...],
+) -> list[CoherenceIssue]:
+    """Check that Tier 2 boundaries declare their ``validation_scope``.
+
+    A boundary needs ``validation_scope`` when its ``transition`` is
+    ``"semantic_validation"`` or ``"combined_validation"``, or when it is
+    a ``"restoration"`` with semantic provenance.
+
+    Args:
+        boundaries: All boundary entries from loaded overlays.
+
+    Returns:
+        One ``CoherenceIssue`` per missing declaration (kind
+        ``"missing_validation_scope"``).
+    """
+    issues: list[CoherenceIssue] = []
+    for boundary in boundaries:
+        needs_scope = boundary.transition in (
+            "semantic_validation",
+            "combined_validation",
+        ) or (
+            boundary.transition == "restoration"
+            and boundary.provenance is not None
+            and boundary.provenance.get("semantic") is True
+        )
+        if needs_scope and boundary.validation_scope is None:
+            issues.append(
+                CoherenceIssue(
+                    kind="missing_validation_scope",
+                    function=boundary.function,
+                    file_path=boundary.overlay_path,
+                    detail=(
+                        f"Boundary '{boundary.function}' claims Tier 2 semantics "
+                        f"(transition={boundary.transition}) but has no "
+                        f"validation_scope declaration (\u00a713.1.2)."
+                    ),
+                )
+            )
     return issues
