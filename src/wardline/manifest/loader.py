@@ -49,6 +49,15 @@ class ManifestLoadError(Exception):
     """Raised when manifest loading fails (file size, schema, version)."""
 
 
+class ManifestPolicyError(ManifestLoadError):
+    """Raised for policy violations that must not be silently skipped.
+
+    Subclass of ManifestLoadError so callers catching the base class
+    still see it, but resolve.py can let it propagate while catching
+    ordinary ManifestLoadError for I/O-level parse failures.
+    """
+
+
 def make_wardline_loader(
     alias_limit: int = DEFAULT_ALIAS_LIMIT,
 ) -> type[yaml.SafeLoader]:
@@ -258,6 +267,19 @@ def load_overlay(
 
 def _build_overlay(data: dict[str, Any]) -> WardlineOverlay:
     """Construct a WardlineOverlay from validated data."""
+    # Reject skip-promotions: to_tier=1 is valid only from from_tier=2 (§13.1.2).
+    for b in data.get("boundaries", []):
+        to_tier = b.get("to_tier")
+        if to_tier == 1 and b.get("transition") != "restoration":
+            from_tier = b.get("from_tier")
+            if from_tier != 2:
+                raise ManifestPolicyError(
+                    f"Boundary '{b.get('function', '<unknown>')}' declares "
+                    f"from_tier={from_tier}, to_tier=1 — skip-promotions to "
+                    f"Tier 1 are prohibited. Use composed steps: "
+                    f"validation to T2, then T2→T1 construction (§13.1.2)."
+                )
+
     boundaries = tuple(
         BoundaryEntry(
             function=b["function"],

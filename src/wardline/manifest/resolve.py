@@ -11,7 +11,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from wardline.manifest.discovery import GovernanceError, discover_overlays
-from wardline.manifest.loader import ManifestLoadError, load_overlay
+from wardline.manifest.loader import ManifestLoadError, ManifestPolicyError, load_overlay
 from wardline.manifest.merge import merge
 from wardline.manifest.scope import relative_path_within_scope
 
@@ -44,6 +44,8 @@ def resolve_boundaries(
     for overlay_path in overlay_paths:
         try:
             overlay = load_overlay(overlay_path)
+        except ManifestPolicyError:
+            raise  # Policy violations (e.g. skip-promotion) must propagate
         except (ManifestLoadError, OSError) as exc:
             logger.warning("Failed to load overlay %s: %s", overlay_path, exc)
             continue
@@ -95,6 +97,8 @@ def resolve_optional_fields(
     for overlay_path in overlay_paths:
         try:
             overlay = load_overlay(overlay_path)
+        except ManifestPolicyError:
+            raise  # Policy violations (e.g. skip-promotion) must propagate
         except (ManifestLoadError, OSError) as exc:
             logger.warning("Failed to load overlay %s: %s", overlay_path, exc)
             continue
@@ -158,6 +162,8 @@ def resolve_contract_bindings(
     for overlay_path in overlay_paths:
         try:
             overlay = load_overlay(overlay_path)
+        except ManifestPolicyError:
+            raise  # Policy violations (e.g. skip-promotion) must propagate
         except (ManifestLoadError, OSError) as exc:
             logger.warning("Failed to load overlay %s: %s", overlay_path, exc)
             continue
