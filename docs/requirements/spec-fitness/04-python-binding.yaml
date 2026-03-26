@@ -1,140 +1,180 @@
 requirements:
   - id: WL-FIT-PY-001
-    title: Core decorator vocabulary is exported
+    title: Decorator discovery is AST-based
     statement: >
-      The Python decorator package MUST export the core binding vocabulary needed
-      for authority tiers, validation boundaries, governance-sensitive behaviors,
-      and supplementary contracts that the project claims to support.
+      The Python Wardline-Core implementation MUST discover wardline decorators
+      from the target codebase's AST and MUST NOT rely on runtime introspection
+      as its primary discovery mechanism.
     normative_sources:
       - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.4 Annotation vocabulary"
+        section: "A.3 Interface contract (Wardline-Core)"
     verification:
       method: static_review_and_unit_tests
       target_paths:
-        - src/wardline/decorators/__init__.py
-        - tests/unit/decorators/test_decorators.py
+        - src/wardline/scanner/discovery.py
+        - src/wardline/scanner/context.py
+        - tests/unit/test_wp04_hardening.py
     fitness_dimensions: [correctness, interoperability]
-    notes: This is the public contract surface for the binding.
+    notes: Runtime metadata helpers may exist, but they are not the normative discovery path.
 
   - id: WL-FIT-PY-002
-    title: Restoration boundary decorator exists and carries metadata
+    title: "`schema_default()` is recognised as the governed default marker"
     statement: >
-      The Python binding MUST provide `@restoration_boundary(...)` with metadata
-      fields that can represent restored tier and evidence categories required by
-      the spec.
+      The Python implementation MUST recognise `schema_default()` as the
+      PY-WL-001 suppression marker and only treat it as governed when the
+      overlay declaration supports it.
     normative_sources:
       - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.4 Annotation vocabulary"
+        section: "A.3 Interface contract (Wardline-Core)"
     verification:
       method: static_review_and_unit_tests
       target_paths:
-        - src/wardline/decorators
-        - tests/unit/decorators
-        - tests/unit/scanner/test_py_wl_007.py
+        - src/wardline/decorators/schema.py
+        - src/wardline/scanner/rules/py_wl_001.py
+        - tests/unit/scanner/test_py_wl_001.py
     fitness_dimensions: [correctness, conformance]
-    notes: This is currently a particularly high-value fitness check because the spec treats it as part of the core interface contract.
+    notes: This is a Python-specific part of the normative Wardline-Core interface contract.
 
   - id: WL-FIT-PY-003
-    title: Generic trust-boundary decorators support parameterized transitions
+    title: Mandatory result-level SARIF properties are emitted
     statement: >
-      The Python binding MUST provide parameterized generic boundary decorators
-      for non-standard tier transitions, including the declared `from_tier` and
-      `to_tier` semantics from the binding spec.
+      Each finding emitted by the Python Wardline-Core implementation MUST carry
+      the mandatory result-level property bag fields required by the Python
+      interface contract.
     normative_sources:
       - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.4 Annotation vocabulary"
+        section: "A.3 Interface contract (Wardline-Core)"
     verification:
-      method: decorator_tests
+      method: unit_tests
       target_paths:
-        - src/wardline/decorators/boundaries.py
-        - tests/unit/decorators/test_boundaries.py
+        - src/wardline/scanner/sarif.py
+        - tests/unit/scanner/test_sarif.py
     fitness_dimensions: [correctness, interoperability]
-    notes: The binding exposes both alias decorators and the generic mechanism.
+    notes: This requirement is satisfied by the specific A.3 result keys, not by the full Part I result bag.
 
   - id: WL-FIT-PY-004
-    title: Decorator metadata survives wrapper stacks
+    title: Decorator composition semantics are honoured
     statement: >
-      Scanner and runtime helpers MUST be able to resolve Wardline metadata
-      through `__wrapped__` chains so that third-party decorators do not hide
-      Wardline annotations.
+      The Python implementation MUST honour the binding’s normative decorator
+      composition semantics, including the rule that `@int_data` alone produces
+      `UNKNOWN_RAW` and only composition with `@restoration_boundary` can
+      restore a higher effective tier according to the Part I evidence matrix.
     normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.3 Interface contract (Wardline-Core)"
+    informative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4.2 Decorator mapping table"
       - file: docs/spec/wardline-02-A-python-binding.md
         section: "A.4.3 Non-obvious design rationale"
     verification:
       method: runtime_and_scanner_tests
       target_paths:
-        - src/wardline/runtime/base.py
-        - src/wardline/scanner/context.py
-        - tests/unit/runtime/test_base.py
-        - tests/unit/scanner/test_context.py
-    fitness_dimensions: [correctness, robustness]
-    notes: This is a binding-specific interop requirement, not just a convenience.
+        - src/wardline/decorators
+        - src/wardline/core/registry.py
+        - tests/unit/decorators
+        - tests/unit/scanner/test_py_wl_007.py
+    fitness_dimensions: [correctness, conformance]
+    notes: This is the binding-side bridge between Part I restoration semantics and Python syntax.
 
   - id: WL-FIT-PY-005
-    title: Contradictory combinations are diagnosable
+    title: Unresolvable third-party delegation is handled conservatively
     statement: >
-      The binding MUST detect and report contradictory or suspicious decorator
-      combinations that it explicitly defines as invalid or questionable.
+      When third-party source is unavailable or delegation resolution is not
+      implemented, the Python implementation MUST treat the delegation as
+      unresolvable for minimum-conformance purposes and evaluate the boundary
+      conservatively.
     normative_sources:
       - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.4.3 Non-obvious design rationale"
+        section: "A.3 Interface contract (Wardline-Core)"
     verification:
       method: rule_tests
       target_paths:
-        - src/wardline/scanner/rules/scn_021.py
-        - tests/unit/scanner/test_scn_021.py
-    fitness_dimensions: [correctness, ergonomics]
-    notes: SCN-021 is binding-specific but critical for authoring safety.
+        - src/wardline/scanner/rejection_path.py
+        - tests/unit/scanner/test_delegated_rejection.py
+        - tests/unit/scanner/test_rejection_path_convergence.py
+    fitness_dimensions: [correctness, robustness]
+    notes: Optional deeper resolution is a SHOULD; conservative fallback is the MUST.
 
   - id: WL-FIT-PY-006
-    title: Validation ordering is enforced for semantic validators
+    title: Implemented rules and binding corpus are declared
     statement: >
-      The binding MUST reject semantic validation paths that do not establish
-      prior structural validation when it claims support for validation-ordering
-      enforcement.
+      The Python implementation MUST declare which rules it implements and MUST
+      maintain corpus specimens for those rules.
     normative_sources:
       - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.4 Annotation vocabulary"
+        section: "A.3 Interface contract (Wardline-Core)"
     verification:
-      method: rule_tests
-      target_paths:
-        - src/wardline/scanner/rules/py_wl_009.py
-        - tests/unit/scanner/test_py_wl_009.py
-    fitness_dimensions: [correctness, conformance]
-    notes: This is one of the clearest spec-to-test requirements in the repo.
-
-  - id: WL-FIT-PY-007
-    title: Runtime support complements static enforcement
-    statement: >
-      The binding SHOULD provide runtime structural support for high-assurance
-      paths, including descriptor- or protocol-based enforcement where the
-      project claims those capabilities.
-    normative_sources:
-      - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.5 Type system and runtime enforcement"
-    verification:
-      method: runtime_tests
-      target_paths:
-        - src/wardline/runtime
-        - tests/unit/runtime
-    fitness_dimensions: [defense_in_depth, robustness]
-    notes: This is a fitness enhancer even where the framework treats the section as non-normative.
-
-  - id: WL-FIT-PY-008
-    title: Binding extras beyond Part I are clearly marked
-    statement: >
-      Python-specific rule splits, diagnostics, and supplementary rule IDs MUST
-      be distinguishable from the framework’s language-independent core rules.
-    normative_sources:
-      - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.4 Annotation vocabulary"
-      - file: docs/spec/wardline-01-14-conformance.md
-        section: "14.3.1 Enforcement profiles"
-    verification:
-      method: rule_registry_and_sarif_review
+      method: rule_registry_and_corpus_review
       target_paths:
         - src/wardline/scanner/rules/__init__.py
         - src/wardline/scanner/sarif.py
+        - corpus/specimens
         - tests/unit/scanner/test_rules.py
+    fitness_dimensions: [conformance, interoperability]
+    notes: This overlaps with scanner conformance, but remains part of the Python interface contract.
+
+  - id: WL-FIT-PY-007
+    title: Verification mode exists and is deterministic
+    statement: >
+      The Python implementation MUST support `--verification-mode` and MUST
+      produce deterministic byte-identical SARIF for identical input in that
+      mode.
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.3 Interface contract (Wardline-Core)"
+      - file: docs/spec/wardline-01-10-verification-properties.md
+        section: "10. Verification properties"
+    verification:
+      method: integration_tests
+      target_paths:
+        - src/wardline/cli/scan.py
+        - tests/integration/test_determinism.py
+        - tests/integration/test_self_hosting.py
+    fitness_dimensions: [conformance, assessability]
+    notes: This requirement is about repeatability, not completeness of the property bag.
+
+  - id: WL-FIT-PY-008
+    title: Mandatory run-level SARIF properties are emitted
+    statement: >
+      The Python implementation MUST emit the required run-level SARIF
+      properties from the Python interface contract, including manifest and
+      input identity properties needed for independent determinism checking.
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.3 Interface contract (Wardline-Core)"
+      - file: docs/spec/wardline-01-10-verification-properties.md
+        section: "10.1 Findings interchange format"
+    verification:
+      method: rule_registry_and_sarif_review
+      target_paths:
+        - src/wardline/cli/scan.py
+        - src/wardline/scanner/sarif.py
+        - tests/unit/scanner/test_sarif.py
+        - tests/integration/test_scan_cmd.py
     fitness_dimensions: [interoperability, conformance]
-    notes: This helps assessors separate spec-core coverage from implementation-specific diagnostics.
+    notes: Missing `wardline.inputHash` and related run properties block independent assessment.
+
+  - id: WL-FIT-PY-009
+    title: Manifest is consumed and validated before findings
+    statement: >
+      The Python Wardline-Core tool MUST consume the wardline manifest
+      (wardline.yaml and any overlays) and validate the manifest against the
+      framework's JSON Schemas before producing findings. A tool that produces
+      findings without validating the manifest is non-conformant.
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.3 Interface contract (Wardline-Core)"
+    verification:
+      method: integration_tests
+      target_paths:
+        - src/wardline/cli/scan.py
+        - src/wardline/manifest/loader.py
+        - src/wardline/manifest/schemas/wardline.schema.json
+        - tests/integration/test_scan_cmd.py
+    fitness_dimensions: [conformance, correctness]
+    notes: >
+      This is §A.3 item 1. The scanner must validate the manifest before
+      producing findings, not merely load it. Distinct from MAN-001 which
+      covers the loader; this covers the scanner's obligation to call
+      validation before emitting results.
