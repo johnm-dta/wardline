@@ -187,6 +187,19 @@ REGISTRY: MappingProxyType[str, RegistryEntry] = MappingProxyType({
             "_wardline_feature_flag": str,
         },
     ),
+    # --- Group 17: Restoration Boundaries ---
+    "restoration_boundary": RegistryEntry(
+        canonical_name="restoration_boundary",
+        group=17,
+        attrs={  # type: ignore[arg-type]  # __post_init__ converts
+            "_wardline_restoration_boundary": bool,
+            "_wardline_restored_tier": int,
+            "_wardline_structural_evidence": bool,
+            "_wardline_semantic_evidence": bool,
+            "_wardline_integrity_evidence": object,
+            "_wardline_institutional_provenance": object,
+        },
+    ),
 })
 
 # Import-time consistency: verify each key matches its entry's canonical_name.
