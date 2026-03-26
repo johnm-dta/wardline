@@ -12,10 +12,8 @@ from __future__ import annotations
 
 import ast
 
-from wardline.core import matrix
 from wardline.core.severity import RuleId
-from wardline.scanner.context import Finding
-from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
+from wardline.scanner.rules.base import RuleBase, _AST_TRY_STAR, walk_skip_nested_defs
 
 _BROAD_NAMES = frozenset({"Exception", "BaseException"})
 
@@ -40,10 +38,9 @@ class RulePyWl004(RuleBase):
         is_async: bool,
     ) -> None:
         """Walk the function body looking for PY-WL-004 patterns."""
-        _TryStar = getattr(ast, "TryStar", None)
         trystar_handlers: set[int] = set()
         for child in walk_skip_nested_defs(node):
-            if _TryStar is not None and isinstance(child, _TryStar):
+            if _AST_TRY_STAR is not None and isinstance(child, _AST_TRY_STAR):
                 for handler in child.handlers:
                     trystar_handlers.add(id(handler))
                     self._check_handler(handler, node)
@@ -62,7 +59,7 @@ class RulePyWl004(RuleBase):
             return
         if handler.type is None:
             # Bare except:
-            self._emit_finding(
+            self._emit_matrix_finding(
                 handler,
                 "Broad exception handler — bare 'except:' catches all "
                 "exceptions including SystemExit and KeyboardInterrupt",
@@ -71,7 +68,7 @@ class RulePyWl004(RuleBase):
 
         name = self._resolve_broad_name(handler.type)
         if name is not None:
-            self._emit_finding(
+            self._emit_matrix_finding(
                 handler,
                 f"Broad exception handler — 'except {name}' catches "
                 f"overly broad exception type",
@@ -87,7 +84,7 @@ class RulePyWl004(RuleBase):
             return
         for arg in call.args:
             if isinstance(arg, ast.expr) and self._resolve_broad_name(arg) is not None:
-                self._emit_finding(
+                self._emit_matrix_finding(
                     call,
                     "Broad exception handler — contextlib.suppress() suppresses "
                     "an overly broad exception type",
@@ -140,28 +137,3 @@ class RulePyWl004(RuleBase):
                     return elt.attr
         return None
 
-    def _emit_finding(
-        self,
-        node: ast.AST,
-        message: str,
-    ) -> None:
-        """Emit a PY-WL-004 finding."""
-        taint = self._get_function_taint(self._current_qualname)
-        cell = matrix.lookup(self.RULE_ID, taint)
-        self.findings.append(
-            Finding(
-                rule_id=RuleId.PY_WL_004,
-                file_path=self._file_path,
-                line=getattr(node, "lineno", 0),
-                col=getattr(node, "col_offset", 0),
-                end_line=getattr(node, "end_lineno", None),
-                end_col=getattr(node, "end_col_offset", None),
-                message=message,
-                severity=cell.severity,
-                exceptionability=cell.exceptionability,
-                taint_state=taint,
-                analysis_level=1,
-                source_snippet=None,
-                qualname=self._current_qualname,
-            )
-        )

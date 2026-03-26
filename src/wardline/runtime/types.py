@@ -36,6 +36,9 @@ class TierMarker:
     their tier level for runtime introspection (since ``NewType`` is
     erased at runtime).
 
+    Immutable after construction — ``__setattr__`` and ``__delattr__``
+    raise ``AttributeError`` to prevent mutation.
+
     Args:
         tier: The authority tier (1-4).
     """
@@ -45,7 +48,13 @@ class TierMarker:
     def __init__(self, tier: int) -> None:
         if tier not in (1, 2, 3, 4):
             raise ValueError(f"tier must be 1-4, got {tier}")
-        self.tier = AuthorityTier(tier)
+        object.__setattr__(self, "tier", AuthorityTier(tier))
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError("TierMarker instances are immutable")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError("TierMarker instances are immutable")
 
     def __repr__(self) -> str:
         return f"TierMarker(tier={self.tier!r})"

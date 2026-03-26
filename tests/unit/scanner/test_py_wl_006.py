@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import sys
+
+import pytest
+
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.core.taints import TaintState
 from wardline.scanner.context import ScanContext
@@ -347,3 +351,27 @@ class TestTaintGating:
         assert len(rule.findings) >= 1
         assert rule.findings[0].severity == Severity.ERROR
         assert rule.findings[0].exceptionability == Exceptionability.STANDARD
+
+
+class TestMatchCaseBypass:
+    """match/case branches that bypass audit fire PY-WL-006."""
+
+    @pytest.mark.skipif(
+        sys.version_info < (3, 10),
+        reason="match/case requires Python 3.10+",
+    )
+    def test_match_case_bypass_audit_fires(self) -> None:
+        rule = _run_rule_module(
+            """\
+def handle_event(event):
+    match event.kind:
+        case "critical":
+            audit.emit("processed", event)
+            return event
+        case _:
+            return None
+"""
+        )
+
+        findings = [f for f in rule.findings if "bypass audit" in f.message]
+        assert len(findings) >= 1

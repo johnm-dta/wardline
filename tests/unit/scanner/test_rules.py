@@ -117,6 +117,18 @@ class TestAbcEnforcement:
         rule = _ValidRule()
         assert rule.visited == []
 
+    def test_missing_rule_id_raises_at_definition(self) -> None:
+        with pytest.raises(TypeError, match="must define a RULE_ID"):
+
+            class NoIdRule(RuleBase):
+                def visit_function(
+                    self,
+                    node: ast.FunctionDef | ast.AsyncFunctionDef,
+                    *,
+                    is_async: bool,
+                ) -> None:
+                    pass
+
 
 # ── Dispatch ──────────────────────────────────────────────────────
 
@@ -230,6 +242,8 @@ class TestSuperOrdering:
                 cls._tracked = True
 
         class TrackedRule(TrackingMixin, RuleBase):
+            RULE_ID = RuleId.TEST_STUB
+
             def visit_function(
                 self,
                 node: ast.FunctionDef | ast.AsyncFunctionDef,

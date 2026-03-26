@@ -328,6 +328,20 @@ def target(user):
         assert len(rule.findings) == 1
         assert "PII field" in rule.findings[0].message
 
+    def test_handles_secrets_in_exception_fires(self) -> None:
+        rule = _run_rule(
+            """\
+from wardline.decorators.secrets import handles_secrets
+
+@handles_secrets
+def target(password):
+    raise ValueError(f"invalid credential: {password}")
+"""
+        )
+
+        assert len(rule.findings) == 1
+        assert "error message" in rule.findings[0].message
+
     def test_handles_pii_in_exception_fires(self) -> None:
         rule = _run_rule(
             """\
@@ -341,6 +355,20 @@ def target(user):
 
         assert len(rule.findings) == 1
         assert "error message" in rule.findings[0].message
+
+    def test_handles_pii_malformed_fields_string_warns(self) -> None:
+        rule = _run_rule(
+            """\
+from wardline.decorators.sensitivity import handles_pii
+
+@handles_pii(fields="email")
+def target(user):
+    logger.info(user["email"])
+"""
+        )
+
+        assert len(rule.findings) == 1
+        assert "statically discoverable field" in rule.findings[0].message
 
     def test_handles_classified_lower_call_fires(self) -> None:
         rule = _run_rule(

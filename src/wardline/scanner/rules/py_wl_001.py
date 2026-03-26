@@ -59,7 +59,7 @@ class RulePyWl001(RuleBase):
     ) -> None:
         """Walk the function body looking for PY-WL-001 patterns.
 
-        Uses ``_walk_skip_nested_defs`` to avoid descending into nested
+        Uses ``walk_skip_nested_defs`` to avoid descending into nested
         function definitions — those are visited separately by the base
         class ``_dispatch`` / ``generic_visit``.
         """

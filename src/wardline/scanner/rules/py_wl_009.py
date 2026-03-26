@@ -10,11 +10,9 @@ from __future__ import annotations
 
 import ast
 
-from wardline.core import matrix
-from wardline.core.severity import RuleId
+from wardline.core.severity import Exceptionability, RuleId
 from wardline.manifest.scope import path_within_scope
-from wardline.scanner.context import Finding
-from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
+from wardline.scanner.rules.base import RuleBase, decorator_name, receiver_name, walk_skip_nested_defs
 
 _SEMANTIC_BOUNDARY_TRANSITIONS = frozenset({"semantic_validation"})
 _COMBINED_BOUNDARY_TRANSITIONS = frozenset({
@@ -90,23 +88,13 @@ def _has_shape_check_before(
     return False
 
 
-def _decorator_name(decorator: ast.expr) -> str | None:
-    """Return the terminal decorator name for ``@name`` and ``@pkg.name``."""
-    target = decorator.func if isinstance(decorator, ast.Call) else decorator
-    if isinstance(target, ast.Name):
-        return target.id
-    if isinstance(target, ast.Attribute):
-        return target.attr
-    return None
-
-
 def _has_direct_decorator(
     node: ast.FunctionDef | ast.AsyncFunctionDef,
     names: frozenset[str],
 ) -> bool:
     """Check whether the function has any decorator whose terminal name matches."""
     return any(
-        _decorator_name(decorator) in names
+        decorator_name(decorator) in names
         for decorator in node.decorator_list
     )
 
@@ -142,28 +130,13 @@ def _is_shape_validation_call(call: ast.Call) -> bool:
         # Schema-qualified: receiver.validate() where receiver name
         # contains a schema-related term (e.g. jsonschema.validate).
         if attr in _SCHEMA_QUALIFIED_METHODS:
-            receiver = _receiver_name(call.func.value)
+            receiver = receiver_name(call.func.value)
             if receiver:
                 receiver_lower = receiver.lower()
                 for sub in _SHAPE_VALIDATION_SUBSTRINGS:
                     if sub in receiver_lower:
                         return True
     return False
-
-
-def _receiver_name(node: ast.expr) -> str | None:
-    """Extract a dotted name from an expression for receiver matching.
-
-    Returns the name for ``ast.Name`` (e.g. ``"jsonschema"``) or the
-    full dotted chain for ``ast.Attribute`` (e.g. ``"json_schema"``).
-    Returns ``None`` for complex expressions.
-    """
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        parent = _receiver_name(node.value)
-        return f"{parent}.{node.attr}" if parent else node.attr
-    return None
 
 
 def _is_membership_test(compare: ast.Compare) -> bool:
@@ -235,6 +208,7 @@ class RulePyWl009(RuleBase):
     """
 
     RULE_ID = RuleId.PY_WL_009
+    DEFAULT_EXCEPTIONABILITY = Exceptionability.UNCONDITIONAL
 
     def __init__(self, *, file_path: str = "") -> None:
         super().__init__()
@@ -259,7 +233,7 @@ class RulePyWl009(RuleBase):
         for check in semantic_checks:
             check_line = getattr(check, "lineno", 0)
             if not _has_shape_check_before(node.body, stop_line=check_line):
-                self._emit_finding(check)
+                self._emit_matrix_finding(check, "Semantic validation without prior shape validation — business logic check on data that has not been structurally validated")
 
     def _is_semantic_boundary(
         self,
@@ -291,28 +265,3 @@ class RulePyWl009(RuleBase):
                     return True
         return _has_direct_decorator(node, _COMBINED_BOUNDARY_DECORATORS)
 
-    def _emit_finding(self, node: ast.AST) -> None:
-        """Emit a PY-WL-009 finding."""
-        taint = self._get_function_taint(self._current_qualname)
-        cell = matrix.lookup(self.RULE_ID, taint)
-        self.findings.append(
-            Finding(
-                rule_id=RuleId.PY_WL_009,
-                file_path=self._file_path,
-                line=getattr(node, "lineno", 0),
-                col=getattr(node, "col_offset", 0),
-                end_line=getattr(node, "end_lineno", None),
-                end_col=getattr(node, "end_col_offset", None),
-                message=(
-                    "Semantic validation without prior shape validation — "
-                    "business logic check on data that has not been "
-                    "structurally validated"
-                ),
-                severity=cell.severity,
-                exceptionability=cell.exceptionability,
-                taint_state=taint,
-                analysis_level=1,
-                source_snippet=None,
-                qualname=self._current_qualname,
-            )
-        )

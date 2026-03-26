@@ -1,8 +1,8 @@
-"""Schema markers — Group 2 utility + Group 5 decorators.
+"""Schema markers — utility function + Group 5 decorators.
 
 Provides ``schema_default(expr)`` — a presence-only marker that the
-scanner can detect at call sites.  For MVP it is an identity function:
-it returns its argument unchanged but signals that the call site has an
+scanner can detect at call sites.  It is an identity function: it
+returns its argument unchanged but signals that the call site has an
 explicit schema default.
 
 Group 5 decorators mark functions with schema-completeness metadata.

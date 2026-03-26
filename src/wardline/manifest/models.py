@@ -259,6 +259,20 @@ class ScannerConfig:
     max_expansion_rounds: int = 1
     strict_governance: bool = False
 
+    def __post_init__(self) -> None:
+        if not (1 <= self.analysis_level <= 3):
+            raise ValueError(
+                f"analysis_level must be 1, 2, or 3, got {self.analysis_level!r}"
+            )
+        if self.max_unknown_raw_percent is not None and not (
+            0 <= self.max_unknown_raw_percent <= 100
+        ):
+            raise ValueError(
+                f"max_unknown_raw_percent must be 0-100, got {self.max_unknown_raw_percent}"
+            )
+        if self.max_expansion_rounds < 1:
+            raise ValueError("max_expansion_rounds must be >= 1")
+
     @classmethod
     def from_toml(cls, path: Path) -> ScannerConfig:
         """Load scanner config from a TOML file.

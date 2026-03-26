@@ -66,7 +66,7 @@ class WardlineAnnotation:
             )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ScanContext:
     """Per-file context built once after pass 1 (decorator discovery + taint).
 

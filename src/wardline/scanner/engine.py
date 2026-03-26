@@ -44,7 +44,7 @@ from wardline.scanner.taint.variable_level import compute_variable_taints
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from wardline.core.taints import TaintState as _TS
+    from wardline.core.taints import TaintState
     from wardline.manifest.models import BoundaryEntry, OptionalFieldEntry, WardlineManifest
     from wardline.scanner.rules.base import RuleBase
     from wardline.scanner.taint.function_level import TaintSource
@@ -627,7 +627,7 @@ class ScanEngine:
             if src == "decorator" and qn in return_taint_map:
                 callee_taint_map[qn] = return_taint_map[qn]
 
-        var_map: dict[str, dict[str, _TS]] = {}
+        var_map: dict[str, dict[str, TaintState]] = {}
         qualname_map = self._build_qualname_map(tree)
         try:
             for node in ast.walk(tree):

@@ -299,9 +299,10 @@ def _invoke_on_violation(
     if _on_violation is not None:
         try:
             _on_violation(obj, expected_tier, actual_tier)
-        except Exception:
+        except Exception as exc:
             logging.getLogger("wardline").warning(
-                "on_violation callback raised — enforcement continues"
+                "on_violation callback raised %s — enforcement continues",
+                exc,
             )
 
 

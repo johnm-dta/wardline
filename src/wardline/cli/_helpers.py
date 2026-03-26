@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import ast
+import logging
 from typing import TYPE_CHECKING, Any
 
 import click
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def cli_error(msg: str) -> None:
@@ -44,11 +47,13 @@ def discover_all_annotations(
     for py_file in sorted(scan_path.rglob("*.py")):
         try:
             source = py_file.read_text(encoding="utf-8")
-        except (OSError, PermissionError):
+        except (OSError, PermissionError) as exc:
+            logger.warning("Cannot read %s: %s", py_file, exc)
             continue
         try:
             tree = ast.parse(source, filename=str(py_file))
         except SyntaxError:
+            logger.debug("Skipping unparseable file: %s", py_file)
             continue
         file_annotations = discover_annotations(tree, py_file)
         all_annotations.update(file_annotations)

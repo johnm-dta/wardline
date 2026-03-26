@@ -23,9 +23,7 @@ from __future__ import annotations
 
 import ast
 
-from wardline.core import matrix
 from wardline.core.severity import RuleId
-from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
 
 # Dunder comparison methods where isinstance + NotImplemented is protocol.
@@ -173,7 +171,7 @@ class RulePyWl007(RuleBase):
         if is_declared_boundary:
             return
 
-        self._emit_finding(
+        self._emit_matrix_finding(
             call,
             "Runtime type-checking — isinstance() suggests "
             "unknown type at a trust boundary",
@@ -186,7 +184,7 @@ class RulePyWl007(RuleBase):
             return
         for op in compare.ops:
             if isinstance(op, (ast.Eq, ast.NotEq, ast.Is, ast.IsNot)):
-                self._emit_finding(
+                self._emit_matrix_finding(
                     compare,
                     "Runtime type-checking — type() comparison suggests "
                     "unknown type at a trust boundary",
@@ -202,24 +200,3 @@ class RulePyWl007(RuleBase):
             and node.func.id == "type"
         )
 
-    def _emit_finding(self, node: ast.AST, message: str) -> None:
-        """Emit a PY-WL-007 finding."""
-        taint = self._get_function_taint(self._current_qualname)
-        cell = matrix.lookup(self.RULE_ID, taint)
-        self.findings.append(
-            Finding(
-                rule_id=RuleId.PY_WL_007,
-                file_path=self._file_path,
-                line=getattr(node, "lineno", 0),
-                col=getattr(node, "col_offset", 0),
-                end_line=getattr(node, "end_lineno", None),
-                end_col=getattr(node, "end_col_offset", None),
-                message=message,
-                severity=cell.severity,
-                exceptionability=cell.exceptionability,
-                taint_state=taint,
-                analysis_level=1,
-                source_snippet=None,
-                qualname=self._current_qualname,
-            )
-        )

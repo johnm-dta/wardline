@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner.context import Finding
-from wardline.scanner.rules.base import RuleBase
+from wardline.scanner.rules.base import RuleBase, decorator_name
 
 
 @dataclass(frozen=True)
@@ -93,16 +93,6 @@ _COMBINATIONS: tuple[_CombinationSpec, ...] = (
 )
 
 
-def _decorator_name(decorator: ast.expr) -> str | None:
-    """Return the terminal decorator name for ``@name`` and ``@pkg.name``."""
-    target = decorator.func if isinstance(decorator, ast.Call) else decorator
-    if isinstance(target, ast.Name):
-        return target.id
-    if isinstance(target, ast.Attribute):
-        return target.attr
-    return None
-
-
 class RuleScn021(RuleBase):
     """Detect contradictory and suspicious decorator combinations."""
 
@@ -139,7 +129,7 @@ class RuleScn021(RuleBase):
         return frozenset(
             name
             for decorator in node.decorator_list
-            if (name := _decorator_name(decorator)) is not None
+            if (name := decorator_name(decorator)) is not None
         )
 
     def _emit_finding(

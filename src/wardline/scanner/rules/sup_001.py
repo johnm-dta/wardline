@@ -30,7 +30,7 @@ from datetime import date
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner.context import Finding
-from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
+from wardline.scanner.rules.base import RuleBase, call_name, walk_skip_nested_defs
 
 _ALLOWED_PARSE_CALLERS = ("__init__", "__post_init__", "setup")
 _STATE_MUTATION_NAMES = frozenset({
@@ -106,14 +106,6 @@ _CLASSIFICATION_ORDER = {
 }
 
 
-def _call_name(call: ast.Call) -> str | None:
-    if isinstance(call.func, ast.Name):
-        return call.func.id
-    if isinstance(call.func, ast.Attribute):
-        return call.func.attr
-    return None
-
-
 def _full_name(node: ast.expr) -> str | None:
     if isinstance(node, ast.Name):
         return node.id
@@ -138,7 +130,7 @@ def _keyword_or_arg_name(call: ast.Call, keyword: str) -> str | None:
 
 
 def _is_state_mutating_call(call: ast.Call) -> bool:
-    name = _call_name(call)
+    name = call_name(call)
     return name in _STATE_MUTATION_NAMES
 
 
@@ -151,7 +143,7 @@ def _is_transaction_context(node: ast.With | ast.AsyncWith) -> bool:
 
 
 def _is_auth_call(call: ast.Call) -> bool:
-    name = _call_name(call)
+    name = call_name(call)
     if name is None:
         return False
     lowered = name.lower()
@@ -178,25 +170,23 @@ def _contains_hint(name: str, hints: tuple[str, ...]) -> bool:
     return any(hint in lowered for hint in hints)
 
 
-def _is_log_sink(call: ast.Call) -> bool:
+def _call_matches_hints(call: ast.Call, hints: tuple[str, ...]) -> bool:
     full = _full_name(call.func)
-    name = _call_name(call)
+    name = call_name(call)
     candidates = [value for value in (full, name) if value is not None]
-    return any(_contains_hint(candidate, _LOG_SINK_HINTS) for candidate in candidates)
+    return any(_contains_hint(candidate, hints) for candidate in candidates)
+
+
+def _is_log_sink(call: ast.Call) -> bool:
+    return _call_matches_hints(call, _LOG_SINK_HINTS)
 
 
 def _is_persistence_sink(call: ast.Call) -> bool:
-    full = _full_name(call.func)
-    name = _call_name(call)
-    candidates = [value for value in (full, name) if value is not None]
-    return any(_contains_hint(candidate, _PERSISTENCE_HINTS) for candidate in candidates)
+    return _call_matches_hints(call, _PERSISTENCE_HINTS)
 
 
 def _is_protective_call(call: ast.Call) -> bool:
-    full = _full_name(call.func)
-    name = _call_name(call)
-    candidates = [value for value in (full, name) if value is not None]
-    return any(_contains_hint(candidate, _PROTECTIVE_HINTS) for candidate in candidates)
+    return _call_matches_hints(call, _PROTECTIVE_HINTS)
 
 
 def _contains_sensitive_reference(
@@ -299,7 +289,7 @@ class RuleSup001(RuleBase):
                     name
                     for inner in walk_skip_nested_defs(child)
                     if isinstance(inner, ast.Call)
-                    and (name := _call_name(inner)) is not None
+                    and (name := call_name(inner)) is not None
                 }
 
         if self._context is not None and self._context.annotations_map is not None:
@@ -495,7 +485,7 @@ class RuleSup001(RuleBase):
         for child in walk_skip_nested_defs(node):
             if not isinstance(child, ast.Call):
                 continue
-            name = _call_name(child)
+            name = call_name(child)
             if name in self._parse_at_init_targets:
                 self._emit(
                     child,
@@ -508,7 +498,7 @@ class RuleSup001(RuleBase):
     ) -> None:
         for child in walk_skip_nested_defs(node):
             if isinstance(child, ast.Call) and _is_nondeterministic_call(child):
-                full = _full_name(child.func) or _call_name(child) or "call"
+                full = _full_name(child.func) or call_name(child) or "call"
                 self._emit(
                     child,
                     f"@deterministic function calls non-deterministic API '{full}'",
@@ -576,7 +566,7 @@ class RuleSup001(RuleBase):
         calls: dict[str, list[ast.Call]] = {}
         for child in walk_skip_nested_defs(node):
             if isinstance(child, ast.Call):
-                name = _call_name(child)
+                name = call_name(child)
                 if name is not None:
                     calls.setdefault(name, []).append(child)
 
@@ -608,8 +598,8 @@ class RuleSup001(RuleBase):
         for child in walk_skip_nested_defs(node):
             if not isinstance(child, ast.Call):
                 continue
-            call_name = _call_name(child)
-            if call_name not in self._audit_targets:
+            callee_name = call_name(child)
+            if callee_name not in self._audit_targets:
                 continue
             arg_names = {
                 name
@@ -774,7 +764,7 @@ class RuleSup001(RuleBase):
                 continue
             if not isinstance(child.value, ast.Call):
                 continue
-            callee = _call_name(child.value)
+            callee = call_name(child.value)
             if callee is None:
                 continue
             ann_names = (
@@ -882,7 +872,7 @@ class RuleSup001(RuleBase):
         for child in walk_skip_nested_defs(node):
             if not isinstance(child, ast.Call):
                 continue
-            callee = _call_name(child)
+            callee = call_name(child)
             if callee is None:
                 continue
 

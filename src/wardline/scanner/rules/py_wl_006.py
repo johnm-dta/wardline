@@ -15,10 +15,15 @@ import ast
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from wardline.core import matrix
 from wardline.core.severity import RuleId
-from wardline.scanner.context import Finding
-from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
+from wardline.scanner.rules.base import (
+    RuleBase,
+    _AST_TRY_STAR,
+    call_name,
+    decorator_name,
+    receiver_name,
+    walk_skip_nested_defs,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -27,11 +32,6 @@ _BROAD_NAMES = frozenset({"Exception", "BaseException"})
 _AUDIT_DECORATORS = frozenset({"audit_writer", "audit_critical"})
 _AUDIT_ATTR_PREFIXES = ("audit", "record", "emit")
 _AUDIT_FUNC_NAMES = frozenset({"audit", "record", "emit"})
-
-# Python 3.11 introduced ast.TryStar for except* syntax; Python 3.12 merged
-# it back into ast.Try. Cache at module level to avoid per-function lookup.
-_AST_TRY_STAR: type | None = getattr(ast, "TryStar", None)
-
 
 @dataclass(frozen=True)
 class _BlockAnalysis:
@@ -56,16 +56,6 @@ def _iter_defs_with_qualnames(
             yield from _iter_defs_with_qualnames(node.body, class_prefix)
 
 
-def _decorator_name(decorator: ast.expr) -> str | None:
-    """Return the terminal decorator name for ``@name`` and ``@pkg.name``."""
-    target = decorator.func if isinstance(decorator, ast.Call) else decorator
-    if isinstance(target, ast.Name):
-        return target.id
-    if isinstance(target, ast.Attribute):
-        return target.attr
-    return None
-
-
 def _is_broad_handler(handler: ast.ExceptHandler) -> bool:
     """Check if handler catches broadly (Exception, BaseException, bare)."""
     if handler.type is None:
@@ -83,32 +73,13 @@ def _is_broad_handler(handler: ast.ExceptHandler) -> bool:
     return False
 
 
-def _call_name(call: ast.Call) -> str | None:
-    """Return the bare or terminal attribute name for a call target."""
-    if isinstance(call.func, ast.Name):
-        return call.func.id
-    if isinstance(call.func, ast.Attribute):
-        return call.func.attr
-    return None
-
-
-def _receiver_name(node: ast.expr) -> str | None:
-    """Extract a simple receiver name for ``obj.method(...)`` heuristics."""
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        parent = _receiver_name(node.value)
-        return f"{parent}.{node.attr}" if parent else node.attr
-    return None
-
-
 def _looks_audit_scoped(call: ast.Call) -> bool:
     """Heuristic for obviously audit-shaped sinks, excluding telemetry."""
     if isinstance(call.func, ast.Name):
         return call.func.id in _AUDIT_FUNC_NAMES
     if isinstance(call.func, ast.Attribute):
         attr = call.func.attr
-        receiver = _receiver_name(call.func.value) or ""
+        receiver = receiver_name(call.func.value) or ""
         if any(attr == prefix or attr.startswith(prefix + "_") for prefix in _AUDIT_ATTR_PREFIXES):
             return True
         receiver_lower = receiver.lower()
@@ -118,7 +89,7 @@ def _looks_audit_scoped(call: ast.Call) -> bool:
 
 def _is_audit_call(call: ast.Call, local_audit_names: frozenset[str]) -> bool:
     """Check if a Call node looks like an audit-critical write."""
-    name = _call_name(call)
+    name = call_name(call)
     if name is not None and name in local_audit_names:
         return True
     return _looks_audit_scoped(call)
@@ -197,7 +168,7 @@ class RulePyWl006(RuleBase):
         local_names: set[str] = set()
         for qualname, func in _iter_defs_with_qualnames(node.body):
             if any(
-                _decorator_name(decorator) in _AUDIT_DECORATORS
+                decorator_name(decorator) in _AUDIT_DECORATORS
                 for decorator in func.decorator_list
             ):
                 local_names.add(qualname.split(".")[-1])
@@ -248,7 +219,7 @@ class RulePyWl006(RuleBase):
             if key in seen:
                 continue
             seen.add(key)
-            self._emit_finding(
+            self._emit_matrix_finding(
                 bypass_node,
                 (
                     "Audit-critical path has a success/fallback branch "
@@ -265,7 +236,7 @@ class RulePyWl006(RuleBase):
                 isinstance(handler_node, ast.Call)
                 and _is_audit_call(handler_node, self._local_audit_names)
             ):
-                self._emit_finding(
+                self._emit_matrix_finding(
                     handler_node,
                     (
                         "Audit-critical write in broad exception handler — "
@@ -441,24 +412,3 @@ class RulePyWl006(RuleBase):
             bypass_nodes=tuple(bypass_nodes),
         )
 
-    def _emit_finding(self, node: ast.AST, message: str) -> None:
-        """Emit a PY-WL-006 finding."""
-        taint = self._get_function_taint(self._current_qualname)
-        cell = matrix.lookup(self.RULE_ID, taint)
-        self.findings.append(
-            Finding(
-                rule_id=RuleId.PY_WL_006,
-                file_path=self._file_path,
-                line=getattr(node, "lineno", 0),
-                col=getattr(node, "col_offset", 0),
-                end_line=getattr(node, "end_lineno", None),
-                end_col=getattr(node, "end_col_offset", None),
-                message=message,
-                severity=cell.severity,
-                exceptionability=cell.exceptionability,
-                taint_state=taint,
-                analysis_level=1,
-                source_snippet=None,
-                qualname=self._current_qualname,
-            )
-        )

@@ -2,7 +2,7 @@
 
 Detects declared validation and restoration boundaries whose bodies do
 not contain a structural rejection path. Under the authoritative
-binding/spec contract, WL-008 applies to the boundary function itself:
+binding/spec contract, PY-WL-008 applies to the boundary function itself:
 the body must reject invalid input via a raised exception or a guarded
 early return that clearly represents rejection.
 """
@@ -11,14 +11,12 @@ from __future__ import annotations
 
 import ast
 
-from wardline.core import matrix
-from wardline.core.severity import RuleId
+from wardline.core.severity import Exceptionability, RuleId
 from wardline.manifest.scope import path_within_scope
-from wardline.scanner.context import Finding
 from wardline.scanner.import_resolver import resolve_call_fqn
 from wardline.scanner.rejection_path import has_rejection_path as _has_rejection_path
 from wardline.scanner.rejection_path import iter_reachable_calls
-from wardline.scanner.rules.base import RuleBase
+from wardline.scanner.rules.base import RuleBase, decorator_name
 
 _BOUNDARY_TRANSITIONS = frozenset({
     "shape_validation",
@@ -35,22 +33,12 @@ _BOUNDARY_DECORATORS = frozenset({
 })
 
 
-def _decorator_name(decorator: ast.expr) -> str | None:
-    """Return the terminal decorator name for ``@name`` and ``@pkg.name``."""
-    target = decorator.func if isinstance(decorator, ast.Call) else decorator
-    if isinstance(target, ast.Name):
-        return target.id
-    if isinstance(target, ast.Attribute):
-        return target.attr
-    return None
-
-
 def _has_direct_boundary_decorator(
     node: ast.FunctionDef | ast.AsyncFunctionDef,
 ) -> bool:
     """Check for direct wardline boundary decorators in source."""
     return any(
-        _decorator_name(decorator) in _BOUNDARY_DECORATORS
+        decorator_name(decorator) in _BOUNDARY_DECORATORS
         for decorator in node.decorator_list
     )
 
@@ -63,6 +51,7 @@ class RulePyWl008(RuleBase):
     """
 
     RULE_ID = RuleId.PY_WL_008
+    DEFAULT_EXCEPTIONABILITY = Exceptionability.UNCONDITIONAL
 
     def __init__(self, *, file_path: str = "") -> None:
         super().__init__()
@@ -81,7 +70,7 @@ class RulePyWl008(RuleBase):
             return
         if self._has_delegated_rejection(node):
             return
-        self._emit_finding(node)
+        self._emit_matrix_finding(node, "Declared validation/restoration boundary has no rejection path")
 
     def _has_delegated_rejection(
         self,
@@ -124,27 +113,3 @@ class RulePyWl008(RuleBase):
                     return True
         return _has_direct_boundary_decorator(node)
 
-    def _emit_finding(self, node: ast.AST) -> None:
-        """Emit a PY-WL-008 finding."""
-        taint = self._get_function_taint(self._current_qualname)
-        cell = matrix.lookup(self.RULE_ID, taint)
-        self.findings.append(
-            Finding(
-                rule_id=RuleId.PY_WL_008,
-                file_path=self._file_path,
-                line=getattr(node, "lineno", 0),
-                col=getattr(node, "col_offset", 0),
-                end_line=getattr(node, "end_lineno", None),
-                end_col=getattr(node, "end_col_offset", None),
-                message=(
-                    "Declared validation/restoration boundary has no "
-                    "rejection path"
-                ),
-                severity=cell.severity,
-                exceptionability=cell.exceptionability,
-                taint_state=taint,
-                analysis_level=1,
-                source_snippet=None,
-                qualname=self._current_qualname,
-            )
-        )

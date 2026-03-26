@@ -295,6 +295,21 @@ with suppress(BaseException):
 
         assert len(rule.findings) == 1
 
+    def test_suppress_exception_in_module_function_fires(self) -> None:
+        rule = _run_rule_module(
+            """\
+import contextlib
+
+def target():
+    with contextlib.suppress(Exception):
+        do_something_risky()
+"""
+        )
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_004
+        assert "contextlib.suppress()" in rule.findings[0].message
+
     def test_suppress_value_error_silent(self) -> None:
         rule = _run_rule(
             """\

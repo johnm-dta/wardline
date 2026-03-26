@@ -16,7 +16,9 @@ from abc import ABC, abstractmethod
 from collections import deque
 from typing import TYPE_CHECKING, ClassVar, final
 
+from wardline.core import matrix
 from wardline.core.taints import TaintState
+from wardline.scanner.context import Finding
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +26,17 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from wardline.core.severity import RuleId
-    from wardline.scanner.context import Finding, ScanContext
+    from wardline.scanner.context import ScanContext
 
 _GUARDED_METHODS = frozenset({"visit_FunctionDef", "visit_AsyncFunctionDef"})
 
+# Python 3.11 introduced ast.TryStar for ``except*``. Python 3.12 merged
+# it back into ast.Try, so TryStar may not exist. Cache at module level
+# to avoid repeated getattr() inside hot rule loops.
+_AST_TRY_STAR: type | None = getattr(ast, "TryStar", None)
+
+
+# ── Shared AST helpers ──────────────────────────────────────────
 
 def walk_skip_nested_defs(node: ast.AST) -> Iterator[ast.AST]:
     """Like ``ast.walk`` but skip nested FunctionDef/AsyncFunctionDef bodies.
@@ -46,6 +55,64 @@ def walk_skip_nested_defs(node: ast.AST) -> Iterator[ast.AST]:
                 continue
             todo.append(child)
 
+
+def decorator_name(node: ast.expr) -> str | None:
+    """Return the terminal decorator name for ``@name`` and ``@pkg.name``.
+
+    Handles both bare decorators (``@foo``) and call decorators
+    (``@foo(...)``). Returns ``None`` for complex expressions.
+    """
+    target = node.func if isinstance(node, ast.Call) else node
+    if isinstance(target, ast.Name):
+        return target.id
+    if isinstance(target, ast.Attribute):
+        return target.attr
+    return None
+
+
+def call_name(call: ast.Call) -> str | None:
+    """Return the bare or terminal attribute name for a call target."""
+    if isinstance(call.func, ast.Name):
+        return call.func.id
+    if isinstance(call.func, ast.Attribute):
+        return call.func.attr
+    return None
+
+
+def receiver_name(node: ast.expr) -> str | None:
+    """Extract a dotted name from an expression for receiver matching.
+
+    Returns the name for ``ast.Name`` (e.g. ``"jsonschema"``) or the
+    full dotted chain for ``ast.Attribute`` (e.g. ``"json.loads"``).
+    Returns ``None`` for complex expressions.
+    """
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = receiver_name(node.value)
+        return f"{parent}.{node.attr}" if parent else node.attr
+    return None
+
+
+def iter_exception_handlers(node: ast.AST) -> Iterator[ast.ExceptHandler]:
+    """Yield all ExceptHandler nodes under *node*, deduplicating TryStar.
+
+    Handles both regular ``try/except`` and Python 3.11+ ``try/except*``
+    (``ast.TryStar``). TryStar handlers are yielded when the TryStar
+    node is encountered; those same handlers are then skipped when
+    encountered again as children during the walk.
+    """
+    trystar_ids: set[int] = set()
+    for child in walk_skip_nested_defs(node):
+        if _AST_TRY_STAR is not None and isinstance(child, _AST_TRY_STAR):
+            for handler in child.handlers:
+                trystar_ids.add(id(handler))
+                yield handler
+        elif isinstance(child, ast.ExceptHandler) and id(child) not in trystar_ids:
+            yield child
+
+
+# ── RuleBase ────────────────────────────────────────────────────
 
 class RuleBase(ast.NodeVisitor, ABC):
     """Abstract base for all wardline scanner rules.
@@ -77,6 +144,17 @@ class RuleBase(ast.NodeVisitor, ABC):
                     f"{cls.__name__} must not override {method_name}. "
                     f"Implement visit_function() instead."
                 )
+
+        # Validate RULE_ID is defined on concrete rule subclasses.
+        # Skip abstract classes (those that still have abstractmethod).
+        has_abstract = any(
+            getattr(getattr(cls, name, None), "__isabstractmethod__", False)
+            for name in dir(cls)
+        )
+        if not has_abstract and "RULE_ID" not in cls.__dict__:
+            raise TypeError(
+                f"{cls.__name__} must define a RULE_ID class variable."
+            )
 
     @final
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
@@ -117,6 +195,32 @@ class RuleBase(ast.NodeVisitor, ABC):
             )
             return TaintState.UNKNOWN_RAW
         return taint
+
+    def _emit_matrix_finding(self, node: ast.AST, message: str) -> None:
+        """Emit a finding using the severity matrix for ``self.RULE_ID``.
+
+        Looks up the (rule, taint) severity cell and appends a Finding
+        with standard location extraction from *node*.
+        """
+        taint = self._get_function_taint(self._current_qualname)
+        cell = matrix.lookup(self.RULE_ID, taint)
+        self.findings.append(
+            Finding(
+                rule_id=self.RULE_ID,
+                file_path=self._file_path,
+                line=getattr(node, "lineno", 0),
+                col=getattr(node, "col_offset", 0),
+                end_line=getattr(node, "end_lineno", None),
+                end_col=getattr(node, "end_col_offset", None),
+                message=message,
+                severity=cell.severity,
+                exceptionability=cell.exceptionability,
+                taint_state=taint,
+                analysis_level=1,
+                source_snippet=None,
+                qualname=self._current_qualname,
+            )
+        )
 
     def _dispatch(
         self, node: ast.FunctionDef | ast.AsyncFunctionDef, *, is_async: bool

@@ -9,6 +9,8 @@ from wardline.core.taints import TaintState
 
 REGISTRY_VERSION = "0.1"
 
+# Import-time consistency check added after REGISTRY is constructed (below).
+
 
 @dataclass(frozen=True)
 class RegistryEntry:
@@ -43,9 +45,8 @@ def _bool_entry(name: str, group: int) -> RegistryEntry:
 
 # Group 1: Authority Tier Flow (7 decorators)
 # Group 2: Audit (1 decorator)
-# These are the MVP-required decorators.
 #
-# Groups 3-14: Structural / operational decorators.
+# Groups 3-15: Structural / operational decorators.
 # Each is a simple boolean marker unless noted otherwise.
 REGISTRY: MappingProxyType[str, RegistryEntry] = MappingProxyType({
     # --- Group 1: Authority Tier Flow ---
@@ -187,3 +188,13 @@ REGISTRY: MappingProxyType[str, RegistryEntry] = MappingProxyType({
         },
     ),
 })
+
+# Import-time consistency: verify each key matches its entry's canonical_name.
+_mismatched = {
+    k for k, v in REGISTRY.items() if k != v.canonical_name
+}
+if _mismatched:
+    raise ValueError(
+        f"REGISTRY key/canonical_name mismatch: {sorted(_mismatched)}"
+    )
+del _mismatched

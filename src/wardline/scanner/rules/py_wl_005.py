@@ -16,10 +16,8 @@ from __future__ import annotations
 
 import ast
 
-from wardline.core import matrix
 from wardline.core.severity import RuleId
-from wardline.scanner.context import Finding
-from wardline.scanner.rules.base import RuleBase, walk_skip_nested_defs
+from wardline.scanner.rules.base import RuleBase, iter_exception_handlers
 
 _SILENT_MESSAGES: dict[type, str] = {
     ast.Pass: (
@@ -81,15 +79,8 @@ class RulePyWl005(RuleBase):
         is_async: bool,
     ) -> None:
         """Walk the function body looking for silent exception handlers."""
-        _TryStar = getattr(ast, "TryStar", None)
-        trystar_handlers: set[int] = set()
-        for child in walk_skip_nested_defs(node):
-            if _TryStar is not None and isinstance(child, _TryStar):
-                for handler in child.handlers:
-                    trystar_handlers.add(id(handler))
-                    self._check_handler(handler)
-            elif isinstance(child, ast.ExceptHandler) and id(child) not in trystar_handlers:
-                self._check_handler(child)
+        for handler in iter_exception_handlers(node):
+            self._check_handler(handler)
 
     def _check_handler(self, handler: ast.ExceptHandler) -> None:
         """Check a single exception handler for silent body."""
@@ -99,22 +90,4 @@ class RulePyWl005(RuleBase):
         message = _silent_message(stmt)
         if message is None:
             return
-        taint = self._get_function_taint(self._current_qualname)
-        cell = matrix.lookup(self.RULE_ID, taint)
-        self.findings.append(
-            Finding(
-                rule_id=RuleId.PY_WL_005,
-                file_path=self._file_path,
-                line=handler.lineno,
-                col=handler.col_offset,
-                end_line=handler.end_lineno,
-                end_col=handler.end_col_offset,
-                message=message,
-                severity=cell.severity,
-                exceptionability=cell.exceptionability,
-                taint_state=taint,
-                analysis_level=1,
-                source_snippet=None,
-                qualname=self._current_qualname,
-            )
-        )
+        self._emit_matrix_finding(handler, message)
