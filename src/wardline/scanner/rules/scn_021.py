@@ -65,6 +65,13 @@ _COMBINATIONS: tuple[_CombinationSpec, ...] = (
         "Audit writes create new records; restoration reconstructs existing ones",
     ),
     _CombinationSpec(
+        "external_boundary",
+        "restoration_boundary",
+        _CONTRADICTORY,
+        "External boundaries receive new untrusted data; "
+        "restoration reconstructs previously-known data",
+    ),
+    _CombinationSpec(
         "fail_closed",
         "emits_or_explains",
         _CONTRADICTORY,

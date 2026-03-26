@@ -245,6 +245,44 @@ def target():
         assert len(rule.findings) == 0
 
 
+class TestRestorationBoundaryRejection:
+    """Restoration boundaries must also have rejection paths."""
+
+    def test_restoration_boundary_with_rejection_path_no_finding(self) -> None:
+        rule = _run_rule(
+            """\
+if not isinstance(blob, bytes):
+    raise TypeError("expected bytes")
+record = deserialize(blob)
+return record
+""",
+            boundaries=(_boundary(transition="restoration"),),
+        )
+
+        assert len(rule.findings) == 0
+
+    def test_restoration_boundary_without_rejection_path_fires_finding(self) -> None:
+        rule = _run_rule(
+            """\
+record = deserialize(blob)
+return record
+""",
+            boundaries=(
+                BoundaryEntry(
+                    function="target",
+                    transition="restoration",
+                    restored_tier=2,
+                    overlay_scope="/project/src/api",
+                ),
+            ),
+        )
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_008
+        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
+
+
 class TestNestedAndAsyncBehavior:
     """Nested defs do not satisfy outer rejection requirements; async also works."""
 
