@@ -45,3 +45,77 @@ class TestComputeManifestHash:
 
         result = _compute_manifest_hash(tmp_path / "nonexistent.yaml")
         assert result is None
+
+
+class TestComputeInputHash:
+    def test_deterministic(self, tmp_path: Path) -> None:
+        """Same files produce same hash."""
+        from wardline.cli.scan import _compute_input_hash
+
+        f1 = tmp_path / "a.py"
+        f1.write_text("x = 1\n", encoding="utf-8")
+        f2 = tmp_path / "b.py"
+        f2.write_text("y = 2\n", encoding="utf-8")
+
+        hash1, count1 = _compute_input_hash([f1, f2], tmp_path)
+        hash2, count2 = _compute_input_hash([f1, f2], tmp_path)
+        assert hash1 == hash2
+        assert count1 == count2 == 2
+        assert hash1.startswith("sha256:")
+
+    def test_order_independent(self, tmp_path: Path) -> None:
+        """Different enumeration order produces same hash."""
+        from wardline.cli.scan import _compute_input_hash
+
+        f1 = tmp_path / "a.py"
+        f1.write_text("x = 1\n", encoding="utf-8")
+        f2 = tmp_path / "b.py"
+        f2.write_text("y = 2\n", encoding="utf-8")
+
+        hash_ab, _ = _compute_input_hash([f1, f2], tmp_path)
+        hash_ba, _ = _compute_input_hash([f2, f1], tmp_path)
+        assert hash_ab == hash_ba
+
+    def test_empty_file_set(self, tmp_path: Path) -> None:
+        """Empty file set produces valid hash with count 0."""
+        from wardline.cli.scan import _compute_input_hash
+
+        h, count = _compute_input_hash([], tmp_path)
+        assert h.startswith("sha256:")
+        assert count == 0
+        assert len(h) == len("sha256:") + 64
+
+    def test_symlink_dedup(self, tmp_path: Path) -> None:
+        """Symlink to same file is counted once."""
+        from wardline.cli.scan import _compute_input_hash
+
+        real = tmp_path / "real.py"
+        real.write_text("x = 1\n", encoding="utf-8")
+        link = tmp_path / "link.py"
+        link.symlink_to(real)
+
+        h_both, count_both = _compute_input_hash([real, link], tmp_path)
+        h_real, count_real = _compute_input_hash([real], tmp_path)
+        assert h_both == h_real
+        assert count_both == count_real == 1
+
+    def test_uses_project_root_not_scan_path(self, tmp_path: Path) -> None:
+        """Paths are relative to project_root, not to wherever the scan started."""
+        from wardline.cli.scan import _compute_input_hash
+
+        sub = tmp_path / "src"
+        sub.mkdir()
+        f = sub / "mod.py"
+        f.write_text("x = 1\n", encoding="utf-8")
+
+        h_root, _ = _compute_input_hash([f], tmp_path)
+        h_sub, _ = _compute_input_hash([f], sub)
+        assert h_root != h_sub
+
+    def test_hard_failure_on_unreadable(self, tmp_path: Path) -> None:
+        """OSError on read_bytes raises, does not silently skip."""
+        from wardline.cli.scan import _compute_input_hash
+
+        missing = tmp_path / "gone.py"
+        with pytest.raises(OSError):
+            _compute_input_hash([missing], tmp_path)

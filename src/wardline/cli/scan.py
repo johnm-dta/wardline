@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 import click
 
@@ -61,6 +61,57 @@ def _compute_manifest_hash(manifest_path: Path) -> str | None:
         return "sha256:" + hashlib.sha256(raw).hexdigest()
     except OSError:
         return None
+
+
+def _compute_input_hash(
+    file_paths: Sequence[Path], project_root: Path
+) -> tuple[str, int]:
+    """Hash-of-hashes over analysed files (§10.1 algorithm).
+
+    Args:
+        file_paths: Files the engine analysed (from ScanResult.scanned_file_paths).
+        project_root: The project root (manifest_path.parent), NOT the scan
+            target path. The spec requires paths relative to project root so
+            that scanning a subdirectory produces the same inputHash as scanning
+            the full project (for the same file set).
+
+    Returns:
+        (hash_string, deduplicated_file_count). The hash is always valid
+        (including for empty file sets). OSError on any file is re-raised —
+        silently skipping would make the hash describe a different set than
+        the scan consumed.
+    """
+    import hashlib
+
+    resolved_root = project_root.resolve()
+
+    # Deduplicate after symlink resolution (§10.1 step 2)
+    seen: dict[Path, None] = {}
+    for fp in file_paths:
+        resolved = fp.resolve()
+        if resolved not in seen:
+            seen[resolved] = None
+
+    records: list[str] = []
+    for resolved in seen:
+        # Step 3: normalize to forward-slash path relative to project root
+        try:
+            rel = resolved.relative_to(resolved_root)
+        except ValueError:
+            rel = resolved
+        normalized = rel.as_posix()
+        # Step 4: SHA-256 of raw bytes (OSError re-raises — hard failure)
+        digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+        # Step 5: form record
+        records.append(f"{normalized}\x00{digest}")
+
+    # Step 6: sort, concatenate with \n terminators, hash
+    records.sort()
+    combined = "".join(r + "\n" for r in records)
+    return (
+        "sha256:" + hashlib.sha256(combined.encode("utf-8")).hexdigest(),
+        len(records),
+    )
 
 
 def _utc_timestamp() -> str:
