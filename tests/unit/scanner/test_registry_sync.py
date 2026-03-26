@@ -37,6 +37,7 @@ from wardline.decorators import (
     operations,
     plugin,
     provenance,
+    restoration,
     safety,
     schema,
     secrets,
@@ -54,7 +55,7 @@ _LIBRARY_DECORATORS: dict[str, Any] = {}
 
 _DECORATOR_MODULES = [
     access, audit, authority, boundaries, concurrency, determinism,
-    lifecycle, operations, plugin, provenance, safety, schema,
+    lifecycle, operations, plugin, provenance, restoration, safety, schema,
     secrets, sensitivity,
 ]
 
@@ -75,6 +76,9 @@ _DECORATOR_FACTORIES: dict[str, Any] = {
     "handles_classified": sensitivity.handles_classified(level="PROTECTED"),
     "handles_pii": sensitivity.handles_pii(fields=["email"]),
     "ordered_after": concurrency.ordered_after("bootstrap"),
+    "restoration_boundary": restoration.restoration_boundary(
+        restored_tier=1, structural_evidence=True
+    ),
 }
 
 for _mod in _DECORATOR_MODULES:
