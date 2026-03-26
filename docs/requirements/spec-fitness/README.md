@@ -2,7 +2,7 @@
 
 This folder turns the normative Wardline specification in [docs/spec/](/home/john/wardline/docs/spec) into a project-facing requirements baseline that can be tested against the current Python implementation.
 
-The intent is practical fitness assessment, not restating the entire spec. Each requirement here is:
+The intent is comprehensive traceability from every normative spec requirement to a testable fitness criterion. Each requirement here is:
 
 - anchored in one or more normative spec sections
 - phrased so it can be verified against the repo
@@ -24,13 +24,13 @@ Some records also carry `informative_sources` when a non-normative binding secti
 
 ## File Layout
 
-- [01-framework-core.yaml](01-framework-core.yaml): authority model, taint-state invariants, effective-state closure, annotation vocabulary expressiveness
-- [02-manifest-governance.yaml](02-manifest-governance.yaml): manifests, overlays, governance profile, coherence checks, agent-authored change detection
-- [03-scanner-conformance.yaml](03-scanner-conformance.yaml): scanner rules, corpus, SARIF, living catalogue, taint propagation, corpus independence
-- [04-python-binding.yaml](04-python-binding.yaml): Python decorator and runtime contract
-- [05-enforcement-layers.yaml](05-enforcement-layers.yaml): §8 enforcement layer requirements — static analysis, structural verification, taint flow, SARIF output
-- [06-governance-operations.yaml](06-governance-operations.yaml): §9 governance model operations — exceptionability, fingerprinting, audit logging, control law, exception recurrence
-- [07-conformance-profiles.yaml](07-conformance-profiles.yaml): §14 conformance criteria, enforcement/governance profiles, regime documentation, assessment procedure
+- [01-framework-core.yaml](01-framework-core.yaml): authority model, taint-state invariants, effective-state closure, transition semantics, cross-language taint, dependency taint, annotation vocabulary expressiveness
+- [02-manifest-governance.yaml](02-manifest-governance.yaml): manifests, overlays, governance profile, coherence checks, delegation policy, module-tier mappings, YAML safety, agent-authored change detection
+- [03-scanner-conformance.yaml](03-scanner-conformance.yaml): scanner rules, corpus, SARIF, living catalogue, taint propagation, corpus independence, group-specific enforcement minima (Groups 2, 5, 12, 13)
+- [04-python-binding.yaml](04-python-binding.yaml): Python decorator and runtime contract, contradictory combinations, error handling, exit codes
+- [05-enforcement-layers.yaml](05-enforcement-layers.yaml): §8 enforcement layer requirements — static analysis, structural verification, taint flow, SARIF output, interprocedural analysis, incremental analysis, pre-generation projection, type system, runtime structural
+- [06-governance-operations.yaml](06-governance-operations.yaml): §9 governance model operations — exceptionability, fingerprinting, audit logging, control law, exception recurrence, exception age management, policy/enforcement artefact distinction, provenance justification
+- [07-conformance-profiles.yaml](07-conformance-profiles.yaml): §14 conformance criteria, enforcement/governance profiles, regime composition, assessment procedure, Lite governance checklist
 - [assessment-template.md](assessment-template.md): a lightweight worksheet for a repo fitness pass
 
 ## Requirement Schema
@@ -54,15 +54,15 @@ The baseline covers normative requirements from the following spec sections:
 |---|---|---|
 | §1 What a Wardline Is | 01-framework-core | Effective-state closure, five required components |
 | §2 Problem Statement | 05-enforcement-layers | ACF coverage claims |
-| §4–5 Authority Tier Model | 01-framework-core | Taint vocabulary, join algebra, tier mapping, transitions, dependency taint |
-| §6 Annotation Vocabulary | 01-framework-core | 17-group expressiveness |
-| §7 Pattern Rules | 03-scanner-conformance | Living catalogue, rejection paths, WL-001 suppression, matrix deviations |
-| §8 Enforcement Layers | 05-enforcement-layers | Static analysis, structural verification, taint flow, SARIF output |
-| §9 Governance Model | 02-manifest, 06-governance | Coherence, exceptionability, fingerprinting, audit logging, control law |
-| §10 Verification Properties | 03-scanner, 07-conformance | Corpus, precision/recall, taint propagation, determinism |
-| §13 Manifest Format | 02-manifest-governance | Schema validation, overlays, boundaries, contracts, ratification |
-| §14 Conformance | 07-conformance-profiles | Ten criteria, profiles, regimes, assessment procedure |
-| §A Python Binding | 04-python-binding | AST discovery, decorators, SARIF properties, verification mode |
+| §4–5 Authority Tier Model | 01-framework-core | Taint vocabulary, join algebra, tier mapping, transitions, serialisation authority-shedding, non-contagion, cross-language taint reset, dependency taint defaults |
+| §6 Annotation Vocabulary | 01-framework-core, 03-scanner | 17-group expressiveness, Group 2 audit-primacy ordering, Group 5 field completeness, Group 12 determinism scope, Group 13 concurrency scope |
+| §7 Pattern Rules | 03-scanner-conformance, 01-core | Living catalogue, rejection paths, WL-001 suppression, matrix deviations, taint analysis scope, implicit-flow heuristic |
+| §8 Enforcement Layers | 05-enforcement-layers | Static analysis, structural verification, taint flow, SARIF output, interprocedural (SHOULD), incremental (SHOULD), pre-generation projection, type system (SHOULD), runtime structural (SHOULD) |
+| §9 Governance Model | 02-manifest, 06-governance | Coherence, exceptionability, fingerprinting, audit logging, control law, exception age management, policy/enforcement artefact distinction, supplementary group governance, provenance justification, audit retention |
+| §10 Verification Properties | 03-scanner, 07-conformance | Corpus, precision/recall, taint propagation, determinism, specimen schema, adversarial minimums |
+| §13 Manifest Format | 02-manifest-governance | Schema validation, overlays, boundaries, contracts, ratification, delegation policy, module-tier mappings, YAML quoting, merge conflict rejection, UNCONDITIONAL cell protection |
+| §14 Conformance | 07-conformance-profiles | Ten criteria, profiles, regime composition rules, assessment procedure, Lite governance checklist |
+| §A Python Binding | 04-python-binding | AST discovery, decorators, SARIF properties, verification mode, contradictory combinations, error handling, exit codes, analysis level |
 
 Sections §3 (non-goals), §11 (language evaluation criteria), §12 (residual risks), and §B (Java binding) are non-normative or out of scope for this Python implementation baseline.
 

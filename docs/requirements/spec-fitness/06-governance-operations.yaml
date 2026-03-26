@@ -235,3 +235,110 @@ requirements:
       These governance-level findings appear in SARIF with ruleId GOVERNANCE.
       The anomaly signals provide leading indicators that complement the
       lagging expedited governance ratio metric.
+
+  - id: WL-FIT-GOV-012
+    title: Exception age management
+    statement: >
+      Bindings SHOULD implement age-based exception management: STANDARD
+      exceptions carry a maximum age (recommended 180 days), RELAXED
+      exceptions a longer maximum age (recommended 365 days). If re-review
+      does not occur within a defined grace period, the exception lapses
+      and the underlying finding reverts to its default severity.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.4 Governance capacity"
+    verification:
+      method: model_and_unit_tests
+      target_paths:
+        - src/wardline/manifest/models.py
+        - src/wardline/manifest/exceptions.py
+        - tests/unit/manifest/test_exceptions.py
+    fitness_dimensions: [governance, safety]
+    notes: >
+      Age thresholds, grace period, and escalation mechanism are
+      binding-level decisions. The framework requires the capability,
+      not the specific parameters.
+
+  - id: WL-FIT-GOV-013
+    title: Policy vs enforcement artefact distinction
+    statement: >
+      The implementation SHOULD distinguish policy artefacts (tier
+      assignments, boundary declarations, restoration provenance claims,
+      exception rationale, optional-field declarations) from enforcement
+      artefacts (rule severity configuration, scanner settings, precision
+      thresholds, tool configuration) for governance purposes. Fingerprint
+      baseline diffs SHOULD present these as distinct categories.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.3.1 Artefact classification: policy and enforcement"
+    verification:
+      method: design_review
+      target_paths:
+        - src/wardline/manifest/models.py
+        - src/wardline/scanner/fingerprint.py
+    fitness_dimensions: [governance, assessability]
+    notes: >
+      Policy artefacts require security-policy-grade review; enforcement
+      artefacts require standard configuration management. The distinction
+      is per-field, not per-file.
+
+  - id: WL-FIT-GOV-014
+    title: Supplementary group exceptionability is binding-defined
+    statement: >
+      Findings from supplementary contract annotations (Groups 5–15) are
+      subject to the same governance mechanisms as core findings but their
+      exceptionability is binding-defined. Bindings SHOULD classify
+      supplementary findings as STANDARD by default, unless explicitly
+      designating specific findings as UNCONDITIONAL.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.3 Scope of governance"
+    verification:
+      method: code_review
+      target_paths:
+        - src/wardline/core/matrix.py
+        - src/wardline/scanner/rules
+    fitness_dimensions: [governance, conformance]
+    notes: >
+      This prevents ambiguity: the severity matrix governs pattern rules;
+      supplementary groups generate their own findings with their own severity.
+
+  - id: WL-FIT-GOV-015
+    title: Governance audit retention
+    statement: >
+      Governance artefacts (exception register, fingerprint baseline, SARIF
+      runs) SHOULD be retained for the duration of the system's
+      accreditation period. For ISM-assessed systems, this is typically
+      3 years from the last IRAP assessment.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.2.1 Governance audit logging"
+    verification:
+      method: documentation_review
+      target_paths:
+        - docs
+    fitness_dimensions: [governance, assessability]
+    notes: >
+      This is a process requirement. Document retention policy in the
+      adopter guide or governance documentation.
+
+  - id: WL-FIT-GOV-016
+    title: Provenance justification for trust escalation
+    statement: >
+      High-risk trust-escalation declarations — particularly those claiming
+      external data should be treated as Tier 1 — MUST include documented
+      rationale of the actual data source, the trust basis, and the
+      institutional authority for the escalation. "We trust this because we
+      always have" is not sufficient rationale.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.2 Governance mechanisms"
+    verification:
+      method: manifest_and_model_review
+      target_paths:
+        - src/wardline/manifest/models.py
+        - wardline.yaml
+    fitness_dimensions: [governance, safety]
+    notes: >
+      Restoration boundary provenance MUST address the four evidence
+      categories defined in §5.3.

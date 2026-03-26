@@ -4,9 +4,10 @@ This is the first repo fitness assessment against the baseline in this folder.
 
 ## Rollup
 
-- Pass: 17
+- Pass: 17 (of 35 assessed)
 - Partial: 10
 - Fail: 8
+- Not assessed: 71 (39 previously in YAML + 32 added in baseline expansion)
 
 Overall judgment: the project has a solid core implementation and test surface, but it is not yet fit to claim clean alignment with the current normative spec. The main issues are concentrated in three areas:
 
@@ -75,6 +76,16 @@ Result: `252 passed in 0.38s`
 | `WL-FIT-PY-007` | pass | `src/wardline/cli/scan.py`, `tests/integration/test_determinism.py` | `--verification-mode` exists and deterministic output is tested. |
 | `WL-FIT-PY-008` | fail | `src/wardline/scanner/sarif.py`, `src/wardline/cli/scan.py`, `tests/unit/scanner/test_sarif.py` | The Python interface contract’s required run-level properties are incomplete; notably `wardline.inputHash` and `wardline.inputFiles` are absent. |
 | `WL-FIT-PY-009` | pass | `src/wardline/cli/scan.py`, `src/wardline/manifest/loader.py`, `tests/integration/test_scan_cmd.py` | The scanner loads and validates the manifest against JSON Schema before producing findings. |
+
+## Requirements Not Yet Assessed
+
+The following requirements were either in the YAML files but not assessed in this initial pass, or were added during the baseline expansion to 106 requirements on 2026-03-26. They require assessment in a subsequent fitness pass.
+
+**Previously in YAML, not assessed (39 requirements):**
+CORE-008 through CORE-012, MAN-012 through MAN-013, SCAN-009 through SCAN-014, ENF-001 through ENF-007, GOV-001 through GOV-011, CONF-001 through CONF-008.
+
+**Added in baseline expansion (32 requirements):**
+CORE-013 through CORE-017, MAN-014 through MAN-019, SCAN-015 through SCAN-020, PY-010 through PY-012, ENF-008 through ENF-012, GOV-012 through GOV-016, CONF-009 through CONF-010.
 
 ## Highest-Value Gaps
 

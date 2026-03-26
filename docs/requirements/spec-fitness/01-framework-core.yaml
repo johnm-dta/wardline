@@ -231,3 +231,109 @@ requirements:
       Criterion 1 of the ten conformance criteria. Current implementation
       covers core groups; supplementary group expressiveness should be
       inventoried against the full 17-group list.
+
+  - id: WL-FIT-CORE-013
+    title: Serialisation sheds direct authority
+    statement: >
+      Data crossing a serialisation boundary MUST shed its direct authority
+      at the representation layer. Deserialised data is raw representation
+      until it passes through a declared restoration boundary with adequate
+      evidence (§5.3).
+    normative_sources:
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.2 Transition semantics"
+    verification:
+      method: unit_tests_and_design_review
+      target_paths:
+        - src/wardline/core/taints.py
+        - src/wardline/scanner/taint
+        - tests/unit/scanner/test_taint.py
+    fitness_dimensions: [correctness, safety]
+    notes: >
+      This is §5.2 invariant 5. Ensure the taint engine does not carry
+      pre-serialisation tier through serialisation boundaries without
+      restoration evidence.
+
+  - id: WL-FIT-CORE-014
+    title: Tier assignment is not contagious
+    statement: >
+      A function's tier assignment MUST NOT propagate to its callees or
+      callers. Each function's tier context is determined by its own
+      annotations, not inherited from call-chain position.
+    normative_sources:
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.2 Transition semantics"
+    verification:
+      method: design_review_and_unit_tests
+      target_paths:
+        - src/wardline/scanner/context.py
+        - src/wardline/scanner/taint
+        - tests/unit/scanner/test_taint.py
+    fitness_dimensions: [correctness, safety]
+    notes: >
+      This is §5.2 invariant 7. A Tier 1 function calling a Tier 4 adapter
+      does not make the adapter Tier 1.
+
+  - id: WL-FIT-CORE-015
+    title: Cross-language taint resets to UNKNOWN_RAW
+    statement: >
+      Data crossing a language boundary MUST reset to UNKNOWN_RAW in the
+      receiving binding unless the receiving binding can independently verify
+      the emitting binding's taint assertion. The verification mechanism
+      MUST be declared in the wardline manifest.
+    normative_sources:
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.4 Cross-language taint propagation"
+    verification:
+      method: design_review
+      target_paths:
+        - src/wardline/manifest/models.py
+        - docs/spec/wardline-02-A-python-binding.md
+    fitness_dimensions: [safety, interoperability]
+    notes: >
+      For mono-language projects this is structural. For polyglot projects,
+      verify manifest supports inter-language interface declarations.
+
+  - id: WL-FIT-CORE-016
+    title: Taint analysis scoped to explicit flows
+    statement: >
+      Taint analysis MUST cover explicit flows (data dependencies). Implicit
+      flows (control dependencies) are not required by the framework.
+      Enforcement tools SHOULD flag functions containing both a conditional
+      branch whose predicate depends on a tier-classified value and an
+      assignment in both branches to the same target variable
+      (implicit-flow evasion heuristic).
+    normative_sources:
+      - file: docs/spec/wardline-01-07-pattern-rules.md
+        section: "7.6 Taint analysis scope"
+      - file: docs/spec/wardline-01-07-pattern-rules.md
+        section: "7.6.1 Implicit-flow evasion heuristic"
+    verification:
+      method: code_review_and_unit_tests
+      target_paths:
+        - src/wardline/scanner/taint
+        - tests/unit/scanner/test_taint.py
+    fitness_dimensions: [correctness, conformance]
+    notes: >
+      The heuristic findings SHOULD be classified as WARNING/STANDARD.
+      Document whether the implicit-flow heuristic is implemented.
+
+  - id: WL-FIT-CORE-017
+    title: Dependency taint defaults for undeclared functions
+    statement: >
+      Functions not declared in dependency_taint and not carrying wardline
+      annotations MUST receive UNKNOWN_RAW by default. Enforcement tools
+      SHOULD validate dependency_taint entries against import resolution at
+      scan time.
+    normative_sources:
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.5 Third-party dependency taint"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/scanner/taint
+        - tests/unit/scanner/test_taint.py
+    fitness_dimensions: [correctness, safety]
+    notes: >
+      CORE-011 covers compound call fallback; this covers the baseline
+      default for undeclared functions and import-time validation.

@@ -156,3 +156,109 @@ requirements:
     notes: >
       Verify that any ACF coverage claims in documentation or SARIF output
       are consistent with actual taint tracking implementation status.
+
+  - id: WL-FIT-ENF-008
+    title: Interprocedural analysis (SHOULD)
+    statement: >
+      The scanner SHOULD detect pattern rule violations spanning function
+      boundaries using interprocedural analysis. This is a binding
+      requirement, not a framework invariant.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.1 Static analysis"
+    verification:
+      method: code_review_and_tests
+      target_paths:
+        - src/wardline/scanner/taint
+        - src/wardline/scanner/rules
+        - tests/unit/scanner
+    fitness_dimensions: [conformance, correctness]
+    notes: >
+      Document current interprocedural analysis depth. The minimum
+      conformance requirement is intraprocedural (ENF-001); this is the
+      recommended extension.
+
+  - id: WL-FIT-ENF-009
+    title: Incremental analysis (SHOULD)
+    statement: >
+      The scanner SHOULD support incremental analysis — analysing only
+      changed files and transitive dependents — as this is critical for
+      CI adoption at scale.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.1 Static analysis"
+    verification:
+      method: code_review
+      target_paths:
+        - src/wardline/scanner
+        - src/wardline/cli/scan.py
+    fitness_dimensions: [conformance, performance]
+    notes: >
+      This is a SHOULD-level binding requirement. Document whether
+      incremental analysis is implemented or planned.
+
+  - id: WL-FIT-ENF-010
+    title: Pre-generation context projection content
+    statement: >
+      When pre-generation projection is implemented, for a given file path
+      the projection MUST resolve: taint state summary per-region, active
+      rules with severity, live exceptions, boundary context, optional-field
+      classification, rationale narrative, and currency (commit hash).
+      Projection is advisory and does NOT replace post-generation
+      enforcement.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.5 Pre-generation context projection"
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.5.1 Projection content"
+    verification:
+      method: design_review
+      target_paths:
+        - src/wardline
+        - docs/spec/wardline-02-A-python-binding.md
+    fitness_dimensions: [conformance, assessability]
+    notes: >
+      Under Assurance, deployments SHOULD track whether projection is
+      operational and report availability in SARIF run-level properties.
+      Projection is not an enforcement requirement.
+
+  - id: WL-FIT-ENF-011
+    title: Runtime structural enforcement (SHOULD)
+    statement: >
+      Bindings SHOULD make fabricated defaults on Tier 1 fields
+      structurally impossible, enforce that subclasses of protected base
+      classes cannot add unannotated methods, and make serialisation
+      boundary violations detectable at access time. Bindings implementing
+      runtime structural enforcement MUST include restoration boundary
+      verification.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.3 Runtime structural"
+    verification:
+      method: code_review
+      target_paths:
+        - src/wardline/decorators
+        - src/wardline/core
+    fitness_dimensions: [conformance, safety]
+    notes: >
+      This is the §8.3 enforcement layer. Document which runtime structural
+      mechanisms are implemented and which are deferred.
+
+  - id: WL-FIT-ENF-012
+    title: Type system tier metadata (SHOULD)
+    statement: >
+      Bindings SHOULD make tier mismatches visible at development time —
+      passing raw data where shape-validated data is expected SHOULD produce
+      a type error. Type annotations SHOULD carry tier information.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.2 Type system"
+    verification:
+      method: code_review
+      target_paths:
+        - src/wardline/decorators
+        - src/wardline/core
+    fitness_dimensions: [conformance, correctness]
+    notes: >
+      This is the §8.2 enforcement layer. Document current type-system
+      tier enforcement status and any planned Wardline-Type tooling.

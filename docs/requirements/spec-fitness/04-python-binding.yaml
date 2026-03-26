@@ -178,3 +178,69 @@ requirements:
       producing findings, not merely load it. Distinct from MAN-001 which
       covers the loader; this covers the scanner's obligation to call
       validation before emitting results.
+
+  - id: WL-FIT-PY-010
+    title: Contradictory decorator combinations are detected
+    statement: >
+      The scanner MUST detect mutually exclusive decorator combinations as
+      ERROR findings (SCN-021). The Python binding defines 29 specific
+      contradictory pairs including tier conflicts (e.g., @tier1_read with
+      @validates_shape), semantic conflicts (e.g., @fail_closed with
+      @fail_open), and scope conflicts (e.g., @deterministic with
+      @not_reentrant).
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4.3 Non-obvious design rationale"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/scanner/discovery.py
+        - src/wardline/scanner/rules
+        - tests/unit/scanner
+    fitness_dimensions: [correctness, conformance]
+    notes: >
+      The 29 pairs are enumerated in the binding spec. Verify the scanner
+      implements and tests detection for each pair.
+
+  - id: WL-FIT-PY-011
+    title: Error handling and exit codes follow binding contract
+    statement: >
+      The Python scanner MUST follow the binding's error handling table:
+      invalid wardline.yaml exits non-zero without scanning, missing
+      wardline.yaml exits non-zero without scanning, syntax errors in
+      Tier 1 modules escalate from WARNING to ERROR, and deleted baseline
+      files produce ERROR (not silent re-establishment). Exit codes MUST
+      be: 0 (no ERROR findings), 1 (at least one ERROR), 2 (internal error),
+      3 (direct law — regime cannot produce meaningful output).
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.10 Error handling and control law"
+    verification:
+      method: integration_tests
+      target_paths:
+        - src/wardline/cli/scan.py
+        - tests/integration/test_scan_cmd.py
+    fitness_dimensions: [correctness, conformance]
+    notes: >
+      Exit code semantics are normative. Verify that each error condition
+      maps to the correct exit code and escalation behavior.
+
+  - id: WL-FIT-PY-012
+    title: Analysis level is emitted per finding
+    statement: >
+      Each SARIF result MUST carry wardline.analysisLevel (integer) in its
+      property bag, reflecting the minimum analysis level whose capabilities
+      are sufficient to justify the finding. The tool MUST emit the lowest
+      level whose capabilities are sufficient to produce the finding.
+    normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.3 Interface contract (Wardline-Core)"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/scanner/sarif.py
+        - tests/unit/scanner/test_sarif.py
+    fitness_dimensions: [interoperability, conformance]
+    notes: >
+      Analysis levels enable assessors to understand which scanner
+      capabilities were needed for each finding.

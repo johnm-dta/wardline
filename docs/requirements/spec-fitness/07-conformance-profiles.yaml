@@ -183,3 +183,50 @@ requirements:
     notes: >
       This refines SCAN-005 with the specific floor values from the spec.
       The assessment procedure step 3 tests these floors explicitly.
+
+  - id: WL-FIT-CONF-009
+    title: Enforcement regime composition rules
+    statement: >
+      An enforcement regime MUST satisfy: coverage completeness (every
+      criterion covered by at least one tool), rule coverage completeness
+      (union of all tools covers all eight rules), corpus union (regime
+      corpus satisfies minimum specimen counts across the full rule set),
+      SARIF aggregation (multi-run SARIF log), and per-tool self-hosting
+      where applicable.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.4 Enforcement regimes"
+    verification:
+      method: documentation_review
+      target_paths:
+        - docs/spec/wardline-02-A-python-binding.md
+    fitness_dimensions: [conformance, assessability]
+    notes: >
+      The Python binding should include a regime composition matrix (§A.6)
+      showing how tools map to criteria, rules, and profiles. Gaps in rule
+      coverage MUST be documented.
+
+  - id: WL-FIT-CONF-010
+    title: Lite governance checklist is verifiable
+    statement: >
+      A Lite deployment MUST satisfy the seven-point Lite governance
+      checklist: (1) schema-valid manifest with current ratification,
+      (2) CODEOWNERS protection for governance artefacts, (3) exception
+      register with reviewer identity/rationale/expiry, (4) temporal
+      separation implemented or documented alternative, (5) annotation
+      changes reviewed in assessment window, (6) bootstrap corpus
+      specimens correctly classified, (7) expedited exceptions documented
+      with retrospective review.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.2 Governance profiles"
+    verification:
+      method: repository_and_manifest_review
+      target_paths:
+        - wardline.yaml
+        - .github/CODEOWNERS
+        - corpus/specimens
+    fitness_dimensions: [governance, conformance]
+    notes: >
+      This refines CONF-003 by enumerating the specific Lite governance
+      checklist items that an assessor verifies.
