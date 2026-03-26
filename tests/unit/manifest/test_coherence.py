@@ -20,6 +20,7 @@ from wardline.manifest.coherence import (
     check_undeclared_boundaries,
     check_unmatched_contracts,
     check_validation_scope_presence,
+    check_restoration_evidence,
 )
 from wardline.manifest.models import (
     BoundaryEntry,
@@ -1031,4 +1032,165 @@ class TestValidationScopePresence:
             ),
         )
         issues = check_validation_scope_presence(boundaries)
+        assert issues == []
+
+
+class TestRestorationEvidence:
+    """Tests for check_restoration_evidence."""
+
+    def test_full_evidence_tier_1_passes(self) -> None:
+        """Full provenance supports tier 1 — no issues."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=1,
+                provenance={
+                    "structural": True,
+                    "semantic": True,
+                    "integrity": "hmac",
+                    "institutional": "org-db",
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_tier_1_with_only_structural_fails(self) -> None:
+        """Only structural evidence cannot support tier 1."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=1,
+                provenance={
+                    "structural": True,
+                    "semantic": False,
+                    "integrity": False,
+                    "institutional": False,
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "insufficient_restoration_evidence"
+        assert issues[0].function == "mymod.restore"
+
+    def test_tier_2_with_sufficient_evidence_passes(self) -> None:
+        """structural+semantic+institutional supports tier 2."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=2,
+                provenance={
+                    "structural": True,
+                    "semantic": True,
+                    "integrity": False,
+                    "institutional": "org-db",
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_tier_3_with_structural_institutional_passes(self) -> None:
+        """structural+institutional supports tier 3."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=3,
+                provenance={
+                    "structural": True,
+                    "semantic": False,
+                    "integrity": False,
+                    "institutional": "org-db",
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_restored_tier_none_skipped(self) -> None:
+        """restored_tier=None is skipped."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=None,
+                provenance={"structural": True},
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_provenance_none_skipped(self) -> None:
+        """provenance=None is skipped."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=1,
+                provenance=None,
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_exact_ceiling_passes(self) -> None:
+        """restored_tier exactly equals evidence ceiling — no issue."""
+        # structural+institutional → ceiling tier 3; claim tier 3 → OK
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=3,
+                provenance={
+                    "structural": True,
+                    "semantic": False,
+                    "integrity": False,
+                    "institutional": "org-db",
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_one_above_ceiling_fails(self) -> None:
+        """restored_tier one above evidence ceiling — issue raised."""
+        # structural+institutional → ceiling tier 3; claim tier 2 → overclaim
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=2,
+                provenance={
+                    "structural": True,
+                    "semantic": False,
+                    "integrity": False,
+                    "institutional": "org-db",
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "insufficient_restoration_evidence"
+
+    def test_non_restoration_boundary_skipped(self) -> None:
+        """Non-restoration boundaries are skipped."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.validate",
+                transition="semantic_validation",
+                restored_tier=1,
+                provenance={"structural": True},
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_empty_boundaries(self) -> None:
+        """Empty boundaries tuple produces no issues."""
+        issues = check_restoration_evidence(())
         assert issues == []

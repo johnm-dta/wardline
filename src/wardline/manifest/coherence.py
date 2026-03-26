@@ -688,3 +688,48 @@ def check_validation_scope_presence(
                 )
             )
     return issues
+
+
+def check_restoration_evidence(
+    boundaries: tuple[BoundaryEntry, ...],
+) -> list[CoherenceIssue]:
+    """Check that restoration boundaries don't overclaim their tier.
+
+    For each boundary with ``transition == "restoration"`` and a
+    non-None ``restored_tier``, compares the claimed tier against the
+    maximum tier the declared evidence supports per §5.3.
+    """
+    from wardline.core.evidence import max_restorable_tier
+    from wardline.core.tiers import TAINT_TO_TIER
+
+    issues: list[CoherenceIssue] = []
+    for boundary in boundaries:
+        if boundary.transition != "restoration":
+            continue
+        if boundary.restored_tier is None or boundary.provenance is None:
+            continue
+
+        structural = bool(boundary.provenance.get("structural"))
+        semantic = bool(boundary.provenance.get("semantic"))
+        integrity = bool(boundary.provenance.get("integrity"))
+        institutional = bool(boundary.provenance.get("institutional"))
+
+        ceiling_taint = max_restorable_tier(structural, semantic, integrity, institutional)
+        ceiling_tier = TAINT_TO_TIER[ceiling_taint].value
+
+        if boundary.restored_tier < ceiling_tier:
+            # restored_tier uses lower=better (T1=1), so claimed < ceiling means overclaim
+            issues.append(
+                CoherenceIssue(
+                    kind="insufficient_restoration_evidence",
+                    function=boundary.function,
+                    file_path=boundary.overlay_path,
+                    detail=(
+                        f"Boundary '{boundary.function}' claims "
+                        f"restored_tier={boundary.restored_tier} but evidence "
+                        f"supports at most tier {ceiling_tier} "
+                        f"({ceiling_taint.value}). §5.3 evidence matrix."
+                    ),
+                )
+            )
+    return issues

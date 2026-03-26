@@ -34,6 +34,7 @@ COHERENCE_SEVERITY_MAP: dict[str, str] = {
     "expired_exception": "WARNING",
     "first_scan_perimeter": "WARNING",
     "missing_validation_scope": "ERROR",
+    "insufficient_restoration_evidence": "ERROR",
 }
 
 
