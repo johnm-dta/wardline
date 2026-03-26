@@ -35,6 +35,7 @@ COHERENCE_SEVERITY_MAP: dict[str, str] = {
     "first_scan_perimeter": "WARNING",
     "missing_validation_scope": "ERROR",
     "insufficient_restoration_evidence": "ERROR",
+    "restoration_evidence_divergence": "WARNING",
 }
 
 

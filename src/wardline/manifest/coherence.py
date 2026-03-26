@@ -733,3 +733,59 @@ def check_restoration_evidence(
                 )
             )
     return issues
+
+
+def check_restoration_evidence_consistency(
+    boundaries: tuple[BoundaryEntry, ...],
+    annotations: dict[tuple[str, str], list[WardlineAnnotation]],
+) -> list[CoherenceIssue]:
+    """Check that decorator evidence doesn't exceed overlay provenance.
+
+    The overlay is the governance source of truth. If the decorator
+    claims higher evidence than the overlay declares, emit a WARNING.
+    """
+    issues: list[CoherenceIssue] = []
+    for boundary in boundaries:
+        if boundary.transition != "restoration":
+            continue
+        if boundary.provenance is None:
+            continue
+
+        # Find matching annotation by function name
+        matching_ann = None
+        for (fp, qn), anns in annotations.items():
+            for ann in anns:
+                if ann.canonical_name == "restoration_boundary" and qn == boundary.function:
+                    matching_ann = ann
+                    break
+            if matching_ann is not None:
+                break
+
+        if matching_ann is None:
+            continue  # No decorator found for this boundary — handled by check_undeclared_boundaries
+
+        # Compare each evidence category: decorator vs overlay
+        evidence_keys = [
+            ("structural_evidence", "structural"),
+            ("semantic_evidence", "semantic"),
+            ("integrity_evidence", "integrity"),
+            ("institutional_provenance", "institutional"),
+        ]
+        for dec_key, overlay_key in evidence_keys:
+            dec_value = bool(matching_ann.attrs.get(dec_key))
+            overlay_value = bool(boundary.provenance.get(overlay_key))
+            if dec_value and not overlay_value:
+                issues.append(
+                    CoherenceIssue(
+                        kind="restoration_evidence_divergence",
+                        function=boundary.function,
+                        file_path=boundary.overlay_path,
+                        detail=(
+                            f"Boundary '{boundary.function}' decorator claims "
+                            f"{dec_key}={dec_value} but overlay provenance "
+                            f"has {overlay_key}={overlay_value}. The overlay "
+                            f"is the governance source of truth."
+                        ),
+                    )
+                )
+    return issues

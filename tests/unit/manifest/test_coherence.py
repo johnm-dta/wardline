@@ -12,6 +12,7 @@ from wardline.manifest.coherence import (
     check_expired_exceptions,
     check_first_scan_perimeter,
     check_orphaned_annotations,
+    check_restoration_evidence_consistency,
     check_stale_contract_bindings,
     check_tier_distribution,
     check_tier_downgrades,
@@ -1194,3 +1195,84 @@ class TestRestorationEvidence:
         """Empty boundaries tuple produces no issues."""
         issues = check_restoration_evidence(())
         assert issues == []
+
+
+# ── Restoration evidence consistency tests ────────────────────────
+
+
+class TestRestorationEvidenceConsistency:
+    """Cross-layer reconciliation between overlay and decorator evidence."""
+
+    def _make_ann(self, attrs: dict) -> WardlineAnnotation:
+        return WardlineAnnotation(
+            canonical_name="restoration_boundary",
+            group=17,
+            attrs=MappingProxyType(attrs),
+        )
+
+    def test_matching_evidence_no_issue(self) -> None:
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=2,
+            provenance={"structural": True, "semantic": True, "institutional": "org-db"},
+        )
+        annotations = {
+            ("test.py", "mymod.restore"): [self._make_ann({
+                "structural_evidence": True,
+                "semantic_evidence": True,
+                "institutional_provenance": "org-db",
+            })],
+        }
+        assert check_restoration_evidence_consistency((boundary,), annotations) == []
+
+    def test_decorator_claims_higher_than_overlay_warning(self) -> None:
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=2,
+            provenance={"structural": True},  # no semantic
+        )
+        annotations = {
+            ("test.py", "mymod.restore"): [self._make_ann({
+                "structural_evidence": True,
+                "semantic_evidence": True,  # decorator claims semantic
+            })],
+        }
+        issues = check_restoration_evidence_consistency((boundary,), annotations)
+        assert len(issues) == 1
+        assert issues[0].kind == "restoration_evidence_divergence"
+        assert "semantic_evidence" in issues[0].detail
+
+    def test_decorator_claims_lower_no_issue(self) -> None:
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=2,
+            provenance={"structural": True, "semantic": True, "institutional": "org-db"},
+        )
+        annotations = {
+            ("test.py", "mymod.restore"): [self._make_ann({
+                "structural_evidence": True,
+                # decorator doesn't claim semantic — conservative
+            })],
+        }
+        assert check_restoration_evidence_consistency((boundary,), annotations) == []
+
+    def test_no_annotation_for_boundary_skipped(self) -> None:
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=2,
+            provenance={"structural": True},
+        )
+        annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
+        assert check_restoration_evidence_consistency((boundary,), annotations) == []
+
+    def test_non_restoration_boundary_skipped(self) -> None:
+        boundary = BoundaryEntry(
+            function="mymod.validate",
+            transition="semantic_validation",
+        )
+        annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
+        assert check_restoration_evidence_consistency((boundary,), annotations) == []

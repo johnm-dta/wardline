@@ -1,6 +1,6 @@
 """wardline manifest coherence — cross-reference annotations against manifest.
 
-Runs all 13 coherence checks, formats output (text or JSON), and
+Runs all 14 coherence checks, formats output (text or JSON), and
 optionally gates on ERROR-level issues.
 """
 
@@ -32,6 +32,7 @@ CATEGORY_MAP = {
     "first_scan_perimeter": "enforcement",
     "missing_validation_scope": "enforcement",
     "insufficient_restoration_evidence": "enforcement",
+    "restoration_evidence_divergence": "enforcement",
 }
 
 
@@ -89,6 +90,7 @@ def coherence(
         check_unmatched_contracts,
         check_validation_scope_presence,
         check_restoration_evidence,
+        check_restoration_evidence_consistency,
     )
     from wardline.manifest.exceptions import load_exceptions
     from wardline.manifest.loader import (
@@ -143,7 +145,7 @@ def coherence(
     except ManifestLoadError:
         exceptions = ()
 
-    # --- Run all 13 checks ---
+    # --- Run all 14 checks ---
     all_issues: list[CoherenceIssue] = []
 
     all_issues.extend(
@@ -195,6 +197,9 @@ def coherence(
     )
     all_issues.extend(
         check_restoration_evidence(boundaries)
+    )
+    all_issues.extend(
+        check_restoration_evidence_consistency(boundaries, annotations)
     )
 
     # --- Format output ---
