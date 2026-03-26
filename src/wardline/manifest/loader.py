@@ -285,7 +285,7 @@ def _build_overlay(data: dict[str, Any]) -> WardlineOverlay:
             function=b["function"],
             transition=b["transition"],
             from_tier=b.get("from_tier"),
-            to_tier=b.get("to_tier"),
+            to_tier=None if b["transition"] == "restoration" else b.get("to_tier"),
             restored_tier=b.get("restored_tier"),
             provenance=b.get("provenance"),
             validation_scope=b.get("validation_scope"),

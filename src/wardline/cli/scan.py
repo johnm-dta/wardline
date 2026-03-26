@@ -378,8 +378,14 @@ def scan(
             resolve_optional_fields,
         )
 
+        from wardline.manifest.loader import ManifestPolicyError as _PolicyError
+
         # manifest_path is threaded from _load_manifest — no re-discovery needed
-        boundaries = resolve_boundaries(manifest_path.parent, manifest_model)
+        try:
+            boundaries = resolve_boundaries(manifest_path.parent, manifest_model)
+        except _PolicyError as exc:
+            cli_error(str(exc))
+            sys.exit(EXIT_CONFIG_ERROR)
         optional_fields = resolve_optional_fields(
             manifest_path.parent,
             manifest_model,
@@ -721,7 +727,7 @@ def _load_resolved(
 
         # F6: format_version validation
         version = data.get("format_version")
-        if version != "0.1":
+        if version != "0.2":
             cli_error(f"unsupported resolved manifest version: {version}")
             return None
 

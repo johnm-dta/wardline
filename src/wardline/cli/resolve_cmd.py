@@ -129,7 +129,7 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
 
     # --- Build resolved JSON ---
     resolved_json: dict[str, object] = {
-        "format_version": "0.1",
+        "format_version": "0.2",
         "resolved_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "root": ".",
         "manifest_source": str(manifest_path.relative_to(root))

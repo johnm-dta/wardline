@@ -91,6 +91,7 @@ def coherence(
     from wardline.manifest.exceptions import load_exceptions
     from wardline.manifest.loader import (
         ManifestLoadError,
+        ManifestPolicyError,
         WardlineYAMLError,
         load_manifest,
     )
@@ -121,12 +122,16 @@ def coherence(
 
     try:
         boundaries = resolve_boundaries(manifest_dir, manifest_model)
+    except ManifestPolicyError:
+        raise
     except (GovernanceError, ManifestLoadError, OSError) as exc:
         click.echo(f"warning: boundary resolution failed: {exc}", err=True)
         boundaries = ()
 
     try:
         contract_bindings = resolve_contract_bindings(manifest_dir, manifest_model)
+    except ManifestPolicyError:
+        raise
     except (GovernanceError, ManifestLoadError, OSError) as exc:
         click.echo(f"warning: contract binding resolution failed: {exc}", err=True)
         contract_bindings = ()

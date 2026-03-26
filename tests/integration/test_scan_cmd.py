@@ -717,7 +717,7 @@ class TestScanResolved:
         # Write a resolved JSON with one boundary
         resolved = tmp_path / "wardline.resolved.json"
         resolved.write_text(json.dumps({
-            "format_version": "0.1",
+            "format_version": "0.2",
             "resolved_at": "2026-01-01T00:00:00Z",
             "root": ".",
             "manifest_source": "wardline.yaml",

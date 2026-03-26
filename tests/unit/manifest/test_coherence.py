@@ -1006,3 +1006,29 @@ class TestValidationScopePresence:
         issues = check_validation_scope_presence(boundaries)
         assert len(issues) == 1
         assert issues[0].function == "mymod.validate"
+
+    def test_validation_scope_empty_contracts(self) -> None:
+        """semantic_validation with empty contracts list is flagged."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.validate",
+                transition="semantic_validation",
+                validation_scope={"contracts": []},
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "missing_validation_scope"
+        assert issues[0].function == "mymod.validate"
+
+    def test_restoration_provenance_missing_semantic_key(self) -> None:
+        """restoration with provenance missing 'semantic' key is clean."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                provenance={"structural": True},
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert issues == []

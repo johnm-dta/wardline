@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from wardline.manifest.discovery import GovernanceError
+from wardline.manifest.loader import ManifestPolicyError
 from wardline.manifest.merge import ManifestWidenError
 from wardline.manifest.models import (
     ModuleTierEntry,
@@ -181,4 +182,27 @@ class TestResolveBoundaries:
             GovernanceError,
             match="Duplicate boundary declaration for function 'Client.call'",
         ):
+            resolve_boundaries(tmp_path, manifest)
+
+    def test_skip_promotion_propagates_as_policy_error(
+        self, tmp_path: Path
+    ) -> None:
+        """Overlay with skip-promotion (from_tier=4, to_tier=1) raises ManifestPolicyError."""
+        overlay_dir = tmp_path / "adapters"
+        overlay_dir.mkdir()
+        _write_overlay(
+            overlay_dir / "wardline.overlay.yaml",
+            (
+                '$id: "https://wardline.dev/schemas/0.1/overlay.schema.json"\n'
+                "overlay_for: adapters\n"
+                "boundaries:\n"
+                '  - function: "Client.ingest"\n'
+                '    transition: "construction"\n'
+                "    from_tier: 4\n"
+                "    to_tier: 1\n"
+            ),
+        )
+        manifest = _minimal_manifest(module_paths=("adapters",))
+
+        with pytest.raises(ManifestPolicyError, match="skip-promotions to Tier 1"):
             resolve_boundaries(tmp_path, manifest)

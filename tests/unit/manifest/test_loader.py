@@ -612,3 +612,19 @@ boundaries:
         overlay = load_overlay(f)
         assert overlay.boundaries[0].transition == "restoration"
         assert overlay.boundaries[0].restored_tier == 1
+
+    def test_restoration_with_to_tier_stripped(self, tmp_path: Path) -> None:
+        """Restoration boundary with to_tier in YAML has it stripped at load time."""
+        f = tmp_path / "wardline.overlay.yaml"
+        f.write_text("""\
+overlay_for: "adapters/"
+boundaries:
+  - function: "mymod.restore"
+    transition: "restoration"
+    restored_tier: 1
+    to_tier: 1
+""")
+        overlay = load_overlay(f)
+        assert overlay.boundaries[0].transition == "restoration"
+        assert overlay.boundaries[0].restored_tier == 1
+        assert overlay.boundaries[0].to_tier is None

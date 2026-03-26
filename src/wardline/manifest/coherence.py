@@ -671,7 +671,10 @@ def check_validation_scope_presence(
             and boundary.provenance is not None
             and boundary.provenance.get("semantic") is True
         )
-        if needs_scope and boundary.validation_scope is None:
+        if needs_scope and (
+            boundary.validation_scope is None
+            or not boundary.validation_scope.get("contracts")
+        ):
             issues.append(
                 CoherenceIssue(
                     kind="missing_validation_scope",
