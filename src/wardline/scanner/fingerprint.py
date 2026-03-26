@@ -306,8 +306,8 @@ def batch_compute_fingerprints(
 
             file_path = os.path.join(dirpath, filename)
             try:
-                source_bytes = open(file_path, "rb").read()  # noqa: SIM115
-                source = source_bytes.decode("utf-8")
+                with open(file_path, "rb") as fh:
+                    source = fh.read().decode("utf-8")
                 tree = ast.parse(source, filename=file_path)
             except (OSError, SyntaxError):
                 logger.debug("Skipping unparseable file: %s", file_path)

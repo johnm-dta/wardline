@@ -287,10 +287,10 @@ def _build_exception_section(
     all_exceptions: tuple[Any, ...] = ()
 
     if manifest_path is not None and manifest_path.exists():
-        import contextlib
-
-        with contextlib.suppress(Exception):
+        try:
             all_exceptions = load_exceptions(manifest_path.parent)
+        except Exception as exc:
+            click.echo(f"warning: could not load exception register: {exc}", err=True)
 
     # Build relative location key for matching
     try:
