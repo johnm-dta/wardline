@@ -18,7 +18,11 @@ The SARIF run-level `properties` bag is missing four required fields for Wardlin
 
 Without `inputHash` + `inputFiles`, an assessor cannot distinguish "different output because different input" from "non-deterministic tool." Without `overlayHashes`, individual overlay policy versions are opaque. Without `coverageRatio`, annotation progress is invisible in SARIF output.
 
-Additionally, `_compute_manifest_hash()` in `cli/scan.py` hardcodes an `overlays/` directory for overlay discovery, which is wrong — this project uses dispersed `wardline.overlay.yaml` files discovered via `discover_overlays()`. The `manifestHash` computation must be refactored to use the same consumed overlay path list as `overlayHashes`.
+Additionally, two existing bugs must be fixed:
+
+1. **`_compute_manifest_hash()` in `cli/scan.py` combines root manifest + overlay content into a single hash.** The spec (§10.1) defines `wardline.manifestHash` as the SHA-256 of the root manifest file's raw bytes *only*. Overlays are separately covered by `wardline.overlayHashes`. The current implementation bakes a spec mismatch into every SARIF report — `manifestHash` changes when overlays are added/removed even when the root manifest is unchanged.
+
+2. **`_compute_manifest_hash()` hardcodes `manifest_path.parent / "overlays"` for overlay discovery.** This project uses dispersed `wardline.overlay.yaml` files found by `discover_overlays()`. The hardcoded path misses overlays outside `overlays/` and may include non-consumed files.
 
 ## Architecture Decision
 
@@ -80,13 +84,22 @@ Implements the §10.1 hash-of-hashes algorithm exactly:
 
 ```python
 def _compute_input_hash(
-    file_paths: Sequence[Path], base_path: Path
+    file_paths: Sequence[Path], project_root: Path
 ) -> tuple[str, int]:
     """Hash-of-hashes over analysed files (§10.1 algorithm).
+
+    Args:
+        file_paths: Files the engine analysed (from ScanResult.scanned_file_paths).
+        project_root: The project root (manifest_path.parent), NOT the scan
+            target path. The spec requires paths relative to project root so
+            that scanning a subdirectory produces the same inputHash as scanning
+            the full project (for the same file set).
 
     Returns (hash_string, deduplicated_file_count).
     """
     import hashlib
+
+    resolved_root = project_root.resolve()
 
     # Deduplicate after symlink resolution (§10.1 step 2)
     seen: dict[Path, None] = {}
@@ -97,9 +110,9 @@ def _compute_input_hash(
 
     records: list[str] = []
     for resolved in seen:
-        # Step 3: normalize to forward-slash relative path
+        # Step 3: normalize to forward-slash path relative to project root
         try:
-            rel = resolved.relative_to(base_path.resolve())
+            rel = resolved.relative_to(resolved_root)
         except ValueError:
             rel = resolved
         normalized = rel.as_posix()
@@ -126,13 +139,13 @@ Key spec constraints honoured:
 - Deduplication after resolution prevents aliases/symlinks from producing different hashes
 - Empty file set: zero records → hash of empty string → valid `sha256:<hex>` with `inputFiles: 0`
 
-**Error handling:** If `read_bytes()` raises `OSError` on a file that the engine successfully scanned (should not happen — the engine already read the file), the helper logs a warning and skips that file's record. The caller in `scan.py` is responsible for emitting a TOOL_ERROR finding if the hash computation raises. The `input_hash` field defaults to `""` which signals computation failure to SARIF consumers.
+**Error handling:** If `read_bytes()` raises `OSError` on a file that the engine successfully scanned, this is a hard failure — the helper re-raises. Silently skipping a file would make `inputHash` and `inputFiles` describe a different set than the scan actually consumed, violating the identity property. The caller in `scan.py` catches the exception, emits a TOOL_ERROR finding, and sets `input_hash` to `""` (the default sentinel that signals computation failure to SARIF consumers). This should be vanishingly rare — the engine already read the file successfully during scanning.
 
 ### 4. Overlay hash refactoring — consumed overlay paths
 
 **Problem:** `_compute_manifest_hash()` currently hardcodes `manifest_path.parent / "overlays"` for overlay discovery. This project uses dispersed `wardline.overlay.yaml` files found by `discover_overlays()`. The hardcoded path will miss overlays outside `overlays/` and may include non-consumed files inside it.
 
-**Fix:** Thread the actual consumed overlay file paths from manifest resolution to the SARIF construction block. Both `manifestHash` and `overlayHashes` derive from this single authoritative list.
+**Fix:** Two changes: (a) `manifestHash` must hash only the root manifest's raw bytes, not a combined document. (b) Thread the actual consumed overlay file paths from manifest resolution to the SARIF construction block for `overlayHashes`.
 
 #### 4a. Surface consumed overlay paths from `resolve_boundaries()`
 
@@ -149,33 +162,33 @@ def resolve_boundaries(
     return tuple(all_boundaries), tuple(overlay_paths)
 ```
 
-The second element is the list of overlay files that `discover_overlays()` returned — the full discovered set. This is the correct input for both `manifestHash` (which hashes all policy-relevant overlays) and `overlayHashes` (which reports what the tool consumed). Overlay files that failed to load during `resolve_boundaries()` are still included in this list because they were discovered and attempted — the policy surface includes them even if their boundaries could not be resolved. A failed overlay is a governance concern (already logged as a warning), not a reason to exclude it from the hash.
+The second element is the list of overlay files that `discover_overlays()` returned — the full discovered set. This is the authoritative input for `_compute_overlay_hashes()`. Overlay files that failed to load during `resolve_boundaries()` are still included in this list because they were discovered and attempted — the policy surface includes them even if their boundaries could not be resolved. A failed overlay is a governance concern (already logged as a warning), not a reason to exclude it from the hash.
 
-**Callers to update:** `cli/scan.py` (primary consumer), `cli/resolve_cmd.py` (already has `overlay_file_paths` from its own `discover_overlays()` call — can switch to the returned tuple for consistency).
+**Callers to update (5 production + tests):**
+- `cli/scan.py` — primary consumer; unpacks `(boundaries, overlay_paths)` and uses overlay paths for hashing
+- `cli/resolve_cmd.py` — already has its own `discover_overlays()` call; update to unpack the tuple (only needs boundaries, can discard overlay paths with `_`)
+- `cli/coherence_cmd.py` — uses boundaries only; unpack and discard overlay paths
+- `cli/regime_cmd.py` — uses boundaries only; unpack and discard overlay paths
+- `cli/explain_cmd.py` — uses boundaries only; unpack and discard overlay paths
+- `tests/unit/manifest/test_resolve.py`, `tests/unit/manifest/test_loader.py` — update assertions for tuple return
 
-#### 4b. Refactored `_compute_manifest_hash()`
+#### 4b. Corrected `_compute_manifest_hash()`
 
-Replace the hardcoded overlay directory with the consumed overlay path list:
+The spec (§10.1) defines `wardline.manifestHash` as "SHA-256 hash of the root wardline manifest file content (raw bytes as stored on disk)." The current implementation incorrectly combines overlay content into this hash. Fix: hash only the root manifest's raw bytes.
 
 ```python
-def _compute_manifest_hash(
-    manifest_path: Path,
-    consumed_overlay_paths: Sequence[Path],
-) -> str | None:
-    """SHA-256 of manifest + consumed overlay contents."""
+def _compute_manifest_hash(manifest_path: Path) -> str | None:
+    """SHA-256 of root manifest raw bytes only (§10.1)."""
     import hashlib
 
     try:
-        parts: list[str] = [manifest_path.read_text(encoding="utf-8")]
-        for overlay_path in sorted(consumed_overlay_paths):
-            if overlay_path.is_symlink():
-                continue
-            parts.append(overlay_path.read_text(encoding="utf-8"))
-        combined = "\n---\n".join(parts)
-        return "sha256:" + hashlib.sha256(combined.encode("utf-8")).hexdigest()
+        raw = manifest_path.read_bytes()
+        return "sha256:" + hashlib.sha256(raw).hexdigest()
     except OSError:
         return None
 ```
+
+This is a **breaking change** to existing `manifestHash` values — any downstream consumer comparing historical hashes will see a discontinuity. This is correct: the old values were wrong per spec. The `propertyBagVersion` bump from `"0.2"` to `"0.3"` signals this change.
 
 #### 4c. `_compute_overlay_hashes()` — new helper
 
@@ -204,7 +217,7 @@ def _compute_overlay_hashes(
     return tuple(h for _, h in entries)
 ```
 
-Both `_compute_manifest_hash()` and `_compute_overlay_hashes()` now consume the same `consumed_overlay_paths` list — they cannot drift.
+`_compute_manifest_hash()` now hashes only the root manifest (spec-correct). `_compute_overlay_hashes()` hashes the consumed overlays. The two properties are independent — `manifestHash` pins the root policy version, `overlayHashes` pins the overlay policy versions.
 
 ### 5. Coverage ratio — read from fingerprint baseline
 
@@ -268,10 +281,13 @@ boundaries, consumed_overlay_paths = resolve_boundaries(
 # ... existing scan execution ...
 
 # Compute run identity properties
+# NOTE: project_root (manifest_path.parent), not scan_path — the spec
+# requires paths relative to project root for stable cross-run identity.
+project_root = manifest_path.parent
 input_hash, input_files = _compute_input_hash(
-    result.scanned_file_paths, scan_path
+    result.scanned_file_paths, project_root
 )
-manifest_hash = _compute_manifest_hash(manifest_path, consumed_overlay_paths)
+manifest_hash = _compute_manifest_hash(manifest_path)
 overlay_hashes = _compute_overlay_hashes(consumed_overlay_paths, manifest_path.parent)
 coverage_ratio = _read_coverage_ratio(manifest_path)
 
@@ -345,7 +361,10 @@ New run-level property tests:
 | `test_compute_overlay_hashes_sorted_by_path` | Output sorted by normalized path |
 | `test_compute_overlay_hashes_skips_symlinks` | Symlink exclusion |
 | `test_compute_overlay_hashes_empty_returns_empty_tuple` | No overlays → `()` |
-| `test_compute_manifest_hash_uses_consumed_overlays` | Hash changes when overlay list changes |
+| `test_compute_manifest_hash_root_only` | Hash is SHA-256 of root manifest bytes only, not combined |
+| `test_compute_manifest_hash_unchanged_by_overlay_changes` | Adding/removing overlays does not change manifestHash |
+| `test_compute_input_hash_uses_project_root` | Same files scanned from subdir produce same hash as full scan |
+| `test_compute_input_hash_hard_failure_on_unreadable` | `OSError` on scanned file raises, not silently skips |
 | `test_read_coverage_ratio_no_baseline` | Returns `None` |
 | `test_read_coverage_ratio_with_baseline` | Returns float from JSON |
 
@@ -364,9 +383,14 @@ New run-level property tests:
 |------|--------|--------|
 | `src/wardline/scanner/engine.py` | Modify | Add `scanned_file_paths: list[Path]` to `ScanResult`, populate in `_scan_file()` |
 | `src/wardline/scanner/sarif.py` | Modify | 4 new dataclass fields, 4 new run properties, version bump to 0.3 |
-| `src/wardline/manifest/resolve.py` | Modify | `resolve_boundaries()` returns consumed overlay paths |
-| `src/wardline/cli/scan.py` | Modify | 3 new helpers, refactored `_compute_manifest_hash()`, wiring |
-| `src/wardline/cli/resolve_cmd.py` | Modify | Update call site for new `resolve_boundaries()` signature |
+| `src/wardline/manifest/resolve.py` | Modify | `resolve_boundaries()` returns `(boundaries, overlay_paths)` tuple |
+| `src/wardline/cli/scan.py` | Modify | 3 new helpers, corrected `_compute_manifest_hash()`, wiring |
+| `src/wardline/cli/resolve_cmd.py` | Modify | Unpack tuple from `resolve_boundaries()` |
+| `src/wardline/cli/coherence_cmd.py` | Modify | Unpack tuple from `resolve_boundaries()` |
+| `src/wardline/cli/regime_cmd.py` | Modify | Unpack tuple from `resolve_boundaries()` |
+| `src/wardline/cli/explain_cmd.py` | Modify | Unpack tuple from `resolve_boundaries()` |
+| `tests/unit/manifest/test_resolve.py` | Modify | Update assertions for tuple return |
+| `tests/unit/manifest/test_loader.py` | Modify | Update `resolve_boundaries()` call site |
 | `tests/unit/scanner/test_sarif.py` | Modify | ~9 new test cases |
 | `tests/unit/cli/test_scan_helpers.py` | New | ~10 computation tests |
 | `tests/integration/test_scan_cmd.py` | Modify | ~4 new integration tests |
