@@ -1,0 +1,237 @@
+requirements:
+  - id: WL-FIT-GOV-001
+    title: Exceptionability classes are enforced
+    statement: >
+      The implementation MUST enforce the four exceptionability classes:
+      UNCONDITIONAL (no exception permitted), STANDARD (requires documented
+      rationale, reviewer identity, and expiry), RELAXED (warning-level,
+      reviewer approval RECOMMENDED), and TRANSPARENT (corresponds to SUPPRESS
+      cells — no governance required).
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.1 Exceptionability classes"
+    verification:
+      method: model_and_scanner_tests
+      target_paths:
+        - src/wardline/core/matrix.py
+        - src/wardline/core/severity.py
+        - src/wardline/manifest/models.py
+        - tests/unit/core/test_matrix.py
+    fitness_dimensions: [governance, conformance]
+    notes: >
+      UNCONDITIONAL findings cannot be overridden by any actor. STANDARD
+      exceptions require reviewer identity and expiry in the exception register.
+
+  - id: WL-FIT-GOV-002
+    title: Branch protection CI gates
+    statement: >
+      CI gates — including wardline enforcement — MUST pass before merge to
+      the protected branch. This prevents bypass through direct push and
+      ensures that wardline findings are resolved before code enters the
+      mainline.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.2 Governance mechanisms"
+    verification:
+      method: repository_configuration_review
+      target_paths:
+        - .github/workflows/ci.yml
+    fitness_dimensions: [governance, conformance]
+    notes: >
+      Verify that the CI pipeline includes wardline scan as a required check
+      on the protected branch.
+
+  - id: WL-FIT-GOV-003
+    title: Fingerprint baseline uses canonical hashing
+    statement: >
+      The fingerprint hash MUST be computed over a canonical serialisation of
+      the annotation surface — a deterministic ordering of annotation groups,
+      tier assignments, and boundary declarations — not over the raw source
+      text. The requirement for canonicalisation is a framework invariant.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.2 Governance mechanisms"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/scanner/fingerprint.py
+        - tests/unit/scanner/test_fingerprint.py
+    fitness_dimensions: [governance, correctness]
+    notes: >
+      Without canonicalisation, equivalent annotations in different syntactic
+      order produce different hashes, generating spurious change events.
+
+  - id: WL-FIT-GOV-004
+    title: Fingerprint baseline reports annotation coverage
+    statement: >
+      The fingerprint baseline MUST report annotation coverage: the count and
+      ratio of annotated functions to total functions, with specific
+      enumeration of unannotated functions in Tier 1 modules.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.2 Governance mechanisms"
+    verification:
+      method: cli_and_unit_tests
+      target_paths:
+        - src/wardline/scanner/fingerprint.py
+        - src/wardline/cli/fingerprint_cmd.py
+        - tests/unit/cli/test_fingerprint_cmd.py
+    fitness_dimensions: [governance, assessability]
+    notes: >
+      Unannotated functions in high-authority modules are the highest-risk
+      blind spots; the baseline makes them visible.
+
+  - id: WL-FIT-GOV-005
+    title: Governance audit logging
+    statement: >
+      Governance events — exception grants, baseline changes, manifest
+      modifications, and control-law transitions — MUST produce an auditable
+      trail. Events that MUST be logged include: exception granted/expired,
+      fingerprint baseline change, manifest modification, overlay
+      modification, control-law transition, retrospective scan completed,
+      and phase change.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.2.1 Governance audit logging"
+    verification:
+      method: sarif_and_cli_review
+      target_paths:
+        - src/wardline/scanner/sarif.py
+        - src/wardline/cli
+        - src/wardline/manifest/models.py
+    fitness_dimensions: [governance, assessability]
+    notes: >
+      SARIF output is the primary audit trail. For ISM-assessed systems,
+      SIEM export of governance events is SHOULD (MUST for ISM-assessed).
+
+  - id: WL-FIT-GOV-006
+    title: Exception recurrence tracking
+    statement: >
+      The exception register MUST track recurrence: when an exception for the
+      same rule at the same code location is renewed after expiry, the renewal
+      MUST be flagged as a recurrence event. A second or subsequent renewal
+      MUST trigger automatic governance escalation.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.4 Governance capacity"
+    verification:
+      method: model_and_unit_tests
+      target_paths:
+        - src/wardline/manifest/models.py
+        - src/wardline/manifest/exceptions.py
+        - tests/unit/manifest/test_exceptions.py
+    fitness_dimensions: [governance, safety]
+    notes: >
+      Recurrence operates on the tuple (rule, code location). This prevents
+      temporal gaming where agents regenerate the same violation with fresh
+      exceptions after each expiry.
+
+  - id: WL-FIT-GOV-007
+    title: Expedited governance ratio is computed and reported
+    statement: >
+      The enforcement tool MUST compute and report the expedited/standard
+      ratio — the proportion of active exceptions granted through the
+      expedited path — in SARIF output. Under Assurance, projects MUST
+      declare a threshold in the root manifest and produce a governance-level
+      finding when exceeded. Under Lite, the ratio is RECOMMENDED.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.4 Governance capacity"
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.2 Governance profiles"
+    verification:
+      method: sarif_and_manifest_review
+      target_paths:
+        - src/wardline/scanner/sarif.py
+        - src/wardline/manifest/models.py
+        - wardline.yaml
+    fitness_dimensions: [governance, conformance]
+    notes: >
+      The ratio is reported as wardline.expeditedExceptionRatio in SARIF.
+      This is a leading indicator of governance decay.
+
+  - id: WL-FIT-GOV-008
+    title: Control law three-state model
+    statement: >
+      The implementation MUST support a three-state control law model:
+      Normal law (full enforcement), Alternate law (degraded enforcement
+      with documented acknowledgment), and Direct law (enforcement
+      unavailable — governance incident). SARIF output MUST report the
+      current control-law state.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.5 Enforcement availability (control law)"
+    verification:
+      method: cli_and_sarif_tests
+      target_paths:
+        - src/wardline/manifest/regime.py
+        - src/wardline/scanner/sarif.py
+        - tests/unit/manifest/test_regime.py
+    fitness_dimensions: [governance, conformance]
+    notes: >
+      The SARIF wardline.controlLaw property reports the state. Alternate law
+      requires documented acknowledgment of specific degradation. Direct law
+      requires enforcement-unavailable governance, structurally distinct from
+      expedited exceptions.
+
+  - id: WL-FIT-GOV-009
+    title: Retrospective scan after degraded law
+    statement: >
+      After any period of alternate law or direct law operation, a mandatory
+      retrospective scan MUST be performed covering the code merged during
+      the degraded window. SARIF output reports retrospective scans via
+      wardline.retroactiveScan.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.5 Enforcement availability (control law)"
+    verification:
+      method: cli_and_sarif_review
+      target_paths:
+        - src/wardline/cli/scan.py
+        - src/wardline/scanner/sarif.py
+    fitness_dimensions: [governance, conformance]
+    notes: >
+      This is listed in the governance mechanism summary table as MUST for
+      both Lite and Assurance profiles.
+
+  - id: WL-FIT-GOV-010
+    title: Governance artefact exclusion during direct law
+    statement: >
+      During direct law operation, governance artefacts MUST be excluded from
+      modification to prevent policy changes occurring during enforcement
+      unavailability.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.5 Enforcement availability (control law)"
+    verification:
+      method: process_and_configuration_review
+      target_paths:
+        - .github/CODEOWNERS
+        - .github/workflows/ci.yml
+    fitness_dimensions: [governance, safety]
+    notes: >
+      Listed in the governance mechanism summary as MUST for both Lite and
+      Assurance. This is primarily a VCS/process control, but the tooling
+      should detect and flag violations.
+
+  - id: WL-FIT-GOV-011
+    title: Manifest threat model anomaly detection
+    statement: >
+      Enforcement tools SHOULD implement anomaly detection signals for
+      governance-layer attack vectors: tier reassignment volume spikes,
+      tier downgrades, tier upgrades without evidence, boundary widening,
+      annotation volume spikes, SUPPRESS activation changes, and
+      agent-originated policy changes.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.3.2 Manifest threat model"
+    verification:
+      method: scanner_and_sarif_review
+      target_paths:
+        - src/wardline/manifest/coherence.py
+        - src/wardline/scanner/sarif.py
+    fitness_dimensions: [governance, safety]
+    notes: >
+      These governance-level findings appear in SARIF with ruleId GOVERNANCE.
+      The anomaly signals provide leading indicators that complement the
+      lagging expedited governance ratio metric.

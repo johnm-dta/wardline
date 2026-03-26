@@ -117,10 +117,13 @@ requirements:
       evidence declared for structural, semantic, integrity, and institutional
       provenance.
     normative_sources:
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.3 Trusted restoration boundaries"
       - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
-        section: "13.1.2 Overlay schema"
+        section: "Restoration boundaries"
+    informative_sources:
       - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.4 Annotation vocabulary"
+        section: "A.4.2 Decorator mapping table"
     verification:
       method: manifest_and_rule_tests
       target_paths:
@@ -130,3 +133,101 @@ requirements:
         - tests/unit/scanner/test_py_wl_007.py
     fitness_dimensions: [safety, correctness]
     notes: Treat this as both a manifest contract and a scanner behavior requirement.
+
+  - id: WL-FIT-CORE-008
+    title: Effective states are a closed set
+    statement: >
+      Conformant implementations MUST treat the eight effective states as a
+      closed set. No additional states may be introduced outside the binding
+      extension mechanism (MIXED_TRACKED).
+    normative_sources:
+      - file: docs/spec/wardline-01-01-what-a-wardline-is.md
+        section: "1.1 Terms and definitions"
+    verification:
+      method: static_review_and_unit_tests
+      target_paths:
+        - src/wardline/core/taints.py
+        - src/wardline/core/matrix.py
+        - tests/unit/core/test_taints.py
+    fitness_dimensions: [correctness, conformance]
+    notes: The enum or equivalent must be exhaustive and not permit arbitrary extension.
+
+  - id: WL-FIT-CORE-009
+    title: Token interpretation is not narrowed
+    statement: >
+      Implementations MUST NOT narrow the semantics of canonical taint-state
+      tokens (e.g., AUDIT_TRAIL, PIPELINE) to match the everyday meaning of
+      the token name. AUDIT_TRAIL encompasses all Tier 1 authoritative data,
+      not only audit trails.
+    normative_sources:
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.1 Trust classification and validation status"
+    verification:
+      method: documentation_and_code_review
+      target_paths:
+        - src/wardline/core/taints.py
+        - docs/spec/wardline-02-A-python-binding.md
+    fitness_dimensions: [correctness, interoperability]
+    notes: Primarily a documentation and naming review — ensure docs and code comments do not narrowly describe tokens.
+
+  - id: WL-FIT-CORE-010
+    title: Join table is normative and must not be short-circuited
+    statement: >
+      Implementations MUST derive the join function from the normative join
+      table and MUST NOT use the trust ordering diagram to short-circuit join
+      computation (e.g., by assuming join(a, b) = b when a is below b in
+      the trust ordering).
+    normative_sources:
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.1 Trust classification and validation status"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/core/taints.py
+        - tests/unit/core/test_taints.py
+    fitness_dimensions: [correctness, safety]
+    notes: >
+      The existing join tests (CORE-002) cover algebra properties; this
+      requirement specifically tests that cross-chain joins like
+      join(PIPELINE, AUDIT_TRAIL) produce MIXED_RAW, not AUDIT_TRAIL.
+
+  - id: WL-FIT-CORE-011
+    title: Dependency taint compound call fallback
+    statement: >
+      Where an implementation cannot resolve a compound call pattern against
+      dependency_taint entries, the implementation MUST fall back to
+      UNKNOWN_RAW.
+    normative_sources:
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.5 Third-party dependency taint"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/scanner/taint
+        - tests/unit/scanner/test_taint.py
+    fitness_dimensions: [correctness, safety]
+    notes: This is the conservative fallback for unresolvable compound patterns in third-party code.
+
+  - id: WL-FIT-CORE-012
+    title: Annotation vocabulary expressiveness (17 groups)
+    statement: >
+      The implementation MUST be able to express all 17 annotation vocabulary
+      groups at the function, class, or field level using language-native
+      mechanisms. Core classification groups (1–4, 16–17) establish the trust
+      topology; supplementary contract groups (5–15) are REQUIRED for
+      expressiveness conformance but need not have uniform enforcement depth.
+    normative_sources:
+      - file: docs/spec/wardline-01-06-annotation-vocabulary.md
+        section: "6. Annotation vocabulary"
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.2 Conformance criteria"
+    verification:
+      method: decorator_inventory_and_review
+      target_paths:
+        - src/wardline/decorators
+        - docs/spec/wardline-02-A-python-binding.md
+    fitness_dimensions: [conformance, expressiveness]
+    notes: >
+      Criterion 1 of the ten conformance criteria. Current implementation
+      covers core groups; supplementary group expressiveness should be
+      inventoried against the full 17-group list.

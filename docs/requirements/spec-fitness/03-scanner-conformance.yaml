@@ -9,7 +9,7 @@ requirements:
       - file: docs/spec/wardline-01-14-conformance.md
         section: "14.3.1 Enforcement profiles"
       - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.6 Regime composition matrix"
+        section: "A.3 Interface contract (Wardline-Core)"
     verification:
       method: static_review_and_unit_tests
       target_paths:
@@ -30,7 +30,7 @@ requirements:
       - file: docs/spec/wardline-01-14-conformance.md
         section: "14.2 Conformance criteria"
       - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.4 Annotation vocabulary"
+        section: "A.3 Interface contract (Wardline-Core)"
     verification:
       method: unit_tests_and_corpus_review
       target_paths:
@@ -61,46 +61,50 @@ requirements:
     notes: This is one of the most important fitness checks for higher-assurance scanning.
 
   - id: WL-FIT-SCAN-004
-    title: SARIF output is deterministic and Wardline-shaped
+    title: SARIF output carries the required Wardline property bags
     statement: >
-      SARIF output MUST be valid SARIF v2.1.0, deterministic for equivalent input,
-      and include the Wardline-specific result properties required by the spec.
+      SARIF output MUST be valid SARIF v2.1.0 and include the Wardline-specific
+      result-level and run-level property bags required by the spec.
+    normative_sources:
+      - file: docs/spec/wardline-01-10-verification-properties.md
+        section: "10.1 Findings interchange format"
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.3 Interface contract (Wardline-Core)"
+    verification:
+      method: unit_tests_and_fixture_validation
+      target_paths:
+        - src/wardline/scanner/sarif.py
+        - tests/unit/scanner/test_sarif.py
+        - tests/integration/test_scan_cmd.py
+    fitness_dimensions: [interoperability, conformance]
+    notes: This requirement covers property-bag completeness, not just JSON serialisation.
+
+  - id: WL-FIT-SCAN-005
+    title: Precision and recall are measured per cell
+    statement: >
+      The implementation MUST measure, track, and publish precision and recall
+      against the golden corpus per rule-by-taint-state cell for the rules it
+      claims to implement.
     normative_sources:
       - file: docs/spec/wardline-01-14-conformance.md
         section: "14.2 Conformance criteria"
       - file: docs/spec/wardline-01-10-verification-properties.md
         section: "10. Verification properties"
     verification:
-      method: unit_tests_and_fixture_validation
+      method: corpus_cli_and_reporting_review
       target_paths:
-        - src/wardline/scanner/sarif.py
-        - tests/unit/scanner/test_sarif.py
-        - src/wardline/manifest/schemas/fingerprint.schema.json
-    fitness_dimensions: [interoperability, conformance]
-    notes: Determinism matters for baseline comparison and audit repeatability.
-
-  - id: WL-FIT-SCAN-005
-    title: Tool failures are surfaced without losing scan output
-    statement: >
-      Internal rule or engine failures MUST be reported as tool-level findings or
-      equivalent diagnosable output, and the scan should continue when safe to do so.
-    normative_sources:
-      - file: docs/spec/wardline-01-14-conformance.md
-        section: "14.3.1 Enforcement profiles"
-    verification:
-      method: engine_and_cli_tests
-      target_paths:
-        - src/wardline/scanner/engine.py
-        - src/wardline/scanner/exceptions.py
-        - tests/unit/scanner/test_engine.py
-    fitness_dimensions: [resilience, assessability]
-    notes: A crashed rule with silent data loss is a poor fitness outcome even if the codebase passes lint.
+        - src/wardline/cli/corpus_cmds.py
+        - tests/unit/scanner/test_corpus_runner.py
+        - tests/integration/test_corpus_verify.py
+    fitness_dimensions: [conformance, assessability]
+    notes: Per-rule or ad hoc metrics are weaker than the spec’s per-cell requirement.
 
   - id: WL-FIT-SCAN-006
     title: Corpus exists for claimed coverage
     statement: >
       A golden corpus of labeled specimens MUST exist for the scanner behaviors it
-      claims, and corpus verification must be runnable from the repo.
+      claims, including adversarial specimens where the spec requires them, and
+      corpus verification MUST be runnable from the repo.
     normative_sources:
       - file: docs/spec/wardline-01-10-verification-properties.md
         section: "10. Verification properties"
@@ -117,35 +121,35 @@ requirements:
     notes: Coverage claims without a maintained corpus are weak evidence.
 
   - id: WL-FIT-SCAN-007
-    title: Self-hosting is measurable
+    title: Self-hosting gate is substantive
     statement: >
-      The project MUST provide a repeatable way to assess whether the scanner can
-      scan its own source and report the outcome as a fitness signal.
+      Where the scanner is implemented in the language it analyses, the project
+      MUST verify that the scanner passes the rules it implements on its own
+      source, not merely that self-hosting can be observed.
     normative_sources:
       - file: docs/spec/wardline-01-14-conformance.md
         section: "14.2 Conformance criteria"
-      - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.6 Regime composition matrix"
     verification:
       method: cli_review_and_tests
       target_paths:
         - src/wardline/cli/scan.py
-        - tests/unit/test_wp04_hardening.py
+        - tests/integration/test_self_hosting.py
+        - tests/integration/test_self_hosting_scan.py
         - docs/audits
     fitness_dimensions: [conformance, fitness_signal]
-    notes: This can be satisfied by tests, CI wiring, or a documented audit procedure.
+    notes: A stability-only self-hosting check is weaker than the conformance criterion.
 
   - id: WL-FIT-SCAN-008
-    title: Regime composition is documented honestly
+    title: Manifest-validation responsibility and conformance surface are documented honestly
     statement: >
-      The Python implementation MUST document which capabilities belong to the
-      scanner, which belong to governance tooling, and which are advisory rather
-      than authoritative.
+      The implementation MUST accurately document which normative capabilities it
+      provides directly, which depend on a companion governance tool, and any
+      remaining conformance gaps or delegated validation responsibility.
     normative_sources:
       - file: docs/spec/wardline-01-14-conformance.md
-        section: "14.4 Enforcement regimes"
-      - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.6 Regime composition matrix"
+        section: "14.2 Conformance criteria"
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.1 Enforcement profiles"
     verification:
       method: documentation_review
       target_paths:
@@ -153,4 +157,138 @@ requirements:
         - src/wardline/cli
         - src/wardline/scanner
     fitness_dimensions: [conformance, governance]
-    notes: This prevents overstating what the current repo can actually guarantee.
+    notes: Machine-readable conformance surfaces should not imply zero gaps when tracked gaps remain.
+
+  - id: WL-FIT-SCAN-009
+    title: Living pattern catalogue with version-tracked semantic equivalents
+    statement: >
+      Language bindings MUST maintain version-tracked lists of semantic
+      equivalents for each pattern rule, extending detection coverage as new
+      evasion variants are identified. The precision/recall corpus SHOULD
+      include evasion-variant specimens alongside standard specimens.
+    normative_sources:
+      - file: docs/spec/wardline-01-07-pattern-rules.md
+        section: "7. Pattern rules"
+    verification:
+      method: documentation_and_corpus_review
+      target_paths:
+        - docs/spec/semantic-equivalents
+        - corpus/specimens
+        - src/wardline/scanner/rules
+    fitness_dimensions: [conformance, maintainability]
+    notes: >
+      The semantic-equivalents directory in docs/spec tracks this. Verify that
+      each implemented rule has a corresponding equivalents list and that
+      corpus specimens exercise them.
+
+  - id: WL-FIT-SCAN-010
+    title: Taint propagation correctness (verification property 6)
+    statement: >
+      The taint propagation engine MUST correctly assign taint states to values
+      at merge points and across function boundaries. Taint-flow corpus
+      specimens MUST test: direct boundary-to-boundary flows, two-hop
+      indirection through undecorated helpers, and container-level taint
+      contamination.
+    normative_sources:
+      - file: docs/spec/wardline-01-10-verification-properties.md
+        section: "10. Verification properties"
+    verification:
+      method: unit_tests_and_corpus
+      target_paths:
+        - src/wardline/scanner/taint
+        - tests/unit/scanner/test_taint.py
+        - tests/unit/scanner/test_engine_l3.py
+        - corpus/specimens
+    fitness_dimensions: [correctness, conformance]
+    notes: >
+      This is distinct from SCAN-003 (which tests scanner behavior). Property 6
+      specifically requires corpus specimens of category taint_flow that test
+      propagation correctness independently of rule firing.
+
+  - id: WL-FIT-SCAN-011
+    title: Corpus independence requirements
+    statement: >
+      The golden corpus MUST satisfy independence requirements: separate
+      publication as a versioned artefact, version binding to a specification
+      version, integrity verification via specimen hash manifest, and
+      reproducible evaluation via a corpus verify command.
+    normative_sources:
+      - file: docs/spec/wardline-01-10-verification-properties.md
+        section: "10. Verification properties"
+    verification:
+      method: corpus_and_cli_review
+      target_paths:
+        - corpus/specimens
+        - src/wardline/cli/corpus_cmds.py
+        - tests/integration/test_corpus_verify.py
+    fitness_dimensions: [conformance, assessability]
+    notes: >
+      At DRAFT v0.2.0, the corpus is maintained alongside the spec and is not
+      yet independently published. Full independence requirements apply from v1.0.
+      Verify that the existing corpus infrastructure supports the path to independence.
+
+  - id: WL-FIT-SCAN-012
+    title: Rejection path definition is precise
+    statement: >
+      The scanner MUST correctly classify rejection paths: exception-raising
+      statements, guarded early returns, and resolvable two-hop delegation
+      constitute rejection paths. Assertions MUST NOT be counted as rejection
+      paths. Statically unreachable rejection paths (constant-False guards)
+      SHOULD be detected and treated as absent.
+    normative_sources:
+      - file: docs/spec/wardline-01-07-pattern-rules.md
+        section: "7.2 Structural verification"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/scanner/rules/py_wl_007.py
+        - tests/unit/scanner/test_py_wl_007.py
+    fitness_dimensions: [correctness, conformance]
+    notes: >
+      This refines SCAN-002 and SCAN-003 by specifically testing the rejection
+      path classification logic, including the assertion exclusion and
+      unreachable-path detection.
+
+  - id: WL-FIT-SCAN-013
+    title: WL-001 optional-field suppression follows three conditions
+    statement: >
+      WL-001 is SUPPRESS when three conditions are met simultaneously:
+      (1) the field is declared optional-by-contract in the overlay,
+      (2) the actual default matches the declared approved default exactly,
+      and (3) the access occurs within a declared validation or normalisation
+      boundary. A default that differs from the approved default produces
+      ERROR/UNCONDITIONAL (stronger than the undeclared case).
+    normative_sources:
+      - file: docs/spec/wardline-01-07-pattern-rules.md
+        section: "7.2.1 Structural-guarantee defaults and WL-001"
+    verification:
+      method: unit_tests_and_corpus
+      target_paths:
+        - src/wardline/scanner/rules/py_wl_001.py
+        - tests/unit/scanner/test_py_wl_001.py
+        - corpus/specimens
+    fitness_dimensions: [correctness, conformance]
+    notes: >
+      The corpus should include suppression_interaction specimens: one negative
+      (all three conditions met), one positive (default mismatch), one positive
+      (correct default but outside boundary).
+
+  - id: WL-FIT-SCAN-014
+    title: Binding matrix deviations are narrowing-only
+    statement: >
+      Language bindings MAY modify individual severity matrix cells where the
+      target language's type system structurally prevents a violation class.
+      Binding-level deviations MUST narrow severity or exceptionability
+      relative to the framework matrix, not widen them.
+    normative_sources:
+      - file: docs/spec/wardline-01-07-pattern-rules.md
+        section: "7.3 Severity matrix"
+    verification:
+      method: static_review
+      target_paths:
+        - src/wardline/core/matrix.py
+        - docs/spec/wardline-02-A-python-binding.md
+    fitness_dimensions: [conformance, safety]
+    notes: >
+      Verify that any Python binding matrix deviations from the framework
+      matrix are documented and narrowing-only.
