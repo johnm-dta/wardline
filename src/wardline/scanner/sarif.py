@@ -225,6 +225,11 @@ class SarifReport:
     manifest_hash: str | None = None
     scan_timestamp: str | None = None
     commit_ref: str | None = None
+    # Gap 3: Run-level identity properties (§10.1)
+    input_hash: str = ""
+    input_files: int = 0
+    overlay_hashes: tuple[str, ...] = ()
+    coverage_ratio: float | None = None
 
     def _implemented_rules(self) -> list[str]:
         """Return sorted list of canonical rule ID values (excludes pseudo-IDs).
@@ -277,12 +282,17 @@ class SarifReport:
                    else {}),
                 "wardline.conformanceGaps": [],
                 "wardline.controlLaw": self.control_law,
+                **({"wardline.coverageRatio": round(self.coverage_ratio, 4)}
+                   if self.coverage_ratio is not None else {}),
                 "wardline.governanceProfile": self.governance_profile,
                 "wardline.implementedRules": self._implemented_rules(),
+                "wardline.inputFiles": self.input_files,
+                "wardline.inputHash": self.input_hash,
                 **({"wardline.manifestHash": self.manifest_hash}
                    if self.manifest_hash is not None
                    else {}),
-                "wardline.propertyBagVersion": "0.2",
+                "wardline.overlayHashes": list(self.overlay_hashes),
+                "wardline.propertyBagVersion": "0.3",
                 **({"wardline.scanTimestamp": self.scan_timestamp}
                    if not self.verification_mode and self.scan_timestamp
                    else {}),

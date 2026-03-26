@@ -327,7 +327,77 @@ class TestSarifPropertyBags:
     def test_property_bag_version(self) -> None:
         report = SarifReport(findings=[])
         props = report.to_dict()["runs"][0]["properties"]
-        assert props["wardline.propertyBagVersion"] == "0.2"
+        assert props["wardline.propertyBagVersion"] == "0.3"
+
+    def test_input_hash_always_emitted(self) -> None:
+        """wardline.inputHash is always present in run properties."""
+        report = SarifReport(findings=[], input_hash="sha256:abc123")
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.inputHash"] == "sha256:abc123"
+
+    def test_input_hash_empty_string_default(self) -> None:
+        """Default empty input_hash emits empty string (not absent)."""
+        report = SarifReport(findings=[])
+        props = report.to_dict()["runs"][0]["properties"]
+        assert "wardline.inputHash" in props
+        assert props["wardline.inputHash"] == ""
+
+    def test_input_files_always_emitted(self) -> None:
+        """wardline.inputFiles is always present, defaults to 0."""
+        report = SarifReport(findings=[])
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.inputFiles"] == 0
+
+    def test_input_files_wired(self) -> None:
+        report = SarifReport(findings=[], input_files=42)
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.inputFiles"] == 42
+
+    def test_overlay_hashes_always_emitted(self) -> None:
+        """wardline.overlayHashes is always present (empty list when no overlays)."""
+        report = SarifReport(findings=[])
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.overlayHashes"] == []
+
+    def test_overlay_hashes_with_entries(self) -> None:
+        report = SarifReport(
+            findings=[],
+            overlay_hashes=("sha256:aaa", "sha256:bbb"),
+        )
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.overlayHashes"] == ["sha256:aaa", "sha256:bbb"]
+
+    def test_coverage_ratio_omitted_when_none(self) -> None:
+        """wardline.coverageRatio is absent when coverage_ratio is None."""
+        report = SarifReport(findings=[], coverage_ratio=None)
+        props = report.to_dict()["runs"][0]["properties"]
+        assert "wardline.coverageRatio" not in props
+
+    def test_coverage_ratio_present_when_set(self) -> None:
+        report = SarifReport(findings=[], coverage_ratio=0.73456789)
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.coverageRatio"] == 0.7346
+
+    def test_coverage_ratio_zero_is_emitted(self) -> None:
+        """coverageRatio 0.0 is emitted (distinct from None/absent)."""
+        report = SarifReport(findings=[], coverage_ratio=0.0)
+        props = report.to_dict()["runs"][0]["properties"]
+        assert "wardline.coverageRatio" in props
+        assert props["wardline.coverageRatio"] == 0.0
+
+    def test_input_hash_not_suppressed_in_verification_mode(self) -> None:
+        """inputHash is deterministic — present even in verification mode."""
+        report = SarifReport(
+            findings=[],
+            verification_mode=True,
+            input_hash="sha256:abc",
+            input_files=5,
+            overlay_hashes=("sha256:def",),
+        )
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.inputHash"] == "sha256:abc"
+        assert props["wardline.inputFiles"] == 5
+        assert props["wardline.overlayHashes"] == ["sha256:def"]
 
 
 # ---------------------------------------------------------------------------
