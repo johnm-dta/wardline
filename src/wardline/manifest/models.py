@@ -134,9 +134,15 @@ class ManifestMetadata:
     """Manifest metadata — organisational and governance fields."""
 
     organisation: str = ""
-    ratified_by: dict[str, str] | None = None
+    ratified_by: MappingProxyType[str, str] | None = None
     ratification_date: str | None = None
     review_interval_days: int | None = None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.ratified_by, dict):
+            object.__setattr__(
+                self, "ratified_by", MappingProxyType(self.ratified_by)
+            )
 
 
 @dataclass(frozen=True)
@@ -148,10 +154,20 @@ class BoundaryEntry:
     from_tier: int | None = None
     to_tier: int | None = None
     restored_tier: int | None = None
-    provenance: dict[str, object] | None = None
-    bounded_context: dict[str, object] | None = None
+    provenance: MappingProxyType[str, object] | None = None
+    bounded_context: MappingProxyType[str, object] | None = None
     overlay_scope: str = ""
     overlay_path: str = ""
+
+    def __post_init__(self) -> None:
+        if isinstance(self.provenance, dict):
+            object.__setattr__(
+                self, "provenance", MappingProxyType(self.provenance)
+            )
+        if isinstance(self.bounded_context, dict):
+            object.__setattr__(
+                self, "bounded_context", MappingProxyType(self.bounded_context)
+            )
 
 
 @dataclass(frozen=True)

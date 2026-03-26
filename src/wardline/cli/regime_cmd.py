@@ -8,6 +8,7 @@ optionally gating on ERROR-level failures.
 from __future__ import annotations
 
 import json as json_mod
+import logging
 import sys
 from pathlib import Path
 from typing import Any
@@ -76,7 +77,10 @@ def _run_coherence_checks(
 
     try:
         boundaries = resolve_boundaries(manifest_dir, manifest_model)
-    except (GovernanceError, ManifestLoadError, OSError):
+    except (GovernanceError, ManifestLoadError, OSError) as exc:
+        logging.getLogger("wardline").warning(
+            "Could not resolve boundaries: %s", exc,
+        )
         boundaries = ()
 
     try:

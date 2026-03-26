@@ -2,7 +2,7 @@
 
 Detects declared validation and restoration boundaries whose bodies do
 not contain a structural rejection path. Under the authoritative
-binding/spec contract, WL-007 applies to the boundary function itself:
+binding/spec contract, WL-008 applies to the boundary function itself:
 the body must reject invalid input via a raised exception or a guarded
 early return that clearly represents rejection.
 """
@@ -32,7 +32,6 @@ _BOUNDARY_DECORATORS = frozenset({
     "validates_shape",
     "validates_semantic",
     "validates_external",
-    "restoration_boundary",
 })
 
 

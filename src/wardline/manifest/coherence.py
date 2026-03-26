@@ -185,7 +185,7 @@ def check_tier_downgrades(
         baseline_path: Path to ``wardline.manifest.baseline.json``.
 
     Returns:
-        GOVERNANCE WARNING for each downgraded module, or GOVERNANCE INFO
+        GOVERNANCE WARNING for each downgraded module, or empty list
         if the baseline file does not exist.
     """
     if not baseline_path.exists():

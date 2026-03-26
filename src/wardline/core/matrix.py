@@ -71,6 +71,17 @@ for _rule, _cells in _MATRIX_DATA:
             severity=_sev, exceptionability=_exc
         )
 
+# Completeness check: every canonical rule must have all 8 taint entries.
+_EXPECTED_RULES = frozenset(r for r, _ in _MATRIX_DATA)
+_EXPECTED_COUNT = len(_EXPECTED_RULES) * len(_TAINT_ORDER)
+if len(_severity_matrix_builder) != _EXPECTED_COUNT:
+    raise ValueError(
+        f"Severity matrix incomplete: expected {_EXPECTED_COUNT} cells "
+        f"({len(_EXPECTED_RULES)} rules × {len(_TAINT_ORDER)} taints), "
+        f"got {len(_severity_matrix_builder)}"
+    )
+del _EXPECTED_RULES, _EXPECTED_COUNT
+
 SEVERITY_MATRIX: MappingProxyType[tuple[RuleId, TaintState], SeverityCell] = (
     MappingProxyType(_severity_matrix_builder)
 )

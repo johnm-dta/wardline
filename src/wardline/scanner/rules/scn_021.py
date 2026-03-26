@@ -86,12 +86,6 @@ _COMBINATIONS: tuple[_CombinationSpec, ...] = (
         "preserve_cause implies propagation; exception boundaries terminate",
     ),
     _CombinationSpec("compensatable", "audit_writer", _CONTRADICTORY, "Audit writes must not be compensated"),
-    _CombinationSpec(
-        "data_flow",
-        "external_boundary",
-        _CONTRADICTORY,
-        "External boundaries produce T4 data; data-flow produces declared-tier data",
-    ),
     _CombinationSpec("system_plugin", "tier1_read", _CONTRADICTORY, "Plugins receive external input; Tier 1 reads are internal"),
     _CombinationSpec("fail_open", "deterministic", _SUSPICIOUS, "Fail-open with fallback defaults may produce non-deterministic output"),
     _CombinationSpec("compensatable", "deterministic", _SUSPICIOUS, "Compensation introduces state changes that may affect determinism"),

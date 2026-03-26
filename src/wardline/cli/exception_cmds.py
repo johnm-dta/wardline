@@ -265,7 +265,10 @@ def refresh(
                 if datetime.date.fromisoformat(entry["expires"]) < today_date:
                     continue
             except ValueError:
-                pass
+                logger.warning(
+                    "Invalid expiry date %r on %s — treating as non-expired",
+                    entry["expires"], entry["id"],
+                )
 
         location = entry["location"]
         rule = entry["rule"]
@@ -578,7 +581,9 @@ def review(json_output: bool) -> None:
                 elif exp_date <= today + datetime.timedelta(days=30):
                     approaching.append(entry["id"])
             except ValueError:
-                pass
+                logger.warning(
+                    "Invalid expiry date %r on %s", entry["expires"], entry["id"],
+                )
 
         if entry.get("agent_originated") is None:
             unknown_prov.append(entry["id"])
