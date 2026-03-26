@@ -114,6 +114,53 @@ def _compute_input_hash(
     )
 
 
+def _compute_overlay_hashes(
+    consumed_overlay_paths: Sequence[Path],
+    project_root: Path,
+) -> tuple[str, ...]:
+    """SHA-256 of each consumed overlay, sorted by normalized path (§10.1).
+
+    Symlinked overlay files are excluded (consistent with overlay discovery).
+    """
+    import hashlib
+
+    entries: list[tuple[str, str]] = []
+    resolved_root = project_root.resolve()
+    for overlay_path in consumed_overlay_paths:
+        if overlay_path.is_symlink():
+            continue
+        resolved = overlay_path.resolve()
+        try:
+            rel = resolved.relative_to(resolved_root)
+        except ValueError:
+            rel = resolved
+        normalized = rel.as_posix()
+        digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+        entries.append((normalized, f"sha256:{digest}"))
+
+    entries.sort(key=lambda e: e[0])
+    return tuple(h for _, h in entries)
+
+
+def _read_coverage_ratio(manifest_path: Path) -> float | None:
+    """Read annotation coverage ratio from fingerprint baseline.
+
+    Returns None when no baseline exists (property omitted from SARIF).
+    Returns 0.0 when baseline exists but shows zero coverage.
+    """
+    import json
+
+    baseline = manifest_path.parent / "wardline.fingerprint.json"
+    if not baseline.exists():
+        return None
+    try:
+        data = json.loads(baseline.read_text(encoding="utf-8"))
+        ratio = data.get("coverage", {}).get("ratio")
+        return float(ratio) if ratio is not None else None
+    except (json.JSONDecodeError, OSError, ValueError):
+        return None
+
+
 def _utc_timestamp() -> str:
     """ISO 8601 UTC timestamp for scan temporal binding."""
     from datetime import UTC, datetime

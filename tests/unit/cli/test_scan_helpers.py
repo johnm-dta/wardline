@@ -119,3 +119,95 @@ class TestComputeInputHash:
         missing = tmp_path / "gone.py"
         with pytest.raises(OSError):
             _compute_input_hash([missing], tmp_path)
+
+
+class TestComputeOverlayHashes:
+    def test_sorted_by_normalized_path(self, tmp_path: Path) -> None:
+        """Overlay hashes are sorted by forward-slash path relative to project root."""
+        from wardline.cli.scan import _compute_overlay_hashes
+
+        d1 = tmp_path / "z_dir"
+        d1.mkdir()
+        d2 = tmp_path / "a_dir"
+        d2.mkdir()
+        o1 = d1 / "wardline.overlay.yaml"
+        o1.write_bytes(b"overlay_for: z_dir\n")
+        o2 = d2 / "wardline.overlay.yaml"
+        o2.write_bytes(b"overlay_for: a_dir\n")
+
+        result = _compute_overlay_hashes([o1, o2], tmp_path)
+        assert len(result) == 2
+        assert all(h.startswith("sha256:") for h in result)
+        # a_dir sorts before z_dir
+        h_a = _compute_overlay_hashes([o2], tmp_path)
+        h_z = _compute_overlay_hashes([o1], tmp_path)
+        assert result == (h_a[0], h_z[0])
+
+    def test_empty_returns_empty_tuple(self, tmp_path: Path) -> None:
+        """No overlays returns empty tuple."""
+        from wardline.cli.scan import _compute_overlay_hashes
+
+        result = _compute_overlay_hashes([], tmp_path)
+        assert result == ()
+
+    def test_skips_symlinks(self, tmp_path: Path) -> None:
+        """Symlinked overlay files are excluded."""
+        from wardline.cli.scan import _compute_overlay_hashes
+
+        real = tmp_path / "real.yaml"
+        real.write_bytes(b"overlay_for: x\n")
+        link = tmp_path / "link.yaml"
+        link.symlink_to(real)
+
+        result = _compute_overlay_hashes([real, link], tmp_path)
+        assert len(result) == 1
+
+
+class TestReadCoverageRatio:
+    def test_no_baseline_returns_none(self, tmp_path: Path) -> None:
+        """No fingerprint baseline file returns None."""
+        from wardline.cli.scan import _read_coverage_ratio
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text("tiers: []\n")
+        result = _read_coverage_ratio(manifest)
+        assert result is None
+
+    def test_baseline_with_ratio(self, tmp_path: Path) -> None:
+        """Fingerprint baseline with coverage.ratio returns float."""
+        import json
+
+        from wardline.cli.scan import _read_coverage_ratio
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text("tiers: []\n")
+        baseline = tmp_path / "wardline.fingerprint.json"
+        baseline.write_text(
+            json.dumps({"coverage": {"ratio": 0.73, "annotated": 30, "total": 41}})
+        )
+        result = _read_coverage_ratio(manifest)
+        assert result == 0.73
+
+    def test_baseline_with_zero_ratio(self, tmp_path: Path) -> None:
+        """Baseline exists but ratio is 0.0 — returns 0.0, not None."""
+        import json
+
+        from wardline.cli.scan import _read_coverage_ratio
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text("tiers: []\n")
+        baseline = tmp_path / "wardline.fingerprint.json"
+        baseline.write_text(json.dumps({"coverage": {"ratio": 0.0}}))
+        result = _read_coverage_ratio(manifest)
+        assert result == 0.0
+
+    def test_corrupt_baseline_returns_none(self, tmp_path: Path) -> None:
+        """Corrupt JSON baseline returns None (not crash)."""
+        from wardline.cli.scan import _read_coverage_ratio
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text("tiers: []\n")
+        baseline = tmp_path / "wardline.fingerprint.json"
+        baseline.write_text("NOT JSON")
+        result = _read_coverage_ratio(manifest)
+        assert result is None
