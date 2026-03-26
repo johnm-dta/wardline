@@ -1110,6 +1110,8 @@ with the full set of computations (remove the old `_compute_manifest_hash` call 
     except OSError as exc:
         logger.error("inputHash computation failed: %s", exc)
         all_findings.append(
+            # NOTE: uses the local _make_governance_finding() wrapper (line 142),
+            # NOT the imported make_governance_finding from scanner.context.
             _make_governance_finding(
                 RuleId.TOOL_ERROR,
                 f"inputHash computation failed — scanned file unreadable: {exc}",
@@ -1117,7 +1119,10 @@ with the full set of computations (remove the old `_compute_manifest_hash` call 
             )
         )
         input_hash = ""
-        input_files = result.files_scanned
+        # inputFiles is unavailable — we can't compute the deduplicated count
+        # without reading files. Use 0 to signal "unknown" rather than
+        # files_scanned (which may double-count symlink aliases).
+        input_files = 0
 ```
 
 Then update the `SarifReport` constructor to include the new fields:
