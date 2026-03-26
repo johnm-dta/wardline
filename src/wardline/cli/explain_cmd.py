@@ -100,7 +100,7 @@ def explain(
 
         # Discover annotations and assign taints
         annotations = discover_annotations(tree, file_path_str)
-        taint_map, _return_taint_map, _taint_sources, _conflicts = assign_function_taints(
+        taint_map, _return_taint_map, _taint_sources, _conflicts, _overclaims = assign_function_taints(
             tree, file_path_str, annotations, manifest_model
         )
 

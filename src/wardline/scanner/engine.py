@@ -272,7 +272,7 @@ class ScanEngine:
         # Pass 1: Discovery + taint assignment (fault-tolerant)
         try:
             annotations = discover_annotations(tree, file_path)
-            body_taint_map, return_taint_map, taint_sources, taint_conflicts = assign_function_taints(
+            body_taint_map, return_taint_map, taint_sources, taint_conflicts, restoration_overclaims = assign_function_taints(
                 tree, file_path, annotations, self._manifest
             )
         except Exception as exc:
@@ -304,6 +304,7 @@ class ScanEngine:
             annotations = {}
             body_taint_map, return_taint_map, taint_sources = {}, {}, {}
             taint_conflicts = []
+            restoration_overclaims = []
 
         # Emit GOVERNANCE findings for conflicting taint decorators
         for conflict in taint_conflicts:
@@ -326,6 +327,31 @@ class ScanEngine:
                     analysis_level=self._analysis_level,
                     source_snippet=None,
                     qualname=conflict.qualname,
+                )
+            )
+
+        # Emit GOVERNANCE findings for restoration overclaims
+        for overclaim in restoration_overclaims:
+            result.findings.append(
+                Finding(
+                    rule_id=RuleId.GOVERNANCE_RESTORATION_OVERCLAIM,
+                    file_path=overclaim.file_path,
+                    line=1,
+                    col=0,
+                    end_line=None,
+                    end_col=None,
+                    message=(
+                        f"@restoration_boundary on {overclaim.qualname} claims "
+                        f"restored_tier={overclaim.claimed_tier} but evidence "
+                        f"supports at most tier {overclaim.evidence_ceiling} "
+                        f"({overclaim.evidence_taint.value}). §5.3 evidence matrix."
+                    ),
+                    severity=Severity.WARNING,
+                    exceptionability=Exceptionability.STANDARD,
+                    taint_state=overclaim.evidence_taint,
+                    analysis_level=self._analysis_level,
+                    source_snippet=None,
+                    qualname=overclaim.qualname,
                 )
             )
 

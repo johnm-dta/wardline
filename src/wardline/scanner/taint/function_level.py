@@ -41,6 +41,16 @@ class TaintConflict(NamedTuple):
     ignored_decorator: str
     ignored_taint: TaintState
 
+
+class RestorationOverclaim(NamedTuple):
+    """Diagnostic: decorator claims a restored_tier exceeding its evidence ceiling."""
+
+    qualname: str
+    file_path: str
+    claimed_tier: int
+    evidence_ceiling: int
+    evidence_taint: TaintState
+
 logger = logging.getLogger(__name__)
 
 
@@ -94,7 +104,7 @@ def assign_function_taints(
     file_path: Path | str,
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
     manifest: WardlineManifest | None = None,
-) -> tuple[dict[str, TaintState], dict[str, TaintState], dict[str, TaintSource], list[TaintConflict]]:
+) -> tuple[dict[str, TaintState], dict[str, TaintState], dict[str, TaintSource], list[TaintConflict], list[RestorationOverclaim]]:
     """Assign taint states to every function in a parsed module.
 
     Args:
@@ -106,7 +116,8 @@ def assign_function_taints(
             ``UNKNOWN_RAW``.
 
     Returns:
-        Tuple of (body_taint_map, return_taint_map, taint_sources, taint_conflicts):
+        Tuple of (body_taint_map, return_taint_map, taint_sources,
+        taint_conflicts, restoration_overclaims):
         - body_taint_map: dict mapping qualname → ``TaintState`` for rule
           evaluation inside function bodies (INPUT tier).
         - return_taint_map: dict mapping qualname → ``TaintState`` for
@@ -116,6 +127,8 @@ def assign_function_taints(
           "module_default", or "fallback").
         - taint_conflicts: list of ``TaintConflict`` diagnostics for
           functions with conflicting taint decorators.
+        - restoration_overclaims: list of ``RestorationOverclaim``
+          diagnostics for decorators claiming a tier exceeding evidence.
     """
     path_str = str(file_path)
     module_default = resolve_module_default(path_str, manifest)
@@ -123,15 +136,16 @@ def assign_function_taints(
     return_taint_map: dict[str, TaintState] = {}
     taint_sources: dict[str, TaintSource] = {}
     taint_conflicts: list[TaintConflict] = []
+    restoration_overclaims: list[RestorationOverclaim] = []
 
     _walk_and_assign(
         tree, path_str, annotations, module_default,
         body_taint_map, return_taint_map, taint_sources,
-        taint_conflicts,
+        taint_conflicts, restoration_overclaims,
         scope="",
     )
 
-    return body_taint_map, return_taint_map, taint_sources, taint_conflicts
+    return body_taint_map, return_taint_map, taint_sources, taint_conflicts, restoration_overclaims
 
 
 # ── Internal helpers ─────────────────────────────────────────────
@@ -245,13 +259,19 @@ def _restoration_taint_from_annotations(
     file_path: str,
     qualname: str,
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
+    overclaims: list[RestorationOverclaim] | None = None,
 ) -> TaintState | None:
     """Resolve taint for restoration_boundary via §5.3 evidence matrix.
 
     Returns the evidence-derived taint state if the function has a
     restoration_boundary annotation, or None if it does not.
+
+    When *overclaims* is provided, appends a ``RestorationOverclaim``
+    diagnostic if the decorator's ``restored_tier`` exceeds the evidence
+    ceiling per §5.3.
     """
     from wardline.core.evidence import max_restorable_tier
+    from wardline.core.tiers import TAINT_TO_TIER
 
     key = (file_path, qualname)
     anns = annotations.get(key)
@@ -264,9 +284,24 @@ def _restoration_taint_from_annotations(
             semantic = bool(ann.attrs.get("semantic_evidence", False))
             integrity = bool(ann.attrs.get("integrity_evidence"))
             institutional = bool(ann.attrs.get("institutional_provenance"))
-            return max_restorable_tier(
+            taint = max_restorable_tier(
                 structural, semantic, integrity, institutional,
             )
+
+            # Check if decorator's claimed tier exceeds evidence ceiling
+            claimed_tier = ann.attrs.get("restored_tier")
+            if claimed_tier is not None and overclaims is not None:
+                ceiling_tier = TAINT_TO_TIER[taint].value
+                if isinstance(claimed_tier, int) and claimed_tier < ceiling_tier:
+                    overclaims.append(RestorationOverclaim(
+                        qualname=qualname,
+                        file_path=file_path,
+                        claimed_tier=claimed_tier,
+                        evidence_ceiling=ceiling_tier,
+                        evidence_taint=taint,
+                    ))
+
+            return taint
     return None
 
 
@@ -279,6 +314,7 @@ def _walk_and_assign(
     return_taint_map: dict[str, TaintState],
     taint_sources: dict[str, TaintSource],
     taint_conflicts: list[TaintConflict],
+    restoration_overclaims: list[RestorationOverclaim],
     scope: str,
 ) -> None:
     """Recursively walk AST nodes, assigning taint to each function."""
@@ -298,6 +334,7 @@ def _walk_and_assign(
             if body_taint is None:
                 restoration_taint = _restoration_taint_from_annotations(
                     file_path, qualname, annotations,
+                    overclaims=restoration_overclaims,
                 )
                 body_taint = restoration_taint
 
@@ -331,7 +368,7 @@ def _walk_and_assign(
             _walk_and_assign(
                 child, file_path, annotations, module_default,
                 body_taint_map, return_taint_map, taint_sources,
-                taint_conflicts,
+                taint_conflicts, restoration_overclaims,
                 scope=qualname,
             )
         elif isinstance(child, ast.ClassDef):
@@ -341,13 +378,13 @@ def _walk_and_assign(
             _walk_and_assign(
                 child, file_path, annotations, module_default,
                 body_taint_map, return_taint_map, taint_sources,
-                taint_conflicts,
+                taint_conflicts, restoration_overclaims,
                 scope=class_scope,
             )
         else:
             _walk_and_assign(
                 child, file_path, annotations, module_default,
                 body_taint_map, return_taint_map, taint_sources,
-                taint_conflicts,
+                taint_conflicts, restoration_overclaims,
                 scope=scope,
             )

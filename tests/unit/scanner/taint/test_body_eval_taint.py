@@ -72,7 +72,7 @@ def test_body_eval_taint(
 ) -> None:
     """Body eval taint uses INPUT tier for each decorator."""
     tree, annotations = _make_decorated_function(decorator_name)
-    body_taint_map, _return_taint_map, _taint_sources, _conflicts = assign_function_taints(
+    body_taint_map, _return_taint_map, _taint_sources, _conflicts, _overclaims = assign_function_taints(
         tree, "test.py", annotations
     )
     assert body_taint_map["my_func"] == expected_body_taint
@@ -88,7 +88,7 @@ def test_return_taint(
 ) -> None:
     """Return taint uses OUTPUT tier for each decorator."""
     tree, annotations = _make_decorated_function(decorator_name)
-    _body_taint_map, return_taint_map, _taint_sources, _conflicts = assign_function_taints(
+    _body_taint_map, return_taint_map, _taint_sources, _conflicts, _overclaims = assign_function_taints(
         tree, "test.py", annotations
     )
     assert return_taint_map["my_func"] == expected_return_taint

@@ -35,7 +35,7 @@ class TestL1Provenance:
         annotations = {
             ("test.py", "handler"): [_ann("external_boundary")],
         }
-        taint_map, _return_map, taint_sources, _conflicts = assign_function_taints(
+        taint_map, _return_map, taint_sources, _conflicts, _overclaims = assign_function_taints(
             tree, "test.py", annotations
         )
 
@@ -53,7 +53,7 @@ class TestL1Provenance:
                 ),
             ),
         )
-        taint_map, _return_map, taint_sources, _conflicts = assign_function_taints(
+        taint_map, _return_map, taint_sources, _conflicts, _overclaims = assign_function_taints(
             tree, "src/myapp/handlers.py", {}, manifest=manifest
         )
 
@@ -63,7 +63,7 @@ class TestL1Provenance:
     def test_provenance_fallback(self) -> None:
         """No decorator, no module_tiers → source 'fallback'."""
         tree = _parse("def orphan(): pass\n")
-        taint_map, _return_map, taint_sources, _conflicts = assign_function_taints(
+        taint_map, _return_map, taint_sources, _conflicts, _overclaims = assign_function_taints(
             tree, "test.py", {}
         )
 
@@ -87,7 +87,7 @@ class TestL1Provenance:
         annotations = {
             ("src/myapp/api.py", "decorated"): [_ann("external_boundary")],
         }
-        taint_map, _return_map, taint_sources, _conflicts = assign_function_taints(
+        taint_map, _return_map, taint_sources, _conflicts, _overclaims = assign_function_taints(
             tree, "src/myapp/api.py", annotations, manifest=manifest
         )
 
