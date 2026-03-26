@@ -70,6 +70,7 @@ class ScanResult:
     files_skipped: int = 0
     files_with_degraded_taint: int = 0
     errors: list[str] = field(default_factory=list)
+    scanned_file_paths: list[Path] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -249,6 +250,7 @@ class ScanEngine:
             return
 
         result.files_scanned += 1
+        result.scanned_file_paths.append(file_path)
 
         for diagnostic in _detect_dynamic_imports(tree):
             result.findings.append(
