@@ -48,22 +48,17 @@ EXIT_TOOL_ERROR = 3
 
 
 def _compute_manifest_hash(manifest_path: Path) -> str | None:
-    """SHA-256 of manifest + sorted overlay contents. Binds findings to policy version."""
+    """SHA-256 of root manifest raw bytes only (§10.1).
+
+    The spec defines wardline.manifestHash as the hash of the root manifest
+    file content — not a combined hash with overlays. Overlay hashes are
+    reported separately via wardline.overlayHashes.
+    """
     import hashlib
 
     try:
-        parts: list[str] = [manifest_path.read_text(encoding="utf-8")]
-        overlay_dir = manifest_path.parent / "overlays"
-        if overlay_dir.is_dir():
-            overlay_files = sorted(
-                [*overlay_dir.rglob("*.yaml"), *overlay_dir.rglob("*.yml")]
-            )
-            for overlay_file in overlay_files:
-                if overlay_file.is_symlink():
-                    continue
-                parts.append(overlay_file.read_text(encoding="utf-8"))
-        combined = "\n---\n".join(parts)
-        return "sha256:" + hashlib.sha256(combined.encode("utf-8")).hexdigest()
+        raw = manifest_path.read_bytes()
+        return "sha256:" + hashlib.sha256(raw).hexdigest()
     except OSError:
         return None
 
