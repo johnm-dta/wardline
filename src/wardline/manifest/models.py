@@ -155,7 +155,7 @@ class BoundaryEntry:
     to_tier: int | None = None
     restored_tier: int | None = None
     provenance: MappingProxyType[str, object] | None = None
-    bounded_context: MappingProxyType[str, object] | None = None
+    validation_scope: MappingProxyType[str, object] | None = None
     overlay_scope: str = ""
     overlay_path: str = ""
 
@@ -164,9 +164,9 @@ class BoundaryEntry:
             object.__setattr__(
                 self, "provenance", MappingProxyType(self.provenance)
             )
-        if isinstance(self.bounded_context, dict):
+        if isinstance(self.validation_scope, dict):
             object.__setattr__(
-                self, "bounded_context", MappingProxyType(self.bounded_context)
+                self, "validation_scope", MappingProxyType(self.validation_scope)
             )
 
 

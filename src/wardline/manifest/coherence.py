@@ -5,7 +5,7 @@ Detects multiple classes of inconsistency:
   matching boundary declaration in any overlay.
 - **Undeclared boundaries**: overlay boundary entries whose function name does
   not appear as a decorated function in code.
-- **Unmatched contracts**: bounded_context contract declarations that don't
+- **Unmatched contracts**: validation_scope contract declarations that don't
   match any code-level annotation.
 - **Stale contract bindings**: contract_bindings entries pointing to
   non-existent functions.
@@ -453,9 +453,9 @@ def check_unmatched_contracts(
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
     boundaries: tuple[BoundaryEntry, ...],
 ) -> list[CoherenceIssue]:
-    """Find contract declarations in bounded_contexts with no matching annotation.
+    """Find contract declarations in validation_scopes with no matching annotation.
 
-    For each boundary that declares a ``bounded_context`` with ``contracts``,
+    For each boundary that declares a ``validation_scope`` with ``contracts``,
     verify the boundary's function has a matching annotation in code.  A
     contract declaration without a corresponding code-level annotation
     indicates a specification/implementation mismatch.
@@ -473,10 +473,10 @@ def check_unmatched_contracts(
     issues: list[CoherenceIssue] = []
 
     for boundary in boundaries:
-        if boundary.bounded_context is None:
+        if boundary.validation_scope is None:
             continue
 
-        contracts = boundary.bounded_context.get("contracts")
+        contracts = boundary.validation_scope.get("contracts")
         if not contracts:
             continue
 
@@ -491,7 +491,7 @@ def check_unmatched_contracts(
                     file_path=boundary.overlay_path,
                     detail=(
                         f"Boundary '{boundary.function}' declares contracts "
-                        f"({contract_names}) in bounded_context but has no "
+                        f"({contract_names}) in validation_scope but has no "
                         f"matching wardline-decorated function in code."
                     ),
                 )

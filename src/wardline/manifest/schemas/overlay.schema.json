@@ -55,7 +55,7 @@
             },
             "additionalProperties": false
           },
-          "bounded_context": {
+          "validation_scope": {
             "type": "object",
             "properties": {
               "contracts": {

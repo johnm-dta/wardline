@@ -266,7 +266,7 @@ def _build_overlay(data: dict[str, Any]) -> WardlineOverlay:
             to_tier=b.get("to_tier"),
             restored_tier=b.get("restored_tier"),
             provenance=b.get("provenance"),
-            bounded_context=b.get("bounded_context"),
+            validation_scope=b.get("validation_scope"),
         )
         for b in data.get("boundaries", [])
     )

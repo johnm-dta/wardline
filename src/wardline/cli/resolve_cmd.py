@@ -153,7 +153,7 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
                 "to_tier": b.to_tier,
                 "restored_tier": b.restored_tier,
                 "provenance": b.provenance,
-                "bounded_context": b.bounded_context,
+                "validation_scope": b.validation_scope,
                 "overlay_scope": (
                     str(Path(b.overlay_scope).relative_to(root))
                     if b.overlay_scope else ""

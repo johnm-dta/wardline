@@ -575,7 +575,7 @@ class TestUnmatchedContracts:
     """Tests for check_unmatched_contracts."""
 
     def test_matched_contract_no_issue(self) -> None:
-        """Boundary with bounded_context contracts and matching annotation is clean."""
+        """Boundary with validation_scope contracts and matching annotation is clean."""
         annotations = {
             ("src/api.py", "handle_request"): [_annot("external_boundary")],
         }
@@ -583,7 +583,7 @@ class TestUnmatchedContracts:
             BoundaryEntry(
                 function="handle_request",
                 transition="INGRESS",
-                bounded_context={
+                validation_scope={
                     "contracts": [
                         {"name": "UserInput", "data_tier": 3, "direction": "inbound"},
                     ]
@@ -600,7 +600,7 @@ class TestUnmatchedContracts:
             BoundaryEntry(
                 function="ghost_handler",
                 transition="INGRESS",
-                bounded_context={
+                validation_scope={
                     "contracts": [
                         {"name": "RawPayload", "data_tier": 4, "direction": "inbound"},
                     ]
@@ -614,8 +614,8 @@ class TestUnmatchedContracts:
         assert issues[0].function == "ghost_handler"
         assert "RawPayload" in issues[0].detail
 
-    def test_boundary_without_bounded_context_ignored(self) -> None:
-        """Boundaries without bounded_context are silently skipped."""
+    def test_boundary_without_validation_scope_ignored(self) -> None:
+        """Boundaries without validation_scope are silently skipped."""
         annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
         boundaries = (
             BoundaryEntry(function="handler", transition="INGRESS"),
@@ -630,7 +630,7 @@ class TestUnmatchedContracts:
             BoundaryEntry(
                 function="handler",
                 transition="INGRESS",
-                bounded_context={"contracts": []},
+                validation_scope={"contracts": []},
             ),
         )
         issues = check_unmatched_contracts(annotations, boundaries)
@@ -643,7 +643,7 @@ class TestUnmatchedContracts:
             BoundaryEntry(
                 function="handler",
                 transition="INGRESS",
-                bounded_context={
+                validation_scope={
                     "contracts": [
                         {"name": "ContractA", "data_tier": 2, "direction": "inbound"},
                         {"name": "ContractB", "data_tier": 3, "direction": "outbound"},
