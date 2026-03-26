@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from wardline.core.severity import RuleId, Severity
+from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.core.taints import TaintState
 from wardline.manifest.models import BoundaryEntry
 from wardline.scanner.context import ScanContext
@@ -277,9 +277,9 @@ async def target():
 
 
 class TestTaintMatrix:
-    """PY-WL-008 remains UNCONDITIONAL across taint states."""
+    """PY-WL-008 is ERROR/UNCONDITIONAL across all taint states."""
 
-    def test_audit_trail_is_error(self) -> None:
+    def test_audit_trail_error_unconditional(self) -> None:
         rule = _run_rule(
             "return data\n",
             taint=TaintState.AUDIT_TRAIL,
@@ -288,8 +288,9 @@ class TestTaintMatrix:
 
         assert len(rule.findings) == 1
         assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
 
-    def test_external_raw_is_error(self) -> None:
+    def test_external_raw_error_unconditional(self) -> None:
         rule = _run_rule(
             "return data\n",
             taint=TaintState.EXTERNAL_RAW,
@@ -298,3 +299,26 @@ class TestTaintMatrix:
 
         assert len(rule.findings) == 1
         assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
+
+    def test_pipeline_error_unconditional(self) -> None:
+        rule = _run_rule(
+            "return data\n",
+            taint=TaintState.PIPELINE,
+            boundaries=(_boundary(),),
+        )
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
+
+    def test_mixed_raw_error_unconditional(self) -> None:
+        rule = _run_rule(
+            "return data\n",
+            taint=TaintState.MIXED_RAW,
+            boundaries=(_boundary(),),
+        )
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL

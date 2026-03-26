@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from wardline.core.severity import RuleId, Severity
+from wardline.core.severity import Exceptionability, RuleId, Severity
+from wardline.core.taints import TaintState
+from wardline.scanner.context import ScanContext
 from wardline.scanner.rules.py_wl_006 import RulePyWl006
 
 from .conftest import parse_function_source, parse_module_source
@@ -12,6 +14,19 @@ def _run_rule(source: str) -> RulePyWl006:
     """Parse source inside a function and run PY-WL-006."""
     tree = parse_function_source(source)
     rule = RulePyWl006(file_path="test.py")
+    rule.visit(tree)
+    return rule
+
+
+def _run_rule_with_taint(source: str, taint: TaintState) -> RulePyWl006:
+    """Parse source inside a function, set taint, run PY-WL-006."""
+    tree = parse_function_source(source)
+    rule = RulePyWl006(file_path="test.py")
+    ctx = ScanContext(
+        file_path="test.py",
+        function_level_taint_map={"target": taint},
+    )
+    rule.set_context(ctx)
     rule.visit(tree)
     return rule
 
@@ -288,3 +303,47 @@ except* Exception as eg:
             if "broad exception handler" in f.message.lower()
         ]
         assert len(masking_findings) == 1
+
+
+# ── Taint-gated severity ────────────────────────────────────────
+
+_AUDIT_SOURCE = """\
+try:
+    process()
+except Exception:
+    audit.emit("failure")
+"""
+
+
+class TestTaintGating:
+    """PY-WL-006 severity/exceptionability varies by taint state."""
+
+    def test_audit_trail_is_error_unconditional(self) -> None:
+        rule = _run_rule_with_taint(_AUDIT_SOURCE, TaintState.AUDIT_TRAIL)
+        assert len(rule.findings) >= 1
+        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
+
+    def test_pipeline_is_error_unconditional(self) -> None:
+        rule = _run_rule_with_taint(_AUDIT_SOURCE, TaintState.PIPELINE)
+        assert len(rule.findings) >= 1
+        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
+
+    def test_external_raw_is_error_standard(self) -> None:
+        rule = _run_rule_with_taint(_AUDIT_SOURCE, TaintState.EXTERNAL_RAW)
+        assert len(rule.findings) >= 1
+        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.STANDARD
+
+    def test_shape_validated_is_error_standard(self) -> None:
+        rule = _run_rule_with_taint(_AUDIT_SOURCE, TaintState.SHAPE_VALIDATED)
+        assert len(rule.findings) >= 1
+        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.STANDARD
+
+    def test_mixed_raw_is_error_standard(self) -> None:
+        rule = _run_rule_with_taint(_AUDIT_SOURCE, TaintState.MIXED_RAW)
+        assert len(rule.findings) >= 1
+        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.STANDARD

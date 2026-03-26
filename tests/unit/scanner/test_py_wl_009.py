@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from wardline.core.severity import RuleId, Severity
+from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.core.taints import TaintState
 from wardline.manifest.models import BoundaryEntry
 from wardline.scanner.context import ScanContext
@@ -251,30 +251,53 @@ if dto.amount > 100:
 
 
 class TestTaintMatrix:
-    """PY-WL-009 remains UNCONDITIONAL across taint states when it fires."""
+    """PY-WL-009 is ERROR/UNCONDITIONAL across all taint states."""
 
-    def test_audit_trail_is_error(self) -> None:
-        rule = _run_rule(
-            """\
+    _SRC = """\
 if data["amount"] > 100:
     reject()
-""",
+"""
+
+    def test_audit_trail_error_unconditional(self) -> None:
+        rule = _run_rule(
+            self._SRC,
             taint=TaintState.AUDIT_TRAIL,
             boundaries=(_boundary(),),
         )
 
         assert len(rule.findings) == 1
         assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
 
-    def test_unknown_shape_validated_is_error(self) -> None:
+    def test_unknown_shape_validated_error_unconditional(self) -> None:
         rule = _run_rule(
-            """\
-if data["amount"] > 100:
-    reject()
-""",
+            self._SRC,
             taint=TaintState.UNKNOWN_SHAPE_VALIDATED,
             boundaries=(_boundary(),),
         )
 
         assert len(rule.findings) == 1
         assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
+
+    def test_external_raw_error_unconditional(self) -> None:
+        rule = _run_rule(
+            self._SRC,
+            taint=TaintState.EXTERNAL_RAW,
+            boundaries=(_boundary(),),
+        )
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
+
+    def test_mixed_raw_error_unconditional(self) -> None:
+        rule = _run_rule(
+            self._SRC,
+            taint=TaintState.MIXED_RAW,
+            boundaries=(_boundary(),),
+        )
+
+        assert len(rule.findings) == 1
+        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
