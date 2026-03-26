@@ -301,3 +301,261 @@ class TestExceptionReview:
         )
         assert result.exit_code == 0
         assert "Exception Register Review" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle integration tests (from QA review panel)
+# ---------------------------------------------------------------------------
+
+
+def _add_exception(
+    runner: CliRunner,
+    py_file: Path,
+    *,
+    rule: str = "PY-WL-001",
+    taint: str = "PIPELINE",
+    expires: str | None = None,
+) -> str:
+    """Add an exception and return the exception ID."""
+    args = [
+        "exception", "add",
+        "--rule", rule,
+        "--location", f"{py_file}::process_data",
+        "--taint-state", taint,
+        "--rationale", "Test rationale",
+        "--reviewer", "tester",
+        "--governance-path", "standard",
+    ]
+    if expires is not None:
+        args.extend(["--expires", expires])
+    result = runner.invoke(cli, args, catch_exceptions=False)
+    assert result.exit_code == 0, result.output
+    # Parse "Added exception EXC-XXXXXXXX ..."
+    for word in result.output.split():
+        if word.startswith("EXC-"):
+            return word
+    raise AssertionError(f"No EXC- ID in output: {result.output}")
+
+
+@pytest.mark.integration
+class TestRecurrenceLifecycle:
+    """Spec §9.4: recurrence tracking on exception renewal."""
+
+    def test_add_code_change_refresh_no_increment(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """add → code change → refresh does NOT increment recurrence_count.
+
+        A refresh recomputes the fingerprint for the same exception. It
+        is not a renewal — the exception continues, it just tracks that
+        the code changed.
+        """
+        _manifest, py_file = _make_project(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        runner = CliRunner()
+
+        # Step 1: add exception
+        exc_id = _add_exception(runner, py_file)
+
+        # Step 2: change code (modifies AST fingerprint)
+        py_file.write_text(
+            "def process_data(x):\n"
+            "    y = x + 1\n"
+            "    return y\n"
+        )
+
+        # Step 3: refresh
+        result = runner.invoke(
+            cli,
+            [
+                "exception", "refresh", exc_id,
+                "--actor", "dev",
+                "--rationale", "code changed",
+            ],
+            catch_exceptions=False,
+        )
+        assert result.exit_code == 0
+
+        # Verify recurrence_count is still 0
+        data = json.loads((tmp_path / "wardline.exceptions.json").read_text())
+        entry = next(e for e in data["exceptions"] if e["id"] == exc_id)
+        assert entry["recurrence_count"] == 0
+
+    def test_expire_add_renewal_increments_recurrence(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """expire → add renewal DOES increment recurrence_count.
+
+        When the same (rule, location) gets a new exception after the
+        prior one, recurrence_count must carry forward + 1 per spec §9.4.
+        """
+        _manifest, py_file = _make_project(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        runner = CliRunner()
+
+        # First exception
+        _add_exception(runner, py_file, expires="2026-01-01")
+
+        # Second exception (renewal — same rule + location)
+        exc_id2 = _add_exception(runner, py_file, expires="2026-06-01")
+
+        data = json.loads((tmp_path / "wardline.exceptions.json").read_text())
+        entry2 = next(e for e in data["exceptions"] if e["id"] == exc_id2)
+        assert entry2["recurrence_count"] == 1
+
+        # Third exception (second renewal)
+        exc_id3 = _add_exception(runner, py_file, expires="2026-12-01")
+
+        data = json.loads((tmp_path / "wardline.exceptions.json").read_text())
+        entry3 = next(e for e in data["exceptions"] if e["id"] == exc_id3)
+        assert entry3["recurrence_count"] == 2
+
+
+@pytest.mark.integration
+class TestRefreshHappyPath:
+    """refresh --all --confirm updates all non-expired fingerprints."""
+
+    def test_refresh_all_confirm_updates_fingerprints(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _manifest, py_file = _make_project(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        runner = CliRunner()
+
+        # Add an exception
+        exc_id = _add_exception(runner, py_file)
+
+        # Get original fingerprint
+        data = json.loads((tmp_path / "wardline.exceptions.json").read_text())
+        original_fp = data["exceptions"][0]["ast_fingerprint"]
+
+        # Change the code
+        py_file.write_text(
+            "def process_data(x):\n"
+            "    result = x * 2\n"
+            "    return result\n"
+        )
+
+        # Refresh all
+        result = runner.invoke(
+            cli,
+            [
+                "exception", "refresh",
+                "--all", "--confirm",
+                "--actor", "dev",
+                "--rationale", "code restructured",
+            ],
+            catch_exceptions=False,
+        )
+        assert result.exit_code == 0
+
+        # Verify fingerprint changed
+        data = json.loads((tmp_path / "wardline.exceptions.json").read_text())
+        entry = next(e for e in data["exceptions"] if e["id"] == exc_id)
+        assert entry["ast_fingerprint"] != original_fp
+        assert len(entry["ast_fingerprint"]) == 16
+
+
+@pytest.mark.integration
+class TestMultiFindingPartition:
+    """Multiple findings in the same file matched to different exceptions."""
+
+    def test_two_findings_two_exceptions_both_suppressed(
+        self, tmp_path: Path,
+    ) -> None:
+        """Each finding matches its own exception independently."""
+        import datetime
+
+        from wardline.core.severity import Exceptionability, RuleId, Severity
+        from wardline.core.taints import TaintState
+        from wardline.scanner.context import Finding
+        from wardline.scanner.exceptions import apply_exceptions
+        from wardline.manifest.models import ExceptionEntry
+        from wardline.scanner.fingerprint import compute_ast_fingerprint
+
+        # Create a file with two functions
+        py_file = tmp_path / "multi.py"
+        py_file.write_text(
+            "def func_a(d):\n"
+            "    return d.get('key', None)\n"
+            "\n"
+            "def func_b(d):\n"
+            "    return d.get('other', 0)\n"
+        )
+
+        fp_a = compute_ast_fingerprint(py_file, "func_a", project_root=tmp_path)
+        fp_b = compute_ast_fingerprint(py_file, "func_b", project_root=tmp_path)
+        assert fp_a is not None and fp_b is not None
+
+        rel = "multi.py"
+        findings = [
+            Finding(
+                rule_id=RuleId.PY_WL_001,
+                file_path=str(py_file),
+                line=2, col=11, end_line=2, end_col=30,
+                message="get with default",
+                severity=Severity.ERROR,
+                exceptionability=Exceptionability.STANDARD,
+                taint_state=TaintState.PIPELINE,
+                analysis_level=1,
+                source_snippet=None,
+                qualname="func_a",
+            ),
+            Finding(
+                rule_id=RuleId.PY_WL_001,
+                file_path=str(py_file),
+                line=5, col=11, end_line=5, end_col=28,
+                message="get with default",
+                severity=Severity.ERROR,
+                exceptionability=Exceptionability.STANDARD,
+                taint_state=TaintState.PIPELINE,
+                analysis_level=1,
+                source_snippet=None,
+                qualname="func_b",
+            ),
+        ]
+
+        exceptions = (
+            ExceptionEntry(
+                id="EXC-AAAA0001",
+                rule="PY-WL-001",
+                taint_state="PIPELINE",
+                location=f"{rel}::func_a",
+                exceptionability="STANDARD",
+                severity_at_grant="ERROR",
+                rationale="accepted",
+                reviewer="alice",
+                ast_fingerprint=fp_a,
+                expires="2027-01-01",
+                recurrence_count=0,
+                governance_path="standard",
+                agent_originated=False,
+            ),
+            ExceptionEntry(
+                id="EXC-BBBB0002",
+                rule="PY-WL-001",
+                taint_state="PIPELINE",
+                location=f"{rel}::func_b",
+                exceptionability="STANDARD",
+                severity_at_grant="ERROR",
+                rationale="accepted",
+                reviewer="bob",
+                ast_fingerprint=fp_b,
+                expires="2027-01-01",
+                recurrence_count=0,
+                governance_path="standard",
+                agent_originated=False,
+            ),
+        )
+
+        processed, governance = apply_exceptions(
+            findings, exceptions, project_root=tmp_path,
+            now=datetime.date(2026, 3, 26),
+        )
+
+        # Both findings should be suppressed
+        suppressed = [
+            f for f in processed if f.severity == Severity.SUPPRESS
+        ]
+        assert len(suppressed) == 2
+        assert {f.exception_id for f in suppressed} == {"EXC-AAAA0001", "EXC-BBBB0002"}

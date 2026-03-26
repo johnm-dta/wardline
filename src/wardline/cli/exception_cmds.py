@@ -150,6 +150,23 @@ def _create_exception(
     # Load or create exceptions file
     exc_path = _find_exceptions_file()
     data = _load_or_create(exc_path)
+
+    # Recurrence detection: if any existing exception matches the same
+    # (rule, location), carry forward the highest recurrence_count + 1.
+    # Per spec §9.4: "when an exception for the same rule at the same code
+    # location is renewed after expiry, the renewal MUST be flagged as a
+    # recurrence event."
+    prior_count = max(
+        (
+            e.get("recurrence_count", 0)
+            for e in data["exceptions"]
+            if e.get("rule") == rule and e.get("location") == location
+        ),
+        default=-1,
+    )
+    if prior_count >= 0:
+        entry["recurrence_count"] = prior_count + 1
+
     data["exceptions"].append(entry)
     _write_exceptions(exc_path, data)
 

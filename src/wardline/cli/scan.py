@@ -511,7 +511,7 @@ def scan(
             try:
                 Path(output).write_text(report_text, encoding="utf-8")
             except OSError as exc:
-                clicli_error(f"cannot write to '{output}': {exc}")
+                cli_error(f"cannot write to '{output}': {exc}")
                 sys.exit(EXIT_CONFIG_ERROR)
         else:
             click.echo(report_text, nl=False)
@@ -560,7 +560,7 @@ def scan(
         try:
             Path(output).write_text(sarif_text, encoding="utf-8")
         except OSError as exc:
-            clicli_error(f"cannot write to '{output}': {exc}")
+            cli_error(f"cannot write to '{output}': {exc}")
             sys.exit(EXIT_CONFIG_ERROR)
     else:
         click.echo(sarif_text, nl=False)
