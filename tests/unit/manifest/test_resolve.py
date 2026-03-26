@@ -41,7 +41,7 @@ def _minimal_manifest(
 class TestResolveBoundaries:
     def test_no_overlays_returns_empty(self, tmp_path: Path) -> None:
         manifest = _minimal_manifest()
-        result = resolve_boundaries(tmp_path, manifest)
+        result, _ = resolve_boundaries(tmp_path, manifest)
         assert result == ()
 
     def test_overlay_boundaries_returned_with_scope(self, tmp_path: Path) -> None:
@@ -59,7 +59,7 @@ class TestResolveBoundaries:
         )
         manifest = _minimal_manifest(module_paths=("adapters",))
 
-        result = resolve_boundaries(tmp_path, manifest)
+        result, _ = resolve_boundaries(tmp_path, manifest)
 
         assert len(result) == 1
         assert result[0].function == "Handler.handle"
@@ -119,7 +119,7 @@ class TestResolveBoundaries:
         )
         manifest = _minimal_manifest(module_paths=("adapters",))
 
-        result = resolve_boundaries(tmp_path, manifest)
+        result, _ = resolve_boundaries(tmp_path, manifest)
         assert result == ()
 
     def test_overlay_for_path_mismatch_raises(self, tmp_path: Path) -> None:
@@ -156,7 +156,7 @@ class TestResolveBoundaries:
         )
         manifest = _minimal_manifest(module_paths=("adapters",))
 
-        result = resolve_boundaries(tmp_path, manifest)
+        result, _ = resolve_boundaries(tmp_path, manifest)
         assert len(result) == 1
 
     def test_duplicate_boundary_functions_within_overlay_rejected(
@@ -206,3 +206,32 @@ class TestResolveBoundaries:
 
         with pytest.raises(ManifestPolicyError, match="skip-promotions to Tier 1"):
             resolve_boundaries(tmp_path, manifest)
+
+    def test_returns_boundaries_and_overlay_paths(self, tmp_path: Path) -> None:
+        """resolve_boundaries() returns (boundaries, overlay_paths) tuple."""
+        overlay_dir = tmp_path / "adapters"
+        overlay_dir.mkdir()
+        _write_overlay(
+            overlay_dir / "wardline.overlay.yaml",
+            (
+                '$id: "https://wardline.dev/schemas/0.1/overlay.schema.json"\n'
+                "overlay_for: adapters\n"
+                "boundaries:\n"
+                '  - function: "Handler.handle"\n'
+                '    transition: "construction"\n'
+            ),
+        )
+        manifest = _minimal_manifest(module_paths=("adapters",))
+
+        boundaries, overlay_paths = resolve_boundaries(tmp_path, manifest)
+
+        assert len(boundaries) == 1
+        assert len(overlay_paths) == 1
+        assert overlay_paths[0] == overlay_dir / "wardline.overlay.yaml"
+
+    def test_no_overlays_returns_empty_tuple_pair(self, tmp_path: Path) -> None:
+        """No overlays returns ((), ())."""
+        manifest = _minimal_manifest()
+        boundaries, overlay_paths = resolve_boundaries(tmp_path, manifest)
+        assert boundaries == ()
+        assert overlay_paths == ()

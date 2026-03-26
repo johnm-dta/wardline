@@ -31,8 +31,12 @@ logger = logging.getLogger(__name__)
 def resolve_boundaries(
     root: Path,
     manifest: WardlineManifest,
-) -> tuple[BoundaryEntry, ...]:
-    """Discover overlays, merge each with *manifest*, return all boundaries.
+) -> tuple[tuple[BoundaryEntry, ...], tuple[Path, ...]]:
+    """Discover overlays, merge each with *manifest*, return boundaries and overlay paths.
+
+    Returns a two-tuple of ``(boundaries, overlay_paths)`` where *boundaries*
+    contains all ``BoundaryEntry`` objects with ``overlay_scope`` populated and
+    *overlay_paths* is the list of overlay files that were discovered.
 
     Error handling:
     - ``GovernanceError`` / ``ManifestWidenError``: propagate (policy violation).
@@ -82,7 +86,7 @@ def resolve_boundaries(
             scoped = replace(boundary, overlay_scope=scope, overlay_path=rel_overlay)
             all_boundaries.append(scoped)
 
-    return tuple(all_boundaries)
+    return tuple(all_boundaries), tuple(overlay_paths)
 
 
 def resolve_optional_fields(

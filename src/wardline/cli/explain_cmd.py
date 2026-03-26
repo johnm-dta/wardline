@@ -377,7 +377,7 @@ def _build_overlay_section(
         return None
 
     try:
-        boundaries = resolve_boundaries(root, manifest_model)  # type: ignore[arg-type]
+        boundaries, _ = resolve_boundaries(root, manifest_model)  # type: ignore[arg-type]
         optional_fields = resolve_optional_fields(root, manifest_model)  # type: ignore[arg-type]
     except Exception:
         if not output_json:

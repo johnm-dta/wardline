@@ -357,6 +357,7 @@ def scan(
     boundaries: tuple[_BoundaryEntry, ...] = ()
     optional_fields: tuple[object, ...] = ()
     resolved_rule_overrides: tuple[dict[str, object], ...] | None = None
+    consumed_overlay_paths: tuple[Path, ...] = ()
 
     if resolved:
         loaded = _load_resolved(resolved, manifest_path)
@@ -382,7 +383,7 @@ def scan(
 
         # manifest_path is threaded from _load_manifest — no re-discovery needed
         try:
-            boundaries = resolve_boundaries(manifest_path.parent, manifest_model)
+            boundaries, consumed_overlay_paths = resolve_boundaries(manifest_path.parent, manifest_model)
         except _PolicyError as exc:
             cli_error(str(exc))
             sys.exit(EXIT_CONFIG_ERROR)

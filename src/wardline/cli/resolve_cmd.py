@@ -27,7 +27,7 @@ logger = logging.getLogger("wardline")
 @click.option("-o", "--output", default=None, help="Output file (default: stdout)")
 def resolve(manifest: str | None, path: str, output: str | None) -> None:
     """Resolve overlays and produce wardline.resolved.json."""
-    from wardline.manifest.discovery import discover_manifest, discover_overlays
+    from wardline.manifest.discovery import discover_manifest
     from wardline.manifest.loader import ManifestLoadError, load_manifest, load_overlay
     from wardline.manifest.merge import merge
     from wardline.manifest.resolve import resolve_boundaries, resolve_optional_fields
@@ -59,11 +59,10 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
     manifest_hash = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
 
     # --- Resolve boundaries (with overlay_path + overlay_scope) ---
-    boundaries = resolve_boundaries(root, manifest_model)
+    boundaries, overlay_file_paths = resolve_boundaries(root, manifest_model)
     optional_fields = resolve_optional_fields(root, manifest_model)
 
-    # --- Discover overlays and build per-overlay summary + merged overrides ---
-    overlay_file_paths = discover_overlays(root, manifest_model)
+    # --- Build per-overlay summary + merged overrides ---
 
     import dataclasses
 

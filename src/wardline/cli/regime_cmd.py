@@ -76,7 +76,7 @@ def _run_coherence_checks(
     from wardline.manifest.discovery import GovernanceError
 
     try:
-        boundaries = resolve_boundaries(manifest_dir, manifest_model)
+        boundaries, _ = resolve_boundaries(manifest_dir, manifest_model)
     except (GovernanceError, ManifestLoadError, OSError) as exc:
         logging.getLogger("wardline").warning(
             "Could not resolve boundaries: %s", exc,
