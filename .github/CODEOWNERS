@@ -15,3 +15,9 @@ corpus/                            @wardline/maintainers
 wardline.manifest.baseline.json    @wardline/maintainers
 wardline.perimeter.baseline.json   @wardline/maintainers
 wardline.sarif.baseline.json       @wardline/maintainers
+
+# Exception register
+wardline.exceptions.json           @wardline/maintainers
+
+# Fingerprint baseline
+wardline.fingerprint.json          @wardline/maintainers
