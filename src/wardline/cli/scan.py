@@ -207,12 +207,20 @@ def _read_conformance_gaps(
         current_corpus_hash = _compute_corpus_hash(corpus_dir)
         if inputs["corpus_hash"] != current_corpus_hash:
             stale_reasons.append("corpus_hash")
-    # self_hosting_input_hash: This identity binds the conformance file to
-    # the specific self-hosting scan run that corpus publish summarized.
-    # It cannot be directly recomputed at scan time (would require re-running
-    # the engine on src/wardline/). Staleness for source changes is already
-    # covered by commit_ref above — if the source changed, commit_ref catches
-    # it regardless of whether this scan targets the self-hosting path.
+    # self_hosting_input_hash: validated by hashing the self-hosting source
+    # files on disk and comparing against the conformance file's recorded
+    # hash. This catches source file changes even when commit_ref is
+    # unavailable (e.g., not in a git repo, or dirty working tree).
+    if "self_hosting_input_hash" in inputs:
+        self_hosting_dir = manifest_path.parent / "src" / "wardline"
+        if self_hosting_dir.is_dir():
+            py_files = sorted(self_hosting_dir.rglob("*.py"))
+            if py_files:
+                current_sh_hash, _ = _compute_input_hash(
+                    py_files, manifest_path.parent
+                )
+                if inputs["self_hosting_input_hash"] != current_sh_hash:
+                    stale_reasons.append("self_hosting_input_hash")
     # The self_hosting_input_hash is primarily useful for corpus publish's
     # own evidence chain, not for scan-time re-validation.
 
