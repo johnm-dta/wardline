@@ -346,7 +346,7 @@ Then the regime verify checks use `manifest_m.ratified_by_present` and `manifest
 | Test | Assertion |
 |------|-----------|
 | `test_temporal_separation_defaults` | Default values match spec |
-| `test_manifest_metadata_temporal_separation_none_means_enforced` | `None` is the default |
+| `test_manifest_metadata_temporal_separation_none_means_undeclared` | `None` is the default (undeclared, not enforced) |
 | `test_manifest_metadata_temporal_separation_round_trip` | Construct with values, read back |
 
 ### Unit tests — loader
