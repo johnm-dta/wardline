@@ -508,3 +508,55 @@ class TestPerCellStats:
         stats[("PY-WL-001", "EXTERNAL_RAW")] = _CellStats(tp=3, fp=1)
         assert stats[("PY-WL-001", "AUDIT_TRAIL")].tp == 5
         assert stats[("PY-WL-001", "EXTERNAL_RAW")].tp == 3
+
+
+class TestCorpusVerifyJson:
+    """Assessment-artefact JSON output from corpus verify --json."""
+
+    def test_json_output_has_cells_and_summary(self) -> None:
+        import json
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, ["corpus", "verify", "--corpus-dir", str(FIXTURE_CORPUS), "--json"]
+        )
+        data = json.loads(result.output)
+        assert "cells" in data
+        assert "summary" in data
+        assert "overall_verdict" in data
+        assert isinstance(data["cells"], list)
+
+    def test_json_cell_has_verdict(self) -> None:
+        import json
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, ["corpus", "verify", "--corpus-dir", str(FIXTURE_CORPUS), "--json"]
+        )
+        data = json.loads(result.output)
+        for cell in data["cells"]:
+            assert "cell_verdict" in cell
+            assert cell["cell_verdict"] in ("PASS", "FAIL", "NO_DATA")
+
+    def test_json_output_deterministic(self) -> None:
+        runner = CliRunner()
+        args = ["corpus", "verify", "--corpus-dir", str(FIXTURE_CORPUS), "--json"]
+        r1 = runner.invoke(cli, args)
+        r2 = runner.invoke(cli, args)
+        # Strip generated_at timestamp for comparison
+        import json
+        d1 = json.loads(r1.output)
+        d2 = json.loads(r2.output)
+        d1.pop("generated_at", None)
+        d2.pop("generated_at", None)
+        assert d1 == d2
+
+    def test_json_overall_verdict(self) -> None:
+        import json
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, ["corpus", "verify", "--corpus-dir", str(FIXTURE_CORPUS), "--json"]
+        )
+        data = json.loads(result.output)
+        assert data["overall_verdict"] in ("PASS", "FAIL")

@@ -358,6 +358,113 @@ def _print_cell_stats(stats: dict[tuple[str, str], _CellStats]) -> None:
             click.echo(line)
 
 
+def _build_json_report(
+    stats: dict[tuple[str, str], _CellStats],
+) -> dict[str, object]:
+    """Build per-cell assessment JSON with verdicts."""
+    from wardline.core.matrix import SEVERITY_MATRIX
+    from wardline.core.severity import Exceptionability as _Exc
+    from wardline.core.severity import RuleId as _RuleId
+    from wardline.core.severity import Severity as _Sev
+    from wardline.core.taints import TaintState as _TS
+
+    cells: list[dict[str, object]] = []
+    passing = 0
+    failing = 0
+    no_data = 0
+    suppress_count = 0
+    below_precision = 0
+    below_recall = 0
+
+    for rule_id, taint_state in sorted(stats):
+        s = stats[(rule_id, taint_state)]
+        prec_floor, recall_floor = _get_floors(rule_id, taint_state)
+
+        # Determine matrix cell properties
+        try:
+            matrix_cell = SEVERITY_MATRIX[(_RuleId(rule_id), _TS(taint_state))]
+            is_suppress = matrix_cell.severity == _Sev.SUPPRESS
+            exceptionability = str(matrix_cell.exceptionability.value)
+        except (ValueError, KeyError):
+            is_suppress = False
+            exceptionability = "UNKNOWN"
+
+        if is_suppress:
+            suppress_count += 1
+
+        # Compute metrics
+        prec_denom = s.tp + s.fp
+        precision = round(s.tp / prec_denom, 4) if prec_denom > 0 else None
+        recall_denom = s.tp + s.fn
+        recall = round(s.tp / recall_denom, 4) if recall_denom > 0 else None
+
+        # Determine cell verdict
+        if s.sample_size == 0:
+            verdict = "NO_DATA"
+            no_data += 1
+        elif is_suppress:
+            verdict = "PASS" if s.fp == 0 else "FAIL"
+            if verdict == "PASS":
+                passing += 1
+            else:
+                failing += 1
+        else:
+            below_p = (
+                precision is not None
+                and prec_floor is not None
+                and precision < prec_floor
+            )
+            below_r = (
+                recall is not None
+                and recall_floor is not None
+                and recall < recall_floor
+            )
+            if below_p:
+                below_precision += 1
+            if below_r:
+                below_recall += 1
+            verdict = "FAIL" if below_p or below_r else "PASS"
+            if verdict == "PASS":
+                passing += 1
+            else:
+                failing += 1
+
+        cells.append({
+            "rule": rule_id,
+            "taint_state": taint_state,
+            "exceptionability": exceptionability,
+            "suppress": is_suppress,
+            "tp": s.tp,
+            "tn": s.tn,
+            "fp": s.fp,
+            "fn": s.fn,
+            "kfn": s.kfn,
+            "precision": precision,
+            "recall": recall,
+            "precision_floor": prec_floor,
+            "recall_floor": recall_floor,
+            "cell_verdict": verdict,
+        })
+
+    overall = "PASS" if failing == 0 and no_data == 0 else "FAIL"
+
+    return {
+        "format_version": "1.0",
+        "overall_verdict": overall,
+        "cells": cells,
+        "summary": {
+            "total_cells": len(cells),
+            "measured_cells": passing + failing,
+            "suppress_cells": suppress_count,
+            "passing_cells": passing,
+            "failing_cells": failing,
+            "no_data_cells": no_data,
+            "cells_below_precision_floor": below_precision,
+            "cells_below_recall_floor": below_recall,
+        },
+    }
+
+
 @click.group()
 def corpus() -> None:
     """Corpus management commands."""
@@ -376,7 +483,13 @@ def corpus() -> None:
     default=1,
     help="Analysis level (1-3). Specimens requiring a higher level are skipped.",
 )
-def verify(corpus_dir: str, analysis_level: int) -> None:
+@click.option(
+    "--json", "output_json",
+    is_flag=True,
+    default=False,
+    help="Output per-cell assessment JSON instead of text.",
+)
+def verify(corpus_dir: str, analysis_level: int, output_json: bool) -> None:
     """Verify corpus specimens against scanner rules."""
     corpus_path = Path(corpus_dir)
     # Keep the two glob results concatenated before sorting so `.yaml` and
@@ -487,9 +600,17 @@ def verify(corpus_dir: str, analysis_level: int) -> None:
             errors += 1
             continue
 
-    skip_msg = f" ({skipped} skipped, level > {analysis_level})" if skipped else ""
-    click.echo(f"Lite bootstrap: {total} specimens{skip_msg}")
-    _print_cell_stats(stats)
+    if output_json:
+        import json as json_mod
+        from datetime import UTC, datetime
+
+        report = _build_json_report(stats)
+        report["generated_at"] = datetime.now(UTC).isoformat()
+        click.echo(json_mod.dumps(report, indent=2, sort_keys=True))
+    else:
+        skip_msg = f" ({skipped} skipped, level > {analysis_level})" if skipped else ""
+        click.echo(f"Lite bootstrap: {total} specimens{skip_msg}")
+        _print_cell_stats(stats)
 
     if errors:
         raise SystemExit(1)
