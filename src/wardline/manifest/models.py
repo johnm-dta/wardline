@@ -130,6 +130,15 @@ class RulesConfig:
 
 
 @dataclass(frozen=True)
+class TemporalSeparation:
+    """Temporal separation alternative declaration (§14.3.2)."""
+
+    alternative: str = "same-actor-with-retrospective"
+    retrospective_window_days: int = 10
+    rationale: str = ""
+
+
+@dataclass(frozen=True)
 class ManifestMetadata:
     """Manifest metadata — organisational and governance fields."""
 
@@ -137,6 +146,7 @@ class ManifestMetadata:
     ratified_by: MappingProxyType[str, str] | None = None
     ratification_date: str | None = None
     review_interval_days: int | None = None
+    temporal_separation: TemporalSeparation | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.ratified_by, dict):
