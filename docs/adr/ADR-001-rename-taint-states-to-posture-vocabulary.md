@@ -9,7 +9,7 @@
 
 Rename the four canonical taint state tokens and two compound states from
 prototype-specific names (AUDIT_TRAIL, PIPELINE) to posture-based names
-(STRICT, ASSURED, GUARDED, UNTRUSTED) that describe the coding discipline
+(INTEGRAL, ASSURED, GUARDED, UNTRUSTED) that describe the coding discipline
 required in each trust zone. This aligns the machine-readable tokens with the
 spec's own conceptual model (§4.1 coding postures) and removes the need for
 the defensive §5.1 NOTE warning adopters not to read the names literally.
@@ -68,8 +68,11 @@ what the *prototype used them for*.
 The tokens should describe the **coding posture** — how code and data must
 behave in that zone — not the data classification. This matches the mental
 model of marking code regions with special rules, analogous to designating
-code paths as thread-safe or high-availability. The spec's §4.1 posture
-vocabulary already provides the names.
+code paths as thread-safe or high-availability.
+
+All four tokens are adjectives answering the same question — "what posture
+does this zone require?" — creating grammatical parallelism:
+INTEGRAL / ASSURED / GUARDED / UNTRUSTED.
 
 The one exception is `RAW`, which describes a **data state** ("we don't
 know what we have yet — could be noise, null, or something that evaluates
@@ -86,7 +89,7 @@ Rename all taint state tokens to the posture vocabulary:
 
 | Current | New | Rationale |
 |---------|-----|-----------|
-| `AUDIT_TRAIL` | `STRICT` | Invariant violation is an integrity failure, not a recoverable condition |
+| `AUDIT_TRAIL` | `INTEGRAL` | Essential to system correctness — invariant violation is an integrity failure |
 | `PIPELINE` | `ASSURED` | Values trusted within their declared validation scope |
 | `SHAPE_VALIDATED` | `GUARDED` | Structure trusted, semantic values not yet verified |
 | `EXTERNAL_RAW` | `EXTERNAL_RAW` | Keep — RAW describes data state (unexamined), EXTERNAL describes provenance |
@@ -99,6 +102,25 @@ Rename all taint state tokens to the posture vocabulary:
 | `UNKNOWN_SHAPE_VALIDATED` | `UNKNOWN_GUARDED` | Tracks tier rename |
 | `UNKNOWN_SEM_VALIDATED` | `UNKNOWN_ASSURED` | Tracks tier rename |
 | `MIXED_RAW` | `MIXED_RAW` | Keep — both terms accurate |
+
+### Why INTEGRAL, not STRICT or INTEGRITY
+
+Three candidates were evaluated for T1:
+
+- **STRICT** (from §4.1 posture): Describes the rules ("rigid, no
+  exceptions") but not the stakes. A developer asks "why is it strict?"
+  INTEGRAL answers that question directly.
+- **INTEGRITY** (noun): Carries the right meaning but breaks grammatical
+  parallelism — the other three tokens are adjectives. INTEGRAL is the
+  adjective form, making the four-token set read as a coherent pattern.
+- **INTEGRAL** (adjective): "Essential, must not fail, foundational to
+  system correctness." Grammatically parallel with ASSURED, GUARDED,
+  UNTRUSTED. In everyday English, "integral" means "essential/necessary"
+  which is exactly right for T1 code paths.
+
+The adjective form also creates a clean separation between the taint state
+token (`INTEGRAL`) and the Group 2 decorator (`@integrity_critical`) —
+the adjective describes the zone, the noun describes the consequence.
 
 ### What does not change
 
@@ -143,13 +165,12 @@ is trying to achieve. If we're going to do this, do it once.
 **Cons**:
 - "What the data is" doesn't capture the key insight: these are coding
   postures, not data labels
-- Doesn't match the §4.1 posture vocabulary that the spec already defines
 - A developer seeing `AUTHORITATIVE` still asks "authoritative *what*?"
-  while `STRICT` immediately communicates "this zone has strict rules"
+  while `INTEGRAL` immediately communicates "essential, must not fail"
 
 **Why rejected**: The posture framing better matches how developers think
-about trust zones. STRICT/ASSURED/GUARDED/UNTRUSTED tells a
-descending-trust story that's immediately intuitive without reading the
+about trust zones. INTEGRAL/ASSURED/GUARDED/UNTRUSTED tells a
+descending-stakes story that's immediately intuitive without reading the
 spec.
 
 ### Alternative 3: Do nothing, keep §5.1 NOTE
@@ -175,10 +196,11 @@ and a deprecation cycle.
 
 ### Positive
 
-- Token names match the spec's own conceptual vocabulary (§4.1 postures)
+- Token names match the spec's conceptual vocabulary
 - §5.1 defensive NOTE can be deleted entirely
-- Descending-trust story (STRICT > ASSURED > GUARDED > UNTRUSTED) is
+- Descending-stakes story (INTEGRAL > ASSURED > GUARDED > UNTRUSTED) is
   self-documenting
+- Grammatical parallelism: all four tokens are adjectives
 - Adopters in defence, healthcare, and financial services are not
   misdirected by "audit trail" framing
 - RAW retains its distinct semantic meaning for unexamined data
@@ -204,8 +226,8 @@ and a deprecation cycle.
 
 | Artifact | Estimated changes |
 |----------|------------------|
-| `TaintState` enum in `core/taints.py` | 8 member renames |
-| `TAINT_TO_TIER` mapping in `core/tiers.py` | 8 key renames |
+| `TaintState` enum in `core/taints.py` | 5 member renames (AUDIT_TRAIL, PIPELINE, SHAPE_VALIDATED, UNKNOWN_SHAPE_VALIDATED, UNKNOWN_SEM_VALIDATED) |
+| `TAINT_TO_TIER` mapping in `core/tiers.py` | 5 key renames |
 | `SEVERITY_MATRIX` in `core/matrix.py` | ~72 cell key updates |
 | JSON schemas (3 files) | Enum value lists |
 | `wardline.yaml` module_tiers | `default_taint` values |
@@ -227,6 +249,7 @@ and a deprecation cycle.
 7. Update test assertions
 8. Regenerate `corpus_manifest.json`
 9. Delete §5.1 defensive NOTE from spec
+10. Update spec §5.1 canonical token list, §4.1 table, §1.1 glossary
 
 ### Verification
 
