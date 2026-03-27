@@ -21,6 +21,7 @@ from wardline.manifest.models import (
     DelegationGrant,
     ManifestMetadata,
     OptionalFieldEntry,
+    TemporalSeparation,
     ModuleTierEntry,
     RulesConfig,
     TierEntry,
@@ -229,11 +230,42 @@ def _build_manifest(data: dict[str, Any]) -> WardlineManifest:
     )
 
     raw_meta = data.get("metadata", {})
+
+    # Build TemporalSeparation with conditional validation
+    ts_data = raw_meta.get("temporal_separation")
+    temporal_separation = None
+    if ts_data is not None:
+        alt = ts_data["alternative"]
+        if alt == "same-actor-with-retrospective":
+            if "retrospective_window_days" not in ts_data:
+                raise ManifestLoadError(
+                    "temporal_separation: retrospective_window_days required "
+                    "when alternative is same-actor-with-retrospective"
+                )
+            if not ts_data.get("rationale"):
+                raise ManifestLoadError(
+                    "temporal_separation: rationale required "
+                    "when alternative is same-actor-with-retrospective"
+                )
+            temporal_separation = TemporalSeparation(
+                alternative=alt,
+                retrospective_window_days=ts_data["retrospective_window_days"],
+                rationale=ts_data["rationale"],
+            )
+        elif alt == "enforced":
+            if "retrospective_window_days" in ts_data or "rationale" in ts_data:
+                raise ManifestLoadError(
+                    "temporal_separation: retrospective_window_days and rationale "
+                    "must not be present when alternative is enforced"
+                )
+            temporal_separation = TemporalSeparation(alternative="enforced")
+
     metadata = ManifestMetadata(
         organisation=raw_meta.get("organisation", ""),
         ratified_by=raw_meta.get("ratified_by"),
         ratification_date=raw_meta.get("ratification_date"),
         review_interval_days=raw_meta.get("review_interval_days"),
+        temporal_separation=temporal_separation,
     )
 
     return WardlineManifest(
