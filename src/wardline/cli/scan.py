@@ -428,7 +428,8 @@ def scan(
     strict_governance: bool,
 ) -> None:
     """Scan Python files for boundary violations."""
-    _setup_logging(verbose=verbose, debug=debug)
+    cli_handler = _setup_logging(verbose=verbose, debug=debug)
+    click.get_current_context().call_on_close(lambda: _teardown_logging(cli_handler))
 
     # --- Load manifest ---
     _manifest_result = _load_manifest(manifest)
@@ -802,12 +803,15 @@ def scan(
 _CLI_HANDLER_NAME = "wardline_cli"
 
 
-def _setup_logging(*, verbose: bool, debug: bool) -> None:
+def _setup_logging(*, verbose: bool, debug: bool) -> logging.Handler:
     """Configure logging level based on CLI flags.
 
     Uses a named handler so we only remove our own handler on
     re-entry, preserving any handlers installed by test harnesses
     (e.g. pytest's ``caplog`` fixture).
+
+    Returns the installed handler so callers can pass it to
+    ``_teardown_logging`` when the command completes.
     """
     if debug:
         level = logging.DEBUG
@@ -827,6 +831,12 @@ def _setup_logging(*, verbose: bool, debug: bool) -> None:
     handler.setFormatter(logging.Formatter("%(levelname)s: %(name)s: %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(level)
+    return handler
+
+
+def _teardown_logging(handler: logging.Handler) -> None:
+    """Remove the CLI handler installed by ``_setup_logging``."""
+    logger.removeHandler(handler)
 
 
 def _load_manifest(

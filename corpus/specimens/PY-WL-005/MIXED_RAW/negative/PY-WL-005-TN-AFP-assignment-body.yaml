@@ -1,0 +1,19 @@
+---
+specimen_id: "PY-WL-005-TN-AFP-assignment-body"
+description: "Adversarial false positive: handler body is assignment not pass/ellipsis/continue/break"
+rule: "PY-WL-005"
+category: "adversarial_false_positive"
+fragment: |
+  def cleanup(resource):
+      """Looks silent but body is an assignment, not pass or ellipsis."""
+      try:
+          resource.release()
+      except Exception:
+          resource.state = "abandoned"
+taint_state: "MIXED_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+sha256: "e7d8472d2e4c142d48b63b64792521f4a999774c1cc09e41ba643fca7a3b44e6"
+verdict: "true_negative"

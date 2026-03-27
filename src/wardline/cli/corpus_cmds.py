@@ -690,6 +690,8 @@ def publish(
     rules = make_rules()
     stats: dict[tuple[str, str], _CellStats] = {}
     errors = 0
+    category_rules: dict[str, set[str]] = {}
+    category_counts: dict[str, int] = {}
 
     for specimen_path in specimens:
         try:
@@ -721,6 +723,12 @@ def publish(
         except SyntaxError:
             errors += 1
             continue
+
+        category = str(data.get("category", ""))
+        if category:
+            rule_id = str(data.get("rule", ""))
+            category_rules.setdefault(category, set()).add(rule_id)
+            category_counts[category] = category_counts.get(category, 0) + 1
 
         try:
             _evaluate_specimen(data, str(source), rules, stats)
@@ -767,7 +775,31 @@ def publish(
         gaps.append(f"{failing} corpus cell(s) below floor")
     if self_hosting_verdict == "FAIL":
         gaps.append(f"{unexcepted} unexcepted self-hosting finding(s)")
-    gaps.append("adversarial corpus below full floor (deferred)")
+    # Adversarial corpus floor: per-rule AFP/AFN + aggregate suppression/taint-flow
+    # Per-rule check applies to PY-WL-* analysis rules from the SARIF implementedRules.
+    adversarial_shortfalls: list[str] = []
+    analysis_rules = {r for r in implemented_rules if r.startswith("PY-WL-")}
+    for per_rule_cat in ("adversarial_false_positive", "adversarial_false_negative"):
+        covered_rules = category_rules.get(per_rule_cat, set())
+        missing = sorted(analysis_rules - covered_rules)
+        if missing:
+            adversarial_shortfalls.append(
+                f"{per_rule_cat}: missing for {', '.join(missing)}"
+            )
+    _AGGREGATE_FLOORS: dict[str, int] = {
+        "suppression_interaction": 3,
+        "taint_flow": 8,
+    }
+    for category, floor in _AGGREGATE_FLOORS.items():
+        actual = category_counts.get(category, 0)
+        if actual < floor:
+            adversarial_shortfalls.append(
+                f"{category}: {actual}/{floor}"
+            )
+    if adversarial_shortfalls:
+        gaps.append(
+            f"adversarial corpus below full floor ({', '.join(adversarial_shortfalls)})"
+        )
 
     # --- Assemble conformance status ---
     tool_version = run.get("tool", {}).get("driver", {}).get("version", "unknown")

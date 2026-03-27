@@ -1,0 +1,23 @@
+---
+specimen_id: "PY-WL-003-TN-TF-validated-boundary"
+description: "Taint-flow: external data with existence check inside shape validation boundary is suppressed"
+rule: "PY-WL-003"
+category: "taint_flow"
+fragment: |
+  def validate_payload(data):
+      """Shape validation boundary — existence checks here are expected."""
+      if "user_id" not in data:
+          raise ValueError("missing user_id")
+      if "action" not in data:
+          raise ValueError("missing action")
+      return data
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+sha256: "8e6c0be41f37596c658eaadd333b05bb30f040aca922c6ed3aa73e53652f5774"
+verdict: "true_negative"
+boundaries:
+  - function: "validate_payload"
+    transition: "shape_validation"

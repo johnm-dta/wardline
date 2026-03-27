@@ -1,0 +1,19 @@
+---
+specimen_id: "PY-WL-003-TP-AFN-nested-in-check"
+description: "Adversarial false negative: key-in-dict check disguised via nested boolean condition"
+rule: "PY-WL-003"
+category: "adversarial_false_negative"
+fragment: |
+  def safe_access(data, key):
+      """Existence check disguised as validation via boolean chain."""
+      if key in data and len(data[key]) > 0:
+          return data[key]
+      return None
+taint_state: "EXTERNAL_RAW"
+expected_rules:
+- PY-WL-003
+expected_severity: ERROR
+expected_exceptionability: STANDARD
+expected_match: true
+sha256: "807a4f730e8c0284a2b0ad69ddba48eec22d670e27ccf9bcec6496a984cc647e"
+verdict: "true_positive"

@@ -1,3 +1,111 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What is Wardline
+
+Wardline is a semantic boundary enforcement framework for Python. It defines a four-tier trust hierarchy (Tier 1 AUDIT_TRAIL → Tier 4 EXTERNAL_RAW) and statically verifies that data flows respect those boundaries. The scanner catches trust-boundary violations — untrusted input reaching privileged code, missing validation at tier transitions — via AST analysis with taint propagation.
+
+## Build & Development Commands
+
+```bash
+# Install all dependencies (Python 3.12+, uses uv)
+uv sync --all-extras
+
+# Run unit tests (excludes integration and network tests by default)
+uv run pytest
+
+# Run a single test file
+uv run pytest tests/unit/scanner/test_engine.py
+
+# Run a single test by name
+uv run pytest -k "test_name_substring"
+
+# Run integration tests
+uv run pytest -m integration
+
+# Lint
+uv run ruff check src/
+
+# Type-check (strict mode)
+uv run mypy src/
+
+# Run the scanner against the project itself (self-hosting)
+uv run wardline scan src/
+```
+
+## Architecture
+
+### Core Domain (`src/wardline/core/`)
+
+The trust model foundation. Key types:
+
+- **`TaintState`** (8 variants in `taints.py`) — canonical taint tokens with a join lattice. `taint_join()` is commutative; `MIXED_RAW` is the absorbing element. Values are explicit uppercase strings (not `auto()`).
+- **`AuthorityTier`** (`tiers.py`) — 4-level IntEnum. Lower numeric value = higher authority (Tier 1 > Tier 4). `TAINT_TO_TIER` maps every TaintState to a tier.
+- **`RuleId`** (`severity.py`) — StrEnum of all rule IDs (canonical `PY-WL-*`, diagnostic `GOVERNANCE-*`, pseudo `TOOL-ERROR`, etc.). Member names use underscores; values use hyphens.
+- **`registry.py`** — Frozen `REGISTRY` of all wardline decorators with expected `_wardline_*` attributes, grouped by function.
+
+### Scanner (`src/wardline/scanner/`)
+
+AST-based static analysis engine:
+
+- **`engine.py`** (`ScanEngine`) — orchestrates file discovery → AST parse → taint assignment → rule execution. Resilient: parse errors skip file, rule crashes emit `TOOL-ERROR` finding.
+- **`rules/`** — Each rule is a class inheriting `RuleBase` (`base.py`). `PY-WL-001` through `PY-WL-005` are implemented (MVP); `PY-WL-006` through `PY-WL-009` exist but are post-MVP. `SCN-021` and `SUP-001` are supplementary rules.
+- **`taint/`** — Three-phase taint propagation: variable-level → function-level → callgraph propagation. `TaintProvenance` tracks how taints were assigned.
+- **`sarif.py`** — SARIF v2.1.0 output for CI integration.
+- **`context.py`** — `Finding` and `ScanContext` dataclasses that flow through the pipeline.
+
+### Manifest (`src/wardline/manifest/`)
+
+YAML manifest loading and validation:
+
+- **`models.py`** — `WardlineManifest` and related dataclasses (tier assignments, boundaries, exceptions).
+- **`loader.py`** / **`merge.py`** — Load `wardline.yaml` with overlay support for monorepos.
+- **`coherence.py`** — Cross-manifest consistency checks (tier distribution, registry sync, exception governance).
+- **`schemas/`** — JSON Schema files for manifest validation.
+
+### Decorators (`src/wardline/decorators/`)
+
+Library of decorators (`@audit`, `@authority`, `@external_boundary`, `@validates_shape`, etc.) that mark trust transitions in code. Each sets `_wardline_*` attributes that the scanner reads via `discover_annotations()`.
+
+### Runtime (`src/wardline/runtime/`)
+
+Descriptor-based boundary enforcement at execution time. `enforcement.py` checks tier transitions; `protocols.py` defines the runtime protocol interfaces.
+
+### CLI (`src/wardline/cli/`)
+
+Click-based CLI. Entry point: `wardline.cli.main:cli`. Subcommands: `scan`, `explain`, `manifest`, `corpus`, `coherence`, `fingerprint`, `resolve`, `regime`, `exception`, `preview`.
+
+### Test Corpus (`corpus/`)
+
+Specimens organized by rule ID (e.g., `corpus/specimens/PY-WL-001/`). Each specimen is a Python file with metadata tracking expected verdicts. `corpus_manifest.json` indexes all specimens. The `corpus verify` CLI command validates scanner output against expected verdicts.
+
+## Key Configuration Files
+
+- **`wardline.yaml`** — Self-hosting manifest with tier assignments for every `src/wardline/` sub-package.
+- **`wardline.toml`** — Scanner configuration for self-hosting (target paths, excluded paths, thresholds).
+- **`pyproject.toml`** — Build config (hatchling), test config (pytest markers: `integration`, `network`), ruff rules, mypy strict.
+
+## Code Conventions
+
+- **Zero runtime dependencies** — the core package has no deps. Scanner extras: `pyyaml`, `jsonschema`, `click`.
+- **`MappingProxyType`** for deep immutability of registries and lookup tables.
+- **Explicit `ValueError` over `assert`** — survives `python -O`.
+- **`from __future__ import annotations`** everywhere for deferred evaluation.
+- Ruff line length: 140. Target: Python 3.12+.
+- mypy strict mode with `warn_return_any`.
+
+## Task Tracking
+
+This project uses Filigree for issue tracking. See AGENTS.md for full CLI/MCP reference. Quick workflow:
+
+```bash
+filigree ready          # Find available work
+filigree show <id>      # Review issue details
+filigree claim <id>     # Claim work
+filigree close <id>     # Mark complete
+```
+
 <!-- filigree:instructions:v1.5.1:63b4188e -->
 ## Filigree Issue Tracker
 

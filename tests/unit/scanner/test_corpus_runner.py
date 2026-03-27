@@ -641,3 +641,140 @@ class TestCorpusPublish:
         assert inputs["manifest_hash"] == "sha256:manifest456"
         assert "corpus_hash" in inputs
         assert inputs["corpus_hash"].startswith("sha256:")
+
+    @staticmethod
+    def _make_sarif(tmp_path: Path, implemented_rules: list[str]) -> Path:
+        import json
+
+        sarif = {
+            "version": "2.1.0",
+            "runs": [{
+                "results": [],
+                "properties": {
+                    "wardline.implementedRules": implemented_rules,
+                    "wardline.inputHash": "sha256:test",
+                    "wardline.manifestHash": "sha256:test",
+                },
+                "tool": {"driver": {"version": "0.1.0"}},
+            }],
+        }
+        sarif_path = tmp_path / "self-hosting.sarif.json"
+        sarif_path.write_text(json.dumps(sarif))
+        return sarif_path
+
+    _specimen_counter = 0
+
+    @classmethod
+    def _make_specimen(
+        cls,
+        corpus_dir: Path,
+        rule: str,
+        category: str,
+        verdict: str = "true_positive",
+        fragment: str = 'def f():\n    data = {}\n    x = data.get("k", 0)\n',
+    ) -> None:
+        import hashlib
+
+        sha = hashlib.sha256(fragment.encode("utf-8")).hexdigest()
+        cls._specimen_counter += 1
+        name = f"spec-{cls._specimen_counter:04d}"
+        spec_dir = corpus_dir / "specimens"
+        spec_dir.mkdir(parents=True, exist_ok=True)
+        yaml_content = (
+            f"---\nrule: \"{rule}\"\ncategory: \"{category}\"\n"
+            f"verdict: \"{verdict}\"\n"
+            f"sha256: \"{sha}\"\n"
+            f"fragment: |\n"
+        )
+        for line in fragment.splitlines():
+            yaml_content += f"  {line}\n"
+        if verdict == "true_positive":
+            yaml_content += f"expected_rules:\n- {rule}\nexpected_match: true\n"
+        else:
+            yaml_content += "expected_rules: []\nexpected_match: false\n"
+        (spec_dir / f"{name}.yaml").write_text(yaml_content)
+
+    def test_publish_adversarial_gap_removed_when_floor_met(
+        self, tmp_path: Path,
+    ) -> None:
+        """Per-rule AFP/AFN coverage + aggregate floors → no adversarial gap."""
+        import json
+
+        corpus_dir = tmp_path / "corpus"
+        rules = ["PY-WL-001", "PY-WL-002"]
+        tp_frag = 'def f():\n    data = {}\n    x = data.get("k", 0)\n'
+        tn_frag = "def f():\n    pass\n"
+
+        # 1 AFP (TN) and 1 AFN (TP) per implemented rule
+        for rule in rules:
+            self._make_specimen(corpus_dir, rule, "adversarial_false_positive", "true_negative", tn_frag)
+            self._make_specimen(corpus_dir, rule, "adversarial_false_negative", "true_positive", tp_frag)
+
+        # 3 suppression_interaction specimens
+        for i in range(3):
+            self._make_specimen(
+                corpus_dir, "PY-WL-001", "suppression_interaction", "true_positive",
+                f'def f{i}():\n    data = {{}}\n    x = data.get("k{i}", 0)\n',
+            )
+
+        # 8 taint_flow specimens
+        for i in range(8):
+            self._make_specimen(
+                corpus_dir, "PY-WL-001", "taint_flow", "true_positive",
+                f'def g{i}():\n    data = {{}}\n    x = data.get("k{i}", 0)\n',
+            )
+
+        sarif_path = self._make_sarif(tmp_path, rules)
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["corpus", "publish", "--corpus-dir", str(corpus_dir),
+             "--sarif", str(sarif_path),
+             "--output", str(tmp_path / "conformance.json")],
+        )
+        assert result.exit_code == 0, f"Failed: {result.output}"
+        conf = json.loads((tmp_path / "conformance.json").read_text())
+        adversarial_gaps = [g for g in conf["gaps"] if "adversarial" in g]
+        assert adversarial_gaps == [], f"Unexpected adversarial gap: {adversarial_gaps}"
+
+    def test_publish_adversarial_gap_remains_when_rule_missing_afp(
+        self, tmp_path: Path,
+    ) -> None:
+        """AFP missing for one rule → adversarial gap names the missing rule."""
+        import json
+
+        corpus_dir = tmp_path / "corpus"
+        rules = ["PY-WL-001", "PY-WL-002"]
+        tp_frag = 'def f():\n    data = {}\n    x = data.get("k", 0)\n'
+        tn_frag = "def f():\n    pass\n"
+
+        # AFP only for PY-WL-001, AFN for both — PY-WL-002 AFP is missing
+        self._make_specimen(corpus_dir, "PY-WL-001", "adversarial_false_positive", "true_negative", tn_frag)
+        for rule in rules:
+            self._make_specimen(corpus_dir, rule, "adversarial_false_negative", "true_positive", tp_frag)
+
+        for i in range(3):
+            self._make_specimen(
+                corpus_dir, "PY-WL-001", "suppression_interaction", "true_positive",
+                f'def f{i}():\n    data = {{}}\n    x = data.get("k{i}", 0)\n',
+            )
+        for i in range(8):
+            self._make_specimen(
+                corpus_dir, "PY-WL-001", "taint_flow", "true_positive",
+                f'def g{i}():\n    data = {{}}\n    x = data.get("k{i}", 0)\n',
+            )
+
+        sarif_path = self._make_sarif(tmp_path, rules)
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["corpus", "publish", "--corpus-dir", str(corpus_dir),
+             "--sarif", str(sarif_path),
+             "--output", str(tmp_path / "conformance.json")],
+        )
+        assert result.exit_code == 0, f"Failed: {result.output}"
+        conf = json.loads((tmp_path / "conformance.json").read_text())
+        adversarial_gaps = [g for g in conf["gaps"] if "adversarial" in g]
+        assert len(adversarial_gaps) == 1
+        assert "PY-WL-002" in adversarial_gaps[0]
+        assert "adversarial_false_positive" in adversarial_gaps[0]

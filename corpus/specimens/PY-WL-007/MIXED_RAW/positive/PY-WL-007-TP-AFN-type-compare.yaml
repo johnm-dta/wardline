@@ -1,0 +1,21 @@
+---
+specimen_id: "PY-WL-007-TP-AFN-type-compare"
+description: "Adversarial false negative: type() comparison instead of isinstance — still runtime type-checking"
+rule: "PY-WL-007"
+category: "adversarial_false_negative"
+fragment: |
+  def normalize(value):
+      """type() comparison disguised as isinstance-free but is still runtime type check."""
+      if type(value) is str:
+          return value.strip()
+      if type(value) is int:
+          return str(value)
+      return repr(value)
+taint_state: "MIXED_RAW"
+expected_rules:
+- PY-WL-007
+expected_severity: WARNING
+expected_exceptionability: STANDARD
+expected_match: true
+sha256: "9b6390ae1137ba6291946a8568b5a0ec3d65eb9e9889372dfb152ef96ec3a099"
+verdict: "true_positive"
