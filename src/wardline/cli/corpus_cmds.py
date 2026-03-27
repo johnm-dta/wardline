@@ -1,8 +1,8 @@
 """Corpus verification commands.
 
-Verifies specimen fragments against scanner rules, computes per-rule
-precision/recall where sample >= 5, and tracks known_false_negative
-specimens separately from true negatives.
+Verifies specimen fragments against scanner rules, computes per-cell
+(rule x taint_state) precision/recall where sample >= 5, and tracks
+known_false_negative specimens separately from true negatives.
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class _RuleStats:
-    """Per-rule verdict counters."""
+class _CellStats:
+    """Per-cell (rule x taint_state) verdict counters."""
 
     tp: int = 0
     fp: int = 0
@@ -212,7 +212,7 @@ def _evaluate_specimen(
     data: dict[str, object],
     source: str,
     rules: tuple[RuleBase, ...],
-    stats: dict[str, _RuleStats],
+    stats: dict[tuple[str, str], _CellStats],
 ) -> None:
     """Evaluate a specimen's verdict against scanner results."""
     rule_id = str(data.get("rule", "") or data.get("rule_id", ""))
@@ -221,17 +221,19 @@ def _evaluate_specimen(
     if not rule_id or not verdict:
         return
 
-    if rule_id not in stats:
-        stats[rule_id] = _RuleStats()
-
     raw_taint = data.get("taint_state")
-    taint_state = str(raw_taint) if raw_taint is not None else None
+    taint_state = str(raw_taint) if raw_taint is not None else "UNKNOWN"
+
+    key = (rule_id, taint_state)
+    if key not in stats:
+        stats[key] = _CellStats()
+
     boundaries = _parse_specimen_boundaries(data)
     optional_fields = _parse_specimen_optional_fields(data)
     fired = _run_rules_on_fragment(
         source,
         rules,
-        taint_state=taint_state,
+        taint_state=taint_state if taint_state != "UNKNOWN" else None,
         boundaries=boundaries,
         optional_fields=optional_fields,
     )
@@ -239,55 +241,121 @@ def _evaluate_specimen(
 
     if verdict == "true_positive":
         if rule_fired:
-            stats[rule_id].tp += 1
+            stats[key].tp += 1
         else:
-            stats[rule_id].fn += 1
+            stats[key].fn += 1
     elif verdict == "true_negative":
         if rule_fired:
-            stats[rule_id].fp += 1
+            stats[key].fp += 1
         else:
-            stats[rule_id].tn += 1
+            stats[key].tn += 1
     elif verdict == "known_false_negative":
         if rule_fired:
             click.echo(
                 f"notice: {rule_id} fired on KFN specimen — consider promoting to true_positive",
                 err=True,
             )
-        stats[rule_id].kfn += 1
+        stats[key].kfn += 1
 
 
-def _print_stats(stats: dict[str, _RuleStats]) -> None:
-    """Print per-rule verdict stats with precision/recall where sample >= 5."""
+def _get_floors(
+    rule_id: str, taint_state: str,
+) -> tuple[float | None, float | None]:
+    """Return (precision_floor, recall_floor) from the severity matrix.
+
+    Floors:
+    - Precision: 80% (65% for MIXED_RAW)
+    - Recall: 90% for UNCONDITIONAL, 70% for STANDARD/RELAXED
+    - SUPPRESS cells: precision floor only, no recall floor
+    """
+    from wardline.core.matrix import SEVERITY_MATRIX
+    from wardline.core.severity import Exceptionability, RuleId, Severity
+    from wardline.core.taints import TaintState
+
+    try:
+        rid = RuleId(rule_id)
+        ts = TaintState(taint_state)
+    except ValueError:
+        return (None, None)
+
+    cell = SEVERITY_MATRIX.get((rid, ts))
+    if cell is None:
+        return (None, None)
+
+    # Precision floor
+    precision_floor = 0.65 if ts == TaintState.MIXED_RAW else 0.80
+
+    # SUPPRESS cells: precision floor only, no recall floor
+    if cell.severity == Severity.SUPPRESS:
+        return (precision_floor, None)
+
+    # Recall floor based on exceptionability
+    if cell.exceptionability == Exceptionability.UNCONDITIONAL:
+        recall_floor = 0.90
+    elif cell.exceptionability in (
+        Exceptionability.STANDARD,
+        Exceptionability.RELAXED,
+    ):
+        recall_floor = 0.70
+    else:
+        # TRANSPARENT — no recall floor
+        recall_floor = None
+
+    return (precision_floor, recall_floor)
+
+
+def _print_cell_stats(stats: dict[tuple[str, str], _CellStats]) -> None:
+    """Print per-cell verdict stats grouped by rule, with floor comparison."""
     if not stats:
         return
 
-    for rule_id in sorted(stats):
-        s = stats[rule_id]
-        parts: list[str] = []
-        if s.tp:
-            parts.append(f"{s.tp} TP")
-        if s.tn:
-            parts.append(f"{s.tn} TN")
-        if s.fn:
-            parts.append(f"{s.fn} FN")
-        if s.fp:
-            parts.append(f"{s.fp} FP")
-        if s.kfn:
-            parts.append(f"{s.kfn} KFN")
+    # Group by rule_id
+    rules: dict[str, list[str]] = {}
+    for rule_id, taint_state in sorted(stats):
+        rules.setdefault(rule_id, []).append(taint_state)
 
-        line = f"  {rule_id}: {', '.join(parts)}"
+    for rule_id in sorted(rules):
+        click.echo(f"  {rule_id}:")
+        for taint_state in sorted(rules[rule_id]):
+            key = (rule_id, taint_state)
+            s = stats[key]
+            parts: list[str] = []
+            if s.tp:
+                parts.append(f"{s.tp} TP")
+            if s.tn:
+                parts.append(f"{s.tn} TN")
+            if s.fn:
+                parts.append(f"{s.fn} FN")
+            if s.fp:
+                parts.append(f"{s.fp} FP")
+            if s.kfn:
+                parts.append(f"{s.kfn} KFN")
 
-        if s.sample_size >= 5:
-            prec_denom = s.tp + s.fp
-            precision = s.tp / prec_denom if prec_denom > 0 else 0.0
-            recall_denom = s.tp + s.fn  # KFN excluded
-            recall = s.tp / recall_denom if recall_denom > 0 else 0.0
-            line += (
-                f" | precision={precision:.1%}"
-                f" recall={recall:.1%}"
-            )
+            line = f"    {taint_state}: {', '.join(parts)}"
 
-        click.echo(line)
+            if s.sample_size >= 5:
+                prec_denom = s.tp + s.fp
+                precision = s.tp / prec_denom if prec_denom > 0 else 0.0
+                recall_denom = s.tp + s.fn  # KFN excluded
+                recall = s.tp / recall_denom if recall_denom > 0 else 0.0
+                line += f" | precision={precision:.1%} recall={recall:.1%}"
+
+                prec_floor, recall_floor = _get_floors(rule_id, taint_state)
+                floor_parts: list[str] = []
+                if prec_floor is not None:
+                    status = "ok" if precision >= prec_floor else "BELOW"
+                    floor_parts.append(
+                        f"prec>={prec_floor:.0%} {status}"
+                    )
+                if recall_floor is not None:
+                    status = "ok" if recall >= recall_floor else "BELOW"
+                    floor_parts.append(
+                        f"recall>={recall_floor:.0%} {status}"
+                    )
+                if floor_parts:
+                    line += f" [{', '.join(floor_parts)}]"
+
+            click.echo(line)
 
 
 @click.group()
@@ -324,7 +392,7 @@ def verify(corpus_dir: str, analysis_level: int) -> None:
 
     WardlineSafeLoader = make_wardline_loader()
     rules = make_rules()
-    stats: dict[str, _RuleStats] = {}
+    stats: dict[tuple[str, str], _CellStats] = {}
     errors = 0
     total = 0
     skipped = 0
@@ -421,7 +489,7 @@ def verify(corpus_dir: str, analysis_level: int) -> None:
 
     skip_msg = f" ({skipped} skipped, level > {analysis_level})" if skipped else ""
     click.echo(f"Lite bootstrap: {total} specimens{skip_msg}")
-    _print_stats(stats)
+    _print_cell_stats(stats)
 
     if errors:
         raise SystemExit(1)

@@ -485,3 +485,26 @@ class TestPrecisionRecall:
         assert "2 KFN" in result.output
         # With 3 TP and 0 FN, recall should be 100%
         assert "recall=100.0%" in result.output
+
+
+class TestPerCellStats:
+    """Per-cell (rule x taint_state) metric accumulation."""
+
+    def test_cell_stats_keyed_by_rule_and_taint(self) -> None:
+        from wardline.cli.corpus_cmds import _CellStats
+
+        stats: dict[tuple[str, str], _CellStats] = {}
+        key = ("PY-WL-001", "AUDIT_TRAIL")
+        stats[key] = _CellStats()
+        stats[key].tp += 1
+        assert stats[key].tp == 1
+        assert stats[key].sample_size == 1
+
+    def test_cell_stats_different_taints_are_independent(self) -> None:
+        from wardline.cli.corpus_cmds import _CellStats
+
+        stats: dict[tuple[str, str], _CellStats] = {}
+        stats[("PY-WL-001", "AUDIT_TRAIL")] = _CellStats(tp=5)
+        stats[("PY-WL-001", "EXTERNAL_RAW")] = _CellStats(tp=3, fp=1)
+        assert stats[("PY-WL-001", "AUDIT_TRAIL")].tp == 5
+        assert stats[("PY-WL-001", "EXTERNAL_RAW")].tp == 3
