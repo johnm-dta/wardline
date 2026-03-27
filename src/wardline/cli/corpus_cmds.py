@@ -465,6 +465,34 @@ def _build_json_report(
     }
 
 
+def _compute_corpus_hash(corpus_path: Path) -> str:
+    """Hash-of-hashes over the full corpus artefact set.
+
+    Covers specimen YAML files, corpus_manifest.json, and schema files.
+    Uses the same §10.1 construction as inputHash.
+    """
+    all_files = sorted(
+        list(corpus_path.glob("**/*.yaml"))
+        + list(corpus_path.glob("**/*.yml"))
+        + list(corpus_path.glob("**/*.json"))
+    )
+
+    records: list[str] = []
+    for fp in all_files:
+        resolved = fp.resolve()
+        try:
+            rel = resolved.relative_to(corpus_path.resolve())
+        except ValueError:
+            rel = resolved
+        normalized = rel.as_posix()
+        digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+        records.append(f"{normalized}\x00{digest}")
+
+    records.sort()
+    combined = "".join(r + "\n" for r in records)
+    return "sha256:" + hashlib.sha256(combined.encode("utf-8")).hexdigest()
+
+
 @click.group()
 def corpus() -> None:
     """Corpus management commands."""
@@ -614,3 +642,155 @@ def verify(corpus_dir: str, analysis_level: int, output_json: bool) -> None:
 
     if errors:
         raise SystemExit(1)
+
+
+@corpus.command()
+@click.option(
+    "--corpus-dir",
+    type=click.Path(exists=True, file_okay=False),
+    default="corpus/",
+    help="Corpus specimen directory.",
+)
+@click.option(
+    "--sarif",
+    type=click.Path(exists=True, dir_okay=False),
+    required=True,
+    help="Self-hosting SARIF output file from a previous scan.",
+)
+@click.option(
+    "--output", "-o",
+    type=click.Path(dir_okay=False),
+    default="wardline.conformance.json",
+    help="Output path for conformance status file.",
+)
+@click.option(
+    "--analysis-level",
+    type=click.IntRange(1, 3),
+    default=1,
+    help="Analysis level (1-3).",
+)
+def publish(
+    corpus_dir: str,
+    sarif: str,
+    output: str,
+    analysis_level: int,
+) -> None:
+    """Generate wardline.conformance.json from corpus verify + self-hosting SARIF."""
+    import json as json_mod
+    from datetime import UTC, datetime
+
+    # --- Run corpus verify internally ---
+    corpus_path = Path(corpus_dir)
+    specimens = sorted(
+        list(corpus_path.glob("**/*.yaml"))
+        + list(corpus_path.glob("**/*.yml"))
+    )
+
+    WardlineSafeLoader = make_wardline_loader()
+    rules = make_rules()
+    stats: dict[tuple[str, str], _CellStats] = {}
+    errors = 0
+
+    for specimen_path in specimens:
+        try:
+            with open(specimen_path, encoding="utf-8") as f:
+                data = yaml.load(f, Loader=WardlineSafeLoader)  # noqa: S506
+        except (OSError, yaml.YAMLError):
+            errors += 1
+            continue
+        if not isinstance(data, dict):
+            errors += 1
+            continue
+
+        required_level = int(data.get("analysis_level_required", 1))
+        if required_level > analysis_level:
+            continue
+
+        source = data.get("fragment", "") or data.get("source", "")
+        if not source:
+            errors += 1
+            continue
+
+        actual_hash = hashlib.sha256(str(source).encode("utf-8")).hexdigest()
+        if actual_hash != data.get("sha256", ""):
+            errors += 1
+            continue
+
+        try:
+            ast.parse(str(source))
+        except SyntaxError:
+            errors += 1
+            continue
+
+        try:
+            _evaluate_specimen(data, str(source), rules, stats)
+        except ValueError:
+            errors += 1
+            continue
+
+    corpus_report = _build_json_report(stats)
+
+    # --- Read self-hosting SARIF ---
+    sarif_data = json_mod.loads(Path(sarif).read_text(encoding="utf-8"))
+    run = sarif_data["runs"][0]
+    run_props = run.get("properties", {})
+    implemented_rules = set(run_props.get("wardline.implementedRules", []))
+
+    # Count unexcepted findings for implemented rules
+    unexcepted = 0
+    for result in run.get("results", []):
+        rule_id = result.get("ruleId", "")
+        if rule_id not in implemented_rules:
+            continue
+        props = result.get("properties", {})
+        if "wardline.exceptionId" in props:
+            continue
+        unexcepted += 1
+
+    self_hosting_verdict = "PASS" if unexcepted == 0 else "FAIL"
+
+    # --- Compute corpus hash ---
+    corpus_hash = _compute_corpus_hash(corpus_path)
+
+    # --- Build gaps list ---
+    gaps: list[str] = []
+    if corpus_report["overall_verdict"] == "FAIL":
+        failing = corpus_report["summary"]["failing_cells"]
+        gaps.append(f"{failing} corpus cell(s) below floor")
+    if self_hosting_verdict == "FAIL":
+        gaps.append(f"{unexcepted} unexcepted self-hosting finding(s)")
+    gaps.append("adversarial corpus below full floor (deferred)")
+
+    # --- Assemble conformance status ---
+    tool_version = run.get("tool", {}).get("driver", {}).get("version", "unknown")
+
+    conformance = {
+        "format_version": "1.0",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "inputs": {
+            "tool_version": tool_version,
+            "commit_ref": run_props.get("wardline.commitRef", "unknown"),
+            "manifest_hash": run_props.get("wardline.manifestHash", "unknown"),
+            "corpus_hash": corpus_hash,
+            "self_hosting_input_hash": run_props.get("wardline.inputHash", "unknown"),
+        },
+        "corpus_verdict": corpus_report["overall_verdict"],
+        "self_hosting_verdict": self_hosting_verdict,
+        "gaps": gaps,
+        "corpus_cells_failing": [
+            c for c in corpus_report["cells"]
+            if c["cell_verdict"] == "FAIL"
+        ],
+        "self_hosting_unexcepted_findings": unexcepted,
+    }
+
+    Path(output).write_text(
+        json_mod.dumps(conformance, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    click.echo(
+        f"Conformance status written to {output} "
+        f"(corpus={corpus_report['overall_verdict']}, "
+        f"self-hosting={self_hosting_verdict}, "
+        f"{len(gaps)} gap(s))"
+    )

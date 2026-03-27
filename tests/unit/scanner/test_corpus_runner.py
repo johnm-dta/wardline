@@ -560,3 +560,78 @@ class TestCorpusVerifyJson:
         )
         data = json.loads(result.output)
         assert data["overall_verdict"] in ("PASS", "FAIL")
+
+
+class TestCorpusPublish:
+    """Tests for corpus publish command — generates wardline.conformance.json."""
+
+    def test_publish_creates_conformance_json(self, tmp_path: Path) -> None:
+        import json
+
+        sarif = {
+            "version": "2.1.0",
+            "runs": [{
+                "results": [],
+                "properties": {
+                    "wardline.implementedRules": ["PY-WL-001"],
+                    "wardline.inputHash": "sha256:abc",
+                    "wardline.manifestHash": "sha256:def",
+                },
+                "tool": {"driver": {"version": "0.1.0"}},
+            }],
+        }
+        sarif_path = tmp_path / "self-hosting.sarif.json"
+        sarif_path.write_text(json.dumps(sarif))
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            [
+                "corpus", "publish",
+                "--corpus-dir", str(FIXTURE_CORPUS),
+                "--sarif", str(sarif_path),
+                "--output", str(tmp_path / "wardline.conformance.json"),
+            ],
+        )
+        assert result.exit_code == 0, f"Failed: {result.output}"
+        conf = json.loads((tmp_path / "wardline.conformance.json").read_text())
+        assert "corpus_verdict" in conf
+        assert "self_hosting_verdict" in conf
+        assert "inputs" in conf
+        assert "gaps" in conf
+
+    def test_publish_inputs_binding(self, tmp_path: Path) -> None:
+        import json
+
+        sarif = {
+            "version": "2.1.0",
+            "runs": [{
+                "results": [],
+                "properties": {
+                    "wardline.implementedRules": ["PY-WL-001"],
+                    "wardline.inputHash": "sha256:abc123",
+                    "wardline.manifestHash": "sha256:manifest456",
+                },
+                "tool": {"driver": {"version": "0.1.0"}},
+            }],
+        }
+        sarif_path = tmp_path / "self-hosting.sarif.json"
+        sarif_path.write_text(json.dumps(sarif))
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            [
+                "corpus", "publish",
+                "--corpus-dir", str(FIXTURE_CORPUS),
+                "--sarif", str(sarif_path),
+                "--output", str(tmp_path / "wardline.conformance.json"),
+            ],
+        )
+        conf = json.loads((tmp_path / "wardline.conformance.json").read_text())
+        inputs = conf["inputs"]
+        assert inputs["tool_version"] == "0.1.0"
+        assert inputs["self_hosting_input_hash"] == "sha256:abc123"
+        assert inputs["manifest_hash"] == "sha256:manifest456"
+        assert "corpus_hash" in inputs
+        assert inputs["corpus_hash"].startswith("sha256:")
