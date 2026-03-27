@@ -481,3 +481,137 @@ class TestManifestMetricsFields:
         )
         m = collect_manifest_metrics(manifest)
         assert m.temporal_separation_posture is None
+
+
+class TestVerifyLiteGovernanceChecks:
+    """Tests for Gap 5 regime verify checks (MAN-007/009/010/011)."""
+
+    def test_ratification_metadata_present_passes(self, runner: CliRunner, tmp_path: Path) -> None:
+        manifest = _write_minimal_manifest(tmp_path)
+        result = _invoke_verify(runner, "--json", manifest=str(manifest), path=str(tmp_path))
+        data = json.loads(result.output)
+        check = next(c for c in data["checks"] if c["check"] == "ratification_metadata_present")
+        assert check["passed"] is True
+
+    def test_ratification_metadata_present_fails_missing_ratified_by(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            '  ratification_date: "2026-03-01"\n'
+            "  review_interval_days: 180\n"
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        result = _invoke_verify(runner, "--json", manifest=str(manifest), path=str(tmp_path))
+        data = json.loads(result.output)
+        check = next(c for c in data["checks"] if c["check"] == "ratification_metadata_present")
+        assert check["passed"] is False
+        assert "ratified_by" in check["evidence"]
+
+    def test_ratification_metadata_present_fails_missing_date(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "  ratified_by:\n"
+            '    name: "lead"\n'
+            '    role: "tech"\n'
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        result = _invoke_verify(runner, "--json", manifest=str(manifest), path=str(tmp_path))
+        data = json.loads(result.output)
+        check = next(c for c in data["checks"] if c["check"] == "ratification_metadata_present")
+        assert check["passed"] is False
+        assert "ratification_date" in check["evidence"]
+
+    def test_temporal_separation_declared_lite_with_alternative(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "  temporal_separation:\n"
+            '    alternative: "same-actor-with-retrospective"\n'
+            "    retrospective_window_days: 10\n"
+            "    rationale: small team\n"
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        result = _invoke_verify(runner, "--json", manifest=str(manifest), path=str(tmp_path))
+        data = json.loads(result.output)
+        check = next(c for c in data["checks"] if c["check"] == "temporal_separation_declared")
+        assert check["passed"] is True
+
+    def test_temporal_separation_declared_lite_enforced(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "  temporal_separation:\n"
+            '    alternative: "enforced"\n'
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        result = _invoke_verify(runner, "--json", manifest=str(manifest), path=str(tmp_path))
+        data = json.loads(result.output)
+        check = next(c for c in data["checks"] if c["check"] == "temporal_separation_declared")
+        assert check["passed"] is True
+
+    def test_temporal_separation_declared_lite_undeclared(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        result = _invoke_verify(runner, "--json", manifest=str(manifest), path=str(tmp_path))
+        data = json.loads(result.output)
+        check = next(c for c in data["checks"] if c["check"] == "temporal_separation_declared")
+        assert check["passed"] is False
+        assert "not declared" in check["evidence"]
+
+    def test_annotation_change_tracking_with_baseline(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        manifest = _write_minimal_manifest(tmp_path)
+        (tmp_path / "wardline.fingerprint.json").write_text('{"coverage": {}}')
+        result = _invoke_verify(runner, "--json", manifest=str(manifest), path=str(tmp_path))
+        data = json.loads(result.output)
+        check = next(c for c in data["checks"] if c["check"] == "annotation_change_tracking")
+        assert check["passed"] is True
+
+    def test_annotation_change_tracking_no_baseline(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        manifest = _write_minimal_manifest(tmp_path)
+        result = _invoke_verify(runner, "--json", manifest=str(manifest), path=str(tmp_path))
+        data = json.loads(result.output)
+        check = next(c for c in data["checks"] if c["check"] == "annotation_change_tracking")
+        assert check["passed"] is False

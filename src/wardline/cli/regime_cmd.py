@@ -598,6 +598,101 @@ def verify(
             "evidence": "Manifest ratification current.",
         })
 
+    # Check 10: Ratification metadata present (MAN-007)
+    has_ratification = (
+        manifest_m.ratified_by_present
+        and manifest_m.ratification_date is not None
+        and manifest_m.review_interval_days is not None
+    )
+    if has_ratification:
+        checks.append({
+            "check": "ratification_metadata_present",
+            "passed": True,
+            "severity": "ERROR",
+            "evidence": "Ratification authority, date, and review interval declared.",
+        })
+    else:
+        missing = []
+        if not manifest_m.ratified_by_present:
+            missing.append("ratified_by")
+        if manifest_m.ratification_date is None:
+            missing.append("ratification_date")
+        if manifest_m.review_interval_days is None:
+            missing.append("review_interval_days")
+        checks.append({
+            "check": "ratification_metadata_present",
+            "passed": False,
+            "severity": "ERROR",
+            "evidence": f"Missing ratification metadata: {', '.join(missing)}.",
+        })
+
+    # Check 11: Temporal separation declared (MAN-011)
+    ts = manifest_m.temporal_separation_posture
+    governance_profile = manifest_m.governance_profile
+    if governance_profile == "lite":
+        if ts is not None:
+            checks.append({
+                "check": "temporal_separation_declared",
+                "passed": True,
+                "severity": "WARNING",
+                "evidence": f"Temporal separation posture declared: {ts}.",
+            })
+        else:
+            checks.append({
+                "check": "temporal_separation_declared",
+                "passed": False,
+                "severity": "WARNING",
+                "evidence": (
+                    "Temporal separation posture not declared. "
+                    "Assessor cannot determine whether enforced or "
+                    "alternative applies. Add temporal_separation to "
+                    "manifest metadata."
+                ),
+            })
+    else:
+        if ts is not None and ts.startswith("alternative:"):
+            checks.append({
+                "check": "temporal_separation_declared",
+                "passed": False,
+                "severity": "ERROR",
+                "evidence": (
+                    "Assurance profile does not permit temporal "
+                    "separation alternatives."
+                ),
+            })
+        else:
+            checks.append({
+                "check": "temporal_separation_declared",
+                "passed": ts == "enforced",
+                "severity": "ERROR",
+                "evidence": (
+                    "Temporal separation enforced."
+                    if ts == "enforced"
+                    else "Temporal separation posture not declared."
+                ),
+            })
+
+    # Check 12: Annotation change tracking (MAN-010)
+    # This repo's chosen Lite evidence: fingerprint baseline exists + CODEOWNERS.
+    fingerprint_path = manifest_dir / "wardline.fingerprint.json"
+    if fingerprint_path.exists():
+        checks.append({
+            "check": "annotation_change_tracking",
+            "passed": True,
+            "severity": "WARNING",
+            "evidence": "Fingerprint baseline present — annotation changes visible in diffs.",
+        })
+    else:
+        checks.append({
+            "check": "annotation_change_tracking",
+            "passed": False,
+            "severity": "WARNING",
+            "evidence": (
+                "No fingerprint baseline found. Run 'wardline fingerprint update' "
+                "to establish annotation change tracking."
+            ),
+        })
+
     # --- Format output ---
     if output_json:
         _verify_json(checks)
