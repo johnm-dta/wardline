@@ -201,6 +201,46 @@ class TestSelfHostingScan:
         }
         assert len(files_with_findings) >= 10
 
+    def test_self_hosting_passes_own_rules(self) -> None:
+        """Scanner passes the rules it implements on its own source (§10 property 2).
+
+        Reads implementedRules from the SARIF output and asserts zero
+        unexcepted findings for those rules. This is the real self-hosting
+        gate — not stability checking, but compliance checking.
+        """
+        import json
+
+        exit_code, output = _run_scan()
+
+        sarif = json.loads(_extract_sarif_json(output))
+        run = sarif["runs"][0]
+        props = run["properties"]
+
+        # Get implemented rules from the scanner's own declaration
+        implemented = set(props["wardline.implementedRules"])
+
+        # Find unexcepted findings for implemented rules
+        unexcepted: list[dict[str, object]] = []
+        for result in run["results"]:
+            rule_id = result.get("ruleId", "")
+            if rule_id not in implemented:
+                continue
+            result_props = result.get("properties", {})
+            if "wardline.exceptionId" in result_props:
+                continue
+            unexcepted.append(result)
+
+        assert len(unexcepted) == 0, (
+            f"Self-hosting gate: {len(unexcepted)} unexcepted finding(s) "
+            f"for implemented rules. The scanner's own source must pass "
+            f"all rules it implements, or have active exceptions.\n"
+            + "\n".join(
+                f"  {r['ruleId']} at {r['locations'][0]['physicalLocation']['artifactLocation']['uri']}"
+                f":{r['locations'][0]['physicalLocation']['region']['startLine']}"
+                for r in unexcepted[:10]
+            )
+        )
+
 
 @pytest.mark.integration
 class TestManifestValidation:
