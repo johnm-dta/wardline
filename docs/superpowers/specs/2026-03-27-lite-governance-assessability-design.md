@@ -56,11 +56,11 @@ metadata:
 ```
 
 **Field semantics:**
-- `alternative` — either `"same-actor-with-retrospective"` or absent (meaning enforced)
-- `retrospective_window_days` — required when `alternative` is present
-- `rationale` — required when `alternative` is present; free-text justification
+- `alternative` — `"same-actor-with-retrospective"` or `"enforced"`
+- `retrospective_window_days` — required when `alternative` is `"same-actor-with-retrospective"`
+- `rationale` — required when `alternative` is `"same-actor-with-retrospective"`; free-text justification
 
-When `temporal_separation` is absent from metadata, the manifest is declaring that temporal separation is enforced. This is the default posture — no declaration needed for the common case.
+When `temporal_separation` is absent from metadata, the posture is *undeclared* — an assessability gap. Projects SHOULD explicitly declare their posture. This prevents "absent" from silently meaning "enforced" — an assessor cannot distinguish "intentionally enforced" from "forgot to declare."
 
 ### 3. Schema change — `wardline.schema.json`
 
@@ -69,12 +69,12 @@ Add `temporal_separation` to the `metadata` properties (currently has `additiona
 ```json
 "temporal_separation": {
   "type": "object",
-  "description": "Temporal separation posture declaration (§14.3.2). Absent means enforced.",
+  "description": "Temporal separation posture declaration (§14.3.2).",
   "properties": {
     "alternative": {
       "type": "string",
-      "enum": ["same-actor-with-retrospective"],
-      "description": "The alternative to full temporal separation."
+      "enum": ["enforced", "same-actor-with-retrospective"],
+      "description": "The declared posture: enforced or a named alternative."
     },
     "retrospective_window_days": {
       "type": "integer",
@@ -86,12 +86,12 @@ Add `temporal_separation` to the `metadata` properties (currently has `additiona
       "description": "Free-text justification for the alternative."
     }
   },
-  "required": ["alternative", "retrospective_window_days", "rationale"],
+  "required": ["alternative"],
   "additionalProperties": false
 }
 ```
 
-All three fields are required when the object is present. When temporal separation is enforced, the entire `temporal_separation` object is simply omitted.
+Only `alternative` is required at the schema level. `retrospective_window_days` and `rationale` are conditionally required — the loader validates that they are present when `alternative` is `"same-actor-with-retrospective"` and rejects them as noise when `alternative` is `"enforced"`.
 
 ### 4. Model change — `ManifestMetadata`
 
@@ -119,7 +119,7 @@ class ManifestMetadata:
     temporal_separation: TemporalSeparation | None = None  # NEW
 ```
 
-`None` means enforced (the default). Present means a documented alternative.
+`None` means undeclared (assessability gap). `TemporalSeparation(alternative="enforced")` means explicitly enforced. `TemporalSeparation(alternative="same-actor-with-retrospective", ...)` means documented alternative.
 
 ### 5. Loader change — build `TemporalSeparation` from parsed data
 
@@ -159,7 +159,8 @@ The existing `ratification_current` check in `regime_cmd.py` silently passes whe
 ```python
 # Check 10: Ratification metadata present
 has_ratification = (
-    manifest_m.ratification_date is not None
+    manifest_m.ratified_by_present
+    and manifest_m.ratification_date is not None
     and manifest_m.review_interval_days is not None
 )
 if has_ratification:
@@ -167,10 +168,12 @@ if has_ratification:
         "check": "ratification_metadata_present",
         "passed": True,
         "severity": "ERROR",
-        "evidence": "Ratification date and review interval declared.",
+        "evidence": "Ratification authority, date, and review interval declared.",
     })
 else:
     missing = []
+    if not manifest_m.ratified_by_present:
+        missing.append("ratified_by")
     if manifest_m.ratification_date is None:
         missing.append("ratification_date")
     if manifest_m.review_interval_days is None:
@@ -183,42 +186,104 @@ else:
     })
 ```
 
-This check is ERROR severity — missing ratification metadata means the Lite checklist item 1 ("has a current ratification") is structurally unfulfillable, not just overdue.
+This check is ERROR severity — missing ratification metadata means the Lite checklist item 1 ("has a current ratification") is structurally unfulfillable, not just overdue. All three fields are required: `ratified_by` (the authority), `ratification_date` (when), and `review_interval_days` (how often).
+
+Add `ratified_by_present: bool = False` to `ManifestMetrics`. Populate in `collect_manifest_metrics()`:
+
+```python
+ratified_by_present = meta.ratified_by is not None
+```
 
 ### 8. Regime verify — add temporal separation check
 
-Add a check for temporal separation posture declaration:
+Add a check for temporal separation posture declaration. The check must distinguish three states: explicitly declared alternative, explicitly declared enforced, and undeclared (assessability gap).
 
 ```python
 # Check 11: Temporal separation declared
-# For Lite: either enforced (no temporal_separation field) or
-# alternative documented with rationale.
+# temporal_separation_posture is one of:
+#   "alternative:<name>" — documented alternative
+#   "enforced"           — explicitly declared enforced
+#   None                 — undeclared (assessability gap)
+ts = manifest_m.temporal_separation_posture
 if governance_profile == "lite":
-    # Lite allows documented alternative
-    checks.append({
-        "check": "temporal_separation_declared",
-        "passed": True,
-        "severity": "WARNING",
-        "evidence": (
-            "Temporal separation alternative documented."
-            if manifest_m.temporal_separation_alternative is not None
-            else "Temporal separation enforced (no alternative declared)."
-        ),
-    })
+    if ts is not None:
+        checks.append({
+            "check": "temporal_separation_declared",
+            "passed": True,
+            "severity": "WARNING",
+            "evidence": (
+                f"Temporal separation posture declared: {ts}."
+            ),
+        })
+    else:
+        checks.append({
+            "check": "temporal_separation_declared",
+            "passed": False,
+            "severity": "WARNING",
+            "evidence": (
+                "Temporal separation posture not declared. "
+                "Assessor cannot determine whether enforced or "
+                "alternative applies. Add temporal_separation to "
+                "manifest metadata."
+            ),
+        })
 else:
     # Assurance requires enforcement, no alternatives
-    has_ts_alt = manifest_m.temporal_separation_alternative is not None
+    if ts is not None and ts.startswith("alternative:"):
+        checks.append({
+            "check": "temporal_separation_declared",
+            "passed": False,
+            "severity": "ERROR",
+            "evidence": (
+                "Assurance profile does not permit temporal "
+                "separation alternatives."
+            ),
+        })
+    else:
+        checks.append({
+            "check": "temporal_separation_declared",
+            "passed": ts == "enforced",
+            "severity": "ERROR",
+            "evidence": (
+                "Temporal separation enforced."
+                if ts == "enforced"
+                else "Temporal separation posture not declared."
+            ),
+        })
+```
+```
+
+### 9. Regime verify — add annotation change tracking check (MAN-010)
+
+The Lite requirement (§14.3.2) is: "Changes to the annotation surface are flagged for human review. This MAY be implemented through VCS diff review." The assessable evidence is: `wardline.fingerprint.json` is CODEOWNERS-protected, so annotation-surface changes in PRs will require designated reviewer approval.
+
+Add a check that verifies the fingerprint baseline exists (the tool is in use, not just available):
+
+```python
+# Check 12: Annotation change tracking
+fingerprint_path = manifest_dir / "wardline.fingerprint.json"
+if fingerprint_path.exists():
     checks.append({
-        "check": "temporal_separation_declared",
-        "passed": not has_ts_alt,
-        "severity": "ERROR",
+        "check": "annotation_change_tracking",
+        "passed": True,
+        "severity": "WARNING",
+        "evidence": "Fingerprint baseline present — annotation changes visible in diffs.",
+    })
+else:
+    checks.append({
+        "check": "annotation_change_tracking",
+        "passed": False,
+        "severity": "WARNING",
         "evidence": (
-            "Assurance profile does not permit temporal separation alternatives."
-            if has_ts_alt
-            else "Temporal separation enforced."
+            "No fingerprint baseline found. Run 'wardline fingerprint update' "
+            "to establish annotation change tracking."
         ),
     })
 ```
+
+This is WARNING, not ERROR — Lite allows annotation tracking "through VCS diff review of annotation-bearing files rather than a full fingerprint baseline." But without even a baseline, there's no structured evidence of annotation-surface visibility.
+
+Combined with the CODEOWNERS addition for `wardline.fingerprint.json` (§6), this makes MAN-010 assessable: the baseline exists, it's protected, and changes to it require review.
 
 Note: `manifest_m` is a `ManifestMetrics` object, not the manifest itself. We need to thread the `temporal_separation` field through. Options:
 
@@ -230,20 +295,25 @@ Note: `manifest_m` is a `ManifestMetrics` object, not the manifest itself. We ne
 Add to `ManifestMetrics`:
 
 ```python
-temporal_separation_alternative: str | None = None  # None = enforced
+ratified_by_present: bool = False
+temporal_separation_posture: str | None = None  # None = undeclared
 ```
 
 Populate in `collect_manifest_metrics()`:
 
 ```python
-temporal_separation_alternative = (
-    meta.temporal_separation.alternative
-    if meta.temporal_separation is not None
-    else None
-)
+ratified_by_present = meta.ratified_by is not None
+
+temporal_separation_posture = None  # undeclared
+if meta.temporal_separation is not None:
+    alt = meta.temporal_separation.alternative
+    if alt == "enforced":
+        temporal_separation_posture = "enforced"
+    else:
+        temporal_separation_posture = f"alternative:{alt}"
 ```
 
-Then the regime verify check uses `manifest_m.temporal_separation_alternative`.
+Then the regime verify checks use `manifest_m.ratified_by_present` and `manifest_m.temporal_separation_posture`.
 
 ## Testing
 
@@ -268,11 +338,15 @@ Then the regime verify check uses `manifest_m.temporal_separation_alternative`.
 
 | Test | Assertion |
 |------|-----------|
-| `test_ratification_metadata_present_check_passes` | With date + interval → pass |
-| `test_ratification_metadata_present_check_fails` | Without date → fail with ERROR |
+| `test_ratification_metadata_present_check_passes` | With ratified_by + date + interval → pass |
+| `test_ratification_metadata_present_check_fails_missing_ratified_by` | Without ratified_by → fail with ERROR |
+| `test_ratification_metadata_present_check_fails_missing_date` | Without date → fail with ERROR |
 | `test_temporal_separation_declared_lite_with_alternative` | Lite + alternative → pass |
-| `test_temporal_separation_declared_lite_enforced` | Lite + no alternative → pass |
+| `test_temporal_separation_declared_lite_enforced` | Lite + explicitly enforced → pass |
+| `test_temporal_separation_declared_lite_undeclared` | Lite + absent → fail |
 | `test_temporal_separation_declared_assurance_with_alternative` | Assurance + alternative → fail |
+| `test_annotation_change_tracking_with_baseline` | Fingerprint baseline exists → pass |
+| `test_annotation_change_tracking_no_baseline` | No baseline → fail with WARNING |
 
 ### Integration — self-hosting
 
@@ -301,4 +375,4 @@ Then the regime verify check uses `manifest_m.temporal_separation_alternative`.
 - **Assurance profile implementation** — Gap 5 is Lite only. Assurance requires structured fingerprint governance, per-cell precision gates, and full temporal separation with no alternatives.
 - **Automated temporal-separation enforcement** — the spec says Lite MAY document the alternative. We document it. Automated enforcement (e.g., checking PR author vs approver) is an Assurance concern.
 - **Ratification expiry CI gate** — regime verify surfaces staleness as a finding. Making it a CI gate is a project policy decision, not a spec requirement.
-- **Annotation change tracking mechanism** — WL-FIT-MAN-010 requires annotation change *visibility*. The existing `wardline fingerprint diff` + CODEOWNERS on `wardline.fingerprint.json` provides this. No new mechanism needed.
+- **New annotation change tracking mechanism** — WL-FIT-MAN-010 is closed by the combination of fingerprint baseline existence check (§9) + CODEOWNERS protection (§6). No new tracking mechanism needed beyond existing `wardline fingerprint update/diff`.
