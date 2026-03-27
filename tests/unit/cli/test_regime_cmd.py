@@ -402,3 +402,82 @@ class TestRegimeVerifyJsonWithCheckResults:
             assert "severity" in check
             assert check["severity"] in ("ERROR", "WARNING")
             assert "evidence" in check
+
+
+class TestManifestMetricsFields:
+    def test_ratified_by_present_when_set(self, tmp_path: Path) -> None:
+        from wardline.manifest.regime import collect_manifest_metrics
+
+        manifest = _write_minimal_manifest(tmp_path)
+        m = collect_manifest_metrics(manifest)
+        assert m.ratified_by_present is True
+
+    def test_ratified_by_present_when_missing(self, tmp_path: Path) -> None:
+        from wardline.manifest.regime import collect_manifest_metrics
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        m = collect_manifest_metrics(manifest)
+        assert m.ratified_by_present is False
+
+    def test_temporal_separation_posture_with_alternative(self, tmp_path: Path) -> None:
+        from wardline.manifest.regime import collect_manifest_metrics
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "  temporal_separation:\n"
+            '    alternative: "same-actor-with-retrospective"\n'
+            "    retrospective_window_days: 10\n"
+            "    rationale: small team\n"
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        m = collect_manifest_metrics(manifest)
+        assert m.temporal_separation_posture == "alternative:same-actor-with-retrospective"
+
+    def test_temporal_separation_posture_enforced(self, tmp_path: Path) -> None:
+        from wardline.manifest.regime import collect_manifest_metrics
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "  temporal_separation:\n"
+            '    alternative: "enforced"\n'
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        m = collect_manifest_metrics(manifest)
+        assert m.temporal_separation_posture == "enforced"
+
+    def test_temporal_separation_posture_undeclared(self, tmp_path: Path) -> None:
+        from wardline.manifest.regime import collect_manifest_metrics
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        m = collect_manifest_metrics(manifest)
+        assert m.temporal_separation_posture is None
