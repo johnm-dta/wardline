@@ -129,14 +129,37 @@ In `loader.py`, when building `ManifestMetadata`, extract the `temporal_separati
 ts_data = meta_data.get("temporal_separation")
 temporal_separation = None
 if ts_data is not None:
-    temporal_separation = TemporalSeparation(
-        alternative=ts_data["alternative"],
-        retrospective_window_days=ts_data["retrospective_window_days"],
-        rationale=ts_data["rationale"],
-    )
+    alt = ts_data["alternative"]
+    if alt == "same-actor-with-retrospective":
+        # Conditional fields required for this alternative
+        if "retrospective_window_days" not in ts_data:
+            raise ManifestLoadError(
+                "temporal_separation: retrospective_window_days required "
+                "when alternative is same-actor-with-retrospective"
+            )
+        if not ts_data.get("rationale"):
+            raise ManifestLoadError(
+                "temporal_separation: rationale required "
+                "when alternative is same-actor-with-retrospective"
+            )
+        temporal_separation = TemporalSeparation(
+            alternative=alt,
+            retrospective_window_days=ts_data["retrospective_window_days"],
+            rationale=ts_data["rationale"],
+        )
+    elif alt == "enforced":
+        # Enforced must not carry retrospective fields
+        if "retrospective_window_days" in ts_data or "rationale" in ts_data:
+            raise ManifestLoadError(
+                "temporal_separation: retrospective_window_days and rationale "
+                "must not be present when alternative is enforced"
+            )
+        temporal_separation = TemporalSeparation(alternative="enforced")
 ```
 
-No additional loader-level validation needed beyond what the schema enforces — the schema already requires all three fields when the object is present.
+The loader enforces the conditional requirements that JSON Schema cannot express:
+- `"same-actor-with-retrospective"` requires `retrospective_window_days` and non-empty `rationale`
+- `"enforced"` must not carry those fields (they would be misleading noise)
 
 ### 6. `.github/CODEOWNERS` — add missing governance artefact paths
 
@@ -257,7 +280,8 @@ else:
 
 The Lite requirement (§14.3.2) is: "Changes to the annotation surface are flagged for human review. This MAY be implemented through VCS diff review." The assessable evidence is: `wardline.fingerprint.json` is CODEOWNERS-protected, so annotation-surface changes in PRs will require designated reviewer approval.
 
-Add a check that verifies the fingerprint baseline exists (the tool is in use, not just available):
+The spec allows Lite to satisfy this "through VCS diff review of annotation-bearing files rather than a full fingerprint baseline." This repo chooses the fingerprint baseline path as its Lite evidence mechanism — the baseline exists, CODEOWNERS protects it, and changes to it require review. Other Lite deployments may choose different evidence. The check below reflects this repo's chosen mechanism, not a framework-wide rule:
+
 
 ```python
 # Check 12: Annotation change tracking
@@ -364,7 +388,7 @@ Then the regime verify checks use `manifest_m.ratified_by_present` and `manifest
 | `src/wardline/manifest/schemas/wardline.schema.json` | Add temporal_separation to metadata |
 | `src/wardline/manifest/models.py` | Add `TemporalSeparation` dataclass, field on `ManifestMetadata` |
 | `src/wardline/manifest/loader.py` | Build `TemporalSeparation` from parsed data |
-| `src/wardline/manifest/regime.py` | Add `temporal_separation_alternative` to `ManifestMetrics` |
+| `src/wardline/manifest/regime.py` | Add `ratified_by_present` and `temporal_separation_posture` to `ManifestMetrics` |
 | `src/wardline/cli/regime_cmd.py` | Add ratification-presence + temporal-separation checks |
 | `tests/unit/manifest/test_models.py` | TemporalSeparation tests |
 | `tests/unit/manifest/test_loader.py` | Loader validation tests |
