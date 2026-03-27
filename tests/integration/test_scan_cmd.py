@@ -833,3 +833,37 @@ class TestSarifRunLevelProperties:
         sarif = json.loads(result.stdout)
         props = sarif["runs"][0]["properties"]
         assert props["wardline.propertyBagVersion"] == "0.3"
+
+    def test_input_hash_failure_exits_tool_error(self, tmp_path: Path) -> None:
+        """inputHash OSError produces TOOL_ERROR finding AND exit code 3."""
+        from unittest.mock import patch
+
+        from wardline.scanner.engine import ScanResult
+
+        manifest = _minimal_manifest(tmp_path)
+        # Fake a scan result with a file path that no longer exists
+        ghost = tmp_path / "ghost.py"
+        fake_result = ScanResult(
+            findings=[],
+            files_scanned=1,
+            scanned_file_paths=[ghost],  # does not exist on disk
+        )
+
+        with patch(
+            "wardline.scanner.engine.ScanEngine.scan",
+            return_value=fake_result,
+        ):
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                "scan", str(tmp_path),
+                "--manifest", str(manifest),
+                "--allow-registry-mismatch",
+            ])
+
+        assert result.exit_code == 3
+        sarif = json.loads(result.stdout)
+        tool_errors = [
+            r for r in sarif["runs"][0]["results"]
+            if r["ruleId"] == "TOOL-ERROR"
+        ]
+        assert len(tool_errors) == 1

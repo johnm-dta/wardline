@@ -456,7 +456,7 @@ def scan(
         loaded = _load_resolved(resolved, manifest_path)
         if loaded is None:
             sys.exit(EXIT_CONFIG_ERROR)
-        boundaries, resolved_rule_overrides, optional_fields = loaded
+        boundaries, resolved_rule_overrides, optional_fields, consumed_overlay_paths = loaded
         if resolved_rule_overrides is not None:
             import dataclasses as _dc
 
@@ -711,7 +711,7 @@ def scan(
     #       --strict-governance is set and GOVERNANCE findings exist.
     #   EXIT_CLEAN      (0) — no findings, no errors.
     has_tool_error = any(
-        f.rule_id == RuleId.TOOL_ERROR for f in result.findings
+        f.rule_id == RuleId.TOOL_ERROR for f in all_findings
     )
     has_governance_findings = effective_strict_governance and any(
         str(f.rule_id).startswith("GOVERNANCE-") for f in all_findings
@@ -835,10 +835,13 @@ def _load_resolved(
     tuple[_BoundaryEntry, ...],
     tuple[dict[str, object], ...] | None,
     tuple[object, ...],
+    tuple[Path, ...],
 ] | None:
-    """Load boundaries and rule overrides from a wardline.resolved.json file.
+    """Load boundaries, rule overrides, optional fields, and overlay paths.
 
     Returns ``None`` on error (after printing a structured error message).
+    The fourth element is the tuple of consumed overlay file paths,
+    reconstructed from the resolved JSON's ``overlays_discovered`` array.
     """
     import hashlib
     import json
@@ -901,7 +904,13 @@ def _load_resolved(
             for entry in data.get("optional_fields", [])
         )
 
-        return boundaries, rule_overrides, optional_fields
+        # Reconstruct overlay file paths from overlays_discovered
+        overlay_paths = tuple(
+            project_root / entry["path"]
+            for entry in data.get("overlays_discovered", [])
+        )
+
+        return boundaries, rule_overrides, optional_fields, overlay_paths
     except (json.JSONDecodeError, KeyError, TypeError, OSError) as exc:
         cli_error(f"resolved manifest invalid: {exc}")
         return None
