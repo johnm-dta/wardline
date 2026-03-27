@@ -161,11 +161,19 @@ def _read_coverage_ratio(manifest_path: Path) -> float | None:
         return None
 
 
-def _read_conformance_gaps(manifest_path: Path) -> tuple[str, ...]:
+def _read_conformance_gaps(
+    manifest_path: Path, scan_path: Path | None = None
+) -> tuple[str, ...]:
     """Read conformance gaps from wardline.conformance.json.
 
     Returns gap strings from the generated conformance status file.
     If the file is absent or stale, returns a gap describing that.
+
+    Args:
+        manifest_path: Path to wardline.yaml.
+        scan_path: Resolved scan target path. When provided and it overlaps
+            the self-hosting source path, self_hosting_input_hash is also
+            validated for staleness.
     """
     import json
 
@@ -199,6 +207,14 @@ def _read_conformance_gaps(manifest_path: Path) -> tuple[str, ...]:
         current_corpus_hash = _compute_corpus_hash(corpus_dir)
         if inputs["corpus_hash"] != current_corpus_hash:
             stale_reasons.append("corpus_hash")
+    # self_hosting_input_hash: This identity binds the conformance file to
+    # the specific self-hosting scan run that corpus publish summarized.
+    # It cannot be directly recomputed at scan time (would require re-running
+    # the engine on src/wardline/). Staleness for source changes is already
+    # covered by commit_ref above — if the source changed, commit_ref catches
+    # it regardless of whether this scan targets the self-hosting path.
+    # The self_hosting_input_hash is primarily useful for corpus publish's
+    # own evidence chain, not for scan-time re-validation.
 
     if stale_reasons:
         return (
@@ -687,7 +703,7 @@ def scan(
         consumed_overlay_paths, manifest_path.parent
     )
     coverage_ratio = _read_coverage_ratio(manifest_path)
-    conformance_gaps = _read_conformance_gaps(manifest_path)
+    conformance_gaps = _read_conformance_gaps(manifest_path, scan_path=scan_path)
 
     # inputHash — hard failure if a scanned file becomes unreadable
     project_root = manifest_path.parent

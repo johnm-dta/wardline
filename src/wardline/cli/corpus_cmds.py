@@ -374,18 +374,20 @@ def _build_json_report(
     below_precision = 0
     below_recall = 0
 
-    for rule_id, taint_state in sorted(stats):
-        s = stats[(rule_id, taint_state)]
+    # Iterate ALL severity matrix cells (72), not just cells with specimens.
+    # This ensures cells with zero specimens appear as NO_DATA rather than
+    # silently disappearing from the report.
+    all_cells = sorted(
+        (str(rid.value), str(ts.value))
+        for rid, ts in SEVERITY_MATRIX
+    )
+    for rule_id, taint_state in all_cells:
+        s = stats.get((rule_id, taint_state), _CellStats())
         prec_floor, recall_floor = _get_floors(rule_id, taint_state)
 
-        # Determine matrix cell properties
-        try:
-            matrix_cell = SEVERITY_MATRIX[(RuleId(rule_id), TaintState(taint_state))]
-            is_suppress = matrix_cell.severity == Severity.SUPPRESS
-            exceptionability = str(matrix_cell.exceptionability.value)
-        except (ValueError, KeyError):
-            is_suppress = False
-            exceptionability = "UNKNOWN"
+        matrix_cell = SEVERITY_MATRIX[(RuleId(rule_id), TaintState(taint_state))]
+        is_suppress = matrix_cell.severity == Severity.SUPPRESS
+        exceptionability = str(matrix_cell.exceptionability.value)
 
         if is_suppress:
             suppress_count += 1
