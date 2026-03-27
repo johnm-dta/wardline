@@ -26,6 +26,17 @@ class TestNoExecEval:
         compile is tested separately because ast.parse() internally
         calls builtins.compile at the C level on CPython.
         """
+        # Pre-warm ALL modules that corpus verify lazily imports.
+        # Python's import machinery uses builtins.exec internally, so any
+        # module imported for the first time under the exec patch will
+        # trigger the security invariant.
+        #
+        # Strategy: do a dry-run of corpus verify WITHOUT the exec patch,
+        # then patch and run again. The dry run caches all transitive imports.
+        runner = CliRunner()
+        runner.invoke(
+            cli, ["corpus", "verify", "--corpus-dir", str(FIXTURE_CORPUS)]
+        )
 
         def _fail(*args: object, **kwargs: object) -> None:
             raise AssertionError(
@@ -543,13 +554,8 @@ class TestCorpusVerifyJson:
         args = ["corpus", "verify", "--corpus-dir", str(FIXTURE_CORPUS), "--json"]
         r1 = runner.invoke(cli, args)
         r2 = runner.invoke(cli, args)
-        # Strip generated_at timestamp for comparison
-        import json
-        d1 = json.loads(r1.output)
-        d2 = json.loads(r2.output)
-        d1.pop("generated_at", None)
-        d2.pop("generated_at", None)
-        assert d1 == d2
+        # Byte-identical — no timestamps in verify output (determinism per §10)
+        assert r1.output == r2.output
 
     def test_json_overall_verdict(self) -> None:
         import json

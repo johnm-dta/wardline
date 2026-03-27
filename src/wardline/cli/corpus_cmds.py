@@ -363,10 +363,8 @@ def _build_json_report(
 ) -> dict[str, object]:
     """Build per-cell assessment JSON with verdicts."""
     from wardline.core.matrix import SEVERITY_MATRIX
-    from wardline.core.severity import Exceptionability as _Exc
-    from wardline.core.severity import RuleId as _RuleId
-    from wardline.core.severity import Severity as _Sev
-    from wardline.core.taints import TaintState as _TS
+    from wardline.core.severity import RuleId, Severity
+    from wardline.core.taints import TaintState
 
     cells: list[dict[str, object]] = []
     passing = 0
@@ -382,8 +380,8 @@ def _build_json_report(
 
         # Determine matrix cell properties
         try:
-            matrix_cell = SEVERITY_MATRIX[(_RuleId(rule_id), _TS(taint_state))]
-            is_suppress = matrix_cell.severity == _Sev.SUPPRESS
+            matrix_cell = SEVERITY_MATRIX[(RuleId(rule_id), TaintState(taint_state))]
+            is_suppress = matrix_cell.severity == Severity.SUPPRESS
             exceptionability = str(matrix_cell.exceptionability.value)
         except (ValueError, KeyError):
             is_suppress = False
@@ -630,10 +628,10 @@ def verify(corpus_dir: str, analysis_level: int, output_json: bool) -> None:
 
     if output_json:
         import json as json_mod
-        from datetime import UTC, datetime
 
         report = _build_json_report(stats)
-        report["generated_at"] = datetime.now(UTC).isoformat()
+        # No timestamp — deterministic output per §10 property 5.
+        # corpus publish adds generated_at when producing the conformance file.
         click.echo(json_mod.dumps(report, indent=2, sort_keys=True))
     else:
         skip_msg = f" ({skipped} skipped, level > {analysis_level})" if skipped else ""
@@ -727,6 +725,14 @@ def publish(
         except ValueError:
             errors += 1
             continue
+
+    if errors > 0:
+        click.echo(
+            f"error: {errors} corpus specimen(s) failed verification — "
+            f"cannot generate conformance status from partial evidence.",
+            err=True,
+        )
+        raise SystemExit(1)
 
     corpus_report = _build_json_report(stats)
 

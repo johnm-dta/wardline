@@ -178,7 +178,7 @@ def _read_conformance_gaps(manifest_path: Path) -> tuple[str, ...]:
     except (json.JSONDecodeError, OSError):
         return ("conformance status file unreadable",)
 
-    # Staleness check: compare input identities
+    # Staleness check: compare input identities against current state
     import wardline as _pkg
     inputs = data.get("inputs", {})
 
@@ -188,6 +188,17 @@ def _read_conformance_gaps(manifest_path: Path) -> tuple[str, ...]:
     manifest_hash = _compute_manifest_hash(manifest_path)
     if manifest_hash is not None and inputs.get("manifest_hash") != manifest_hash:
         stale_reasons.append("manifest_hash")
+    # commit_ref: validated against HEAD, not the scan target's inputHash
+    current_ref = _git_head_ref()
+    if current_ref is not None and inputs.get("commit_ref", "unknown") != current_ref:
+        stale_reasons.append("commit_ref")
+    # corpus_hash: validated against the current corpus on disk
+    corpus_dir = manifest_path.parent / "corpus"
+    if corpus_dir.is_dir() and "corpus_hash" in inputs:
+        from wardline.cli.corpus_cmds import _compute_corpus_hash
+        current_corpus_hash = _compute_corpus_hash(corpus_dir)
+        if inputs["corpus_hash"] != current_corpus_hash:
+            stale_reasons.append("corpus_hash")
 
     if stale_reasons:
         return (
