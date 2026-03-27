@@ -198,7 +198,7 @@ def _run_rules_on_fragment(
         rule.set_context(ctx)
         try:
             rule.visit(tree)
-        except Exception as exc:
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
             logger.warning(
                 "Rule %s crashed on specimen: %s", rule.RULE_ID, exc,
             )

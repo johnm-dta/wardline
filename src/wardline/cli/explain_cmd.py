@@ -289,7 +289,7 @@ def _build_exception_section(
     if manifest_path is not None and manifest_path.exists():
         try:
             all_exceptions = load_exceptions(manifest_path.parent)
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
             click.echo(f"warning: could not load exception register: {exc}", err=True)
 
     # Build relative location key for matching
@@ -554,7 +554,7 @@ def _build_fingerprint_section(
                         break
                 else:
                     baseline_status = "no baseline stored"
-            except Exception:
+            except (OSError, ValueError, KeyError, _json.JSONDecodeError):
                 baseline_status = "no baseline stored"
 
     if not output_json:

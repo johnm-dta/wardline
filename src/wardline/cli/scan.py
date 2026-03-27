@@ -907,7 +907,7 @@ def _load_config(config_arg: str | None) -> ScannerConfig | None | _ConfigError:
     except ScannerConfigError as exc:
         cli_error(f"config error: {exc}")
         return _CONFIG_ERROR
-    except Exception as exc:
+    except OSError as exc:
         cli_error(f"config load error: {exc}")
         return _CONFIG_ERROR
 

@@ -375,7 +375,7 @@ def verify(
     manifest_load_ok = True
     try:
         load_manifest(manifest_path)
-    except (WardlineYAMLError, yaml.YAMLError, ManifestLoadError, Exception) as exc:
+    except (WardlineYAMLError, yaml.YAMLError, ManifestLoadError, OSError) as exc:
         manifest_load_ok = False
         checks.append({
             "check": "manifest_loads",
