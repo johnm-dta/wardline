@@ -115,14 +115,14 @@ Add a new CLI command: `wardline corpus publish`. This command:
 }
 ```
 
-**Input binding:** The `inputs` block records the identity of every input that produced this status. The scan command compares these against the current run's values:
-- `tool_version` — must match the running scanner version
-- `commit_ref` — must match the current `wardline.commitRef` (or HEAD)
-- `manifest_hash` — must match the current `wardline.manifestHash`
-- `corpus_hash` — hash-of-hashes over the corpus specimen directory (same §10.1 construction as `inputHash`)
-- `self_hosting_input_hash` — the `wardline.inputHash` from the self-hosting SARIF run that was summarized
+**Input binding:** The `inputs` block records the identity of every input that produced this status. The scan command validates a subset of these against the current run:
+- `tool_version` — must match the running scanner version. A tool upgrade invalidates conformance evidence.
+- `commit_ref` — must match the current HEAD. Source changes invalidate the self-hosting evidence.
+- `manifest_hash` — must match the current `wardline.manifestHash`. Policy changes invalidate all evidence.
+- `corpus_hash` — hash-of-hashes over the full corpus artefact set: specimen YAML files, `corpus_manifest.json` (if present), and specimen schema files. This covers schema or manifest changes that affect corpus interpretation even when specimen bytes are unchanged.
+- `self_hosting_input_hash` — the `wardline.inputHash` from the self-hosting SARIF run that `corpus publish` summarized. This is **not** compared against an arbitrary later scan's `inputHash` — the self-hosting scan has a fixed canonical target (`src/wardline/`), while ordinary scans may target any path. Instead, the scan command compares `self_hosting_input_hash` against the current commit's source identity only when the scan target includes the self-hosting path. For other scan targets, the self-hosting identity is validated only against `commit_ref` (if the source changed, self-hosting evidence is stale regardless of scan target).
 
-If any input identity diverges, the scan reports `"conformance status stale — <field> changed"` as a gap. This prevents a months-old conformance file from passing against a different tool, source tree, manifest, or corpus. If the file is absent entirely, the scan reports `"conformance status not generated — run 'wardline corpus publish'"`.
+If `tool_version`, `commit_ref`, or `manifest_hash` diverge, the scan reports `"conformance status stale — <field> changed"` as a gap. If `corpus_hash` diverges, the scan reports `"corpus evidence stale — corpus artefacts changed"`. If the file is absent entirely, the scan reports `"conformance status not generated — run 'wardline corpus publish'"`.
 
 This keeps the evidence chain: corpus verify produces per-cell metrics → `corpus publish` aggregates with self-hosting → scan reads the generated artefact. No self-attestation.
 
