@@ -151,6 +151,7 @@ class ScanEngine:
         analysis_level: int = 1,
         known_validators: frozenset[str] | None = None,
         max_expansion_rounds: int = 1,
+        project_root: Path | None = None,
     ) -> None:
         self._target_paths = target_paths
         self._exclude_paths = tuple(p.resolve() for p in exclude_paths)
@@ -161,6 +162,7 @@ class ScanEngine:
         self._analysis_level = analysis_level
         self._known_validators = known_validators if known_validators is not None else BUILTIN_KNOWN_VALIDATORS
         self._max_expansion_rounds = max_expansion_rounds
+        self._project_root = project_root
         self._project_index: ProjectIndex | None = None
 
     def scan(self) -> ScanResult:
@@ -275,7 +277,8 @@ class ScanEngine:
         try:
             annotations = discover_annotations(tree, file_path)
             body_taint_map, return_taint_map, taint_sources, taint_conflicts, restoration_overclaims = assign_function_taints(
-                tree, file_path, annotations, self._manifest
+                tree, file_path, annotations, self._manifest,
+                project_root=self._project_root,
             )
         except Exception as exc:
             logger.error("Discovery/taint failed for %s: %s", file_path, exc)

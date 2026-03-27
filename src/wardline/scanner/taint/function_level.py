@@ -104,6 +104,8 @@ def assign_function_taints(
     file_path: Path | str,
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
     manifest: WardlineManifest | None = None,
+    *,
+    project_root: Path | None = None,
 ) -> tuple[dict[str, TaintState], dict[str, TaintState], dict[str, TaintSource], list[TaintConflict], list[RestorationOverclaim]]:
     """Assign taint states to every function in a parsed module.
 
@@ -114,6 +116,8 @@ def assign_function_taints(
         manifest: Loaded manifest (for ``module_tiers`` lookup).
             ``None`` means no manifest — all undecorated functions get
             ``UNKNOWN_RAW``.
+        project_root: Project root directory for resolving relative
+            manifest ``module_tiers`` paths against absolute file paths.
 
     Returns:
         Tuple of (body_taint_map, return_taint_map, taint_sources,
@@ -131,7 +135,7 @@ def assign_function_taints(
           diagnostics for decorators claiming a tier exceeding evidence.
     """
     path_str = str(file_path)
-    module_default = resolve_module_default(path_str, manifest)
+    module_default = resolve_module_default(path_str, manifest, project_root=project_root)
     body_taint_map: dict[str, TaintState] = {}
     return_taint_map: dict[str, TaintState] = {}
     taint_sources: dict[str, TaintSource] = {}
@@ -154,6 +158,8 @@ def assign_function_taints(
 def resolve_module_default(
     file_path: str,
     manifest: WardlineManifest | None,
+    *,
+    project_root: Path | None = None,
 ) -> TaintState | None:
     """Find the module_tiers default taint for a file path.
 
@@ -161,19 +167,23 @@ def resolve_module_default(
     of ``file_path`` at a directory boundary. When multiple entries
     match, the most-specific (longest path) wins.
 
+    ``project_root`` resolves relative manifest entry paths against the
+    project directory so they match absolute scan file paths.
+
     Returns ``None`` if no manifest or no matching module_tiers entry.
     """
     if manifest is None:
         return None
 
-    from pathlib import PurePath
+    from pathlib import Path as _Path, PurePath
 
     file_p = PurePath(file_path)
+    root = _Path(project_root).resolve() if project_root is not None else None
 
     # Collect all matching entries
     matches: list[tuple[int, str]] = []
     for entry in manifest.module_tiers:
-        entry_p = PurePath(entry.path)
+        entry_p = PurePath(root / entry.path) if root is not None else PurePath(entry.path)
         try:
             file_p.relative_to(entry_p)
         except ValueError:

@@ -572,6 +572,7 @@ def scan(
         analysis_level=analysis_level,
         known_validators=effective_known_validators,
         max_expansion_rounds=cfg.max_expansion_rounds if cfg is not None else 1,
+        project_root=manifest_path.parent,
     )
 
     logger.info("Scanning %d target path(s)...", len(target_paths))
