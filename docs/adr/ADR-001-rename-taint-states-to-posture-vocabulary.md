@@ -205,7 +205,7 @@ and a deprecation cycle.
 | Artifact | Estimated changes |
 |----------|------------------|
 | `TaintState` enum in `core/taints.py` | 8 member renames |
-| `TAINT_TO_TIER` mapping in `core/taints.py` | 8 key renames |
+| `TAINT_TO_TIER` mapping in `core/tiers.py` | 8 key renames |
 | `SEVERITY_MATRIX` in `core/matrix.py` | ~72 cell key updates |
 | JSON schemas (3 files) | Enum value lists |
 | `wardline.yaml` module_tiers | `default_taint` values |
