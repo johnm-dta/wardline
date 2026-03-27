@@ -230,6 +230,7 @@ class SarifReport:
     input_files: int = 0
     overlay_hashes: tuple[str, ...] = ()
     coverage_ratio: float | None = None
+    conformance_gaps: tuple[str, ...] = ()
 
     def _implemented_rules(self) -> list[str]:
         """Return sorted list of canonical rule ID values (excludes pseudo-IDs).
@@ -280,7 +281,7 @@ class SarifReport:
                 **({"wardline.commitRef": self.commit_ref}
                    if not self.verification_mode and self.commit_ref
                    else {}),
-                "wardline.conformanceGaps": [],
+                "wardline.conformanceGaps": list(self.conformance_gaps),
                 "wardline.controlLaw": self.control_law,
                 **({"wardline.coverageRatio": round(self.coverage_ratio, 4)}
                    if self.coverage_ratio is not None else {}),

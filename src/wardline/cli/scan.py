@@ -161,6 +161,43 @@ def _read_coverage_ratio(manifest_path: Path) -> float | None:
         return None
 
 
+def _read_conformance_gaps(manifest_path: Path) -> tuple[str, ...]:
+    """Read conformance gaps from wardline.conformance.json.
+
+    Returns gap strings from the generated conformance status file.
+    If the file is absent or stale, returns a gap describing that.
+    """
+    import json
+
+    conf_path = manifest_path.parent / "wardline.conformance.json"
+    if not conf_path.exists():
+        return ("conformance status not generated — run 'wardline corpus publish'",)
+
+    try:
+        data = json.loads(conf_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return ("conformance status file unreadable",)
+
+    # Staleness check: compare input identities
+    import wardline as _pkg
+    inputs = data.get("inputs", {})
+
+    stale_reasons: list[str] = []
+    if inputs.get("tool_version") != _pkg.__version__:
+        stale_reasons.append("tool_version")
+    manifest_hash = _compute_manifest_hash(manifest_path)
+    if manifest_hash is not None and inputs.get("manifest_hash") != manifest_hash:
+        stale_reasons.append("manifest_hash")
+
+    if stale_reasons:
+        return (
+            f"conformance status stale — {', '.join(stale_reasons)} changed",
+            *tuple(data.get("gaps", [])),
+        )
+
+    return tuple(data.get("gaps", []))
+
+
 def _utc_timestamp() -> str:
     """ISO 8601 UTC timestamp for scan temporal binding."""
     from datetime import UTC, datetime
@@ -639,6 +676,7 @@ def scan(
         consumed_overlay_paths, manifest_path.parent
     )
     coverage_ratio = _read_coverage_ratio(manifest_path)
+    conformance_gaps = _read_conformance_gaps(manifest_path)
 
     # inputHash — hard failure if a scanned file becomes unreadable
     project_root = manifest_path.parent
@@ -681,6 +719,7 @@ def scan(
         input_files=input_files,
         overlay_hashes=overlay_hashes,
         coverage_ratio=coverage_ratio,
+        conformance_gaps=conformance_gaps,
     )
 
     sarif_text = sarif_report.to_json_string() + "\n"

@@ -399,6 +399,21 @@ class TestSarifPropertyBags:
         assert props["wardline.inputFiles"] == 5
         assert props["wardline.overlayHashes"] == ["sha256:def"]
 
+    def test_conformance_gaps_from_field(self) -> None:
+        """conformanceGaps populated from field, not hardcoded."""
+        report = SarifReport(
+            findings=[],
+            conformance_gaps=("gap A", "gap B"),
+        )
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.conformanceGaps"] == ["gap A", "gap B"]
+
+    def test_conformance_gaps_default_empty(self) -> None:
+        """No gaps declared = empty list (still present)."""
+        report = SarifReport(findings=[])
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.conformanceGaps"] == []
+
 
 # ---------------------------------------------------------------------------
 # TestSarifOutput
