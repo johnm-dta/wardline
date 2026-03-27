@@ -98,6 +98,13 @@ Add a new CLI command: `wardline corpus publish`. This command:
 {
   "format_version": "1.0",
   "generated_at": "2026-03-27T12:00:00Z",
+  "inputs": {
+    "tool_version": "0.1.0",
+    "commit_ref": "a1b2c3d4",
+    "manifest_hash": "sha256:...",
+    "corpus_hash": "sha256:...",
+    "self_hosting_input_hash": "sha256:..."
+  },
   "corpus_verdict": "PASS",
   "self_hosting_verdict": "PASS",
   "gaps": [
@@ -108,7 +115,14 @@ Add a new CLI command: `wardline corpus publish`. This command:
 }
 ```
 
-The scan command (`wardline scan`) reads `wardline.conformance.json` if present and populates `wardline.conformanceGaps` from its `gaps` array. If the file is absent, the scan emits a single gap: `"conformance status not generated — run 'wardline corpus publish'"`. If the file is stale (older than manifest ratification date), add `"conformance status stale"`.
+**Input binding:** The `inputs` block records the identity of every input that produced this status. The scan command compares these against the current run's values:
+- `tool_version` — must match the running scanner version
+- `commit_ref` — must match the current `wardline.commitRef` (or HEAD)
+- `manifest_hash` — must match the current `wardline.manifestHash`
+- `corpus_hash` — hash-of-hashes over the corpus specimen directory (same §10.1 construction as `inputHash`)
+- `self_hosting_input_hash` — the `wardline.inputHash` from the self-hosting SARIF run that was summarized
+
+If any input identity diverges, the scan reports `"conformance status stale — <field> changed"` as a gap. This prevents a months-old conformance file from passing against a different tool, source tree, manifest, or corpus. If the file is absent entirely, the scan reports `"conformance status not generated — run 'wardline corpus publish'"`.
 
 This keeps the evidence chain: corpus verify produces per-cell metrics → `corpus publish` aggregates with self-hosting → scan reads the generated artefact. No self-attestation.
 
@@ -121,12 +135,13 @@ The spec says "each enforcement tool's own source MUST pass the rules that tool 
 Add a new test: `test_self_hosting_passes_own_rules`. This test:
 1. Runs a scan on `src/wardline/` with the project manifest
 2. Parses the SARIF output
-3. Filters for findings from implemented rules (PY-WL-001 through PY-WL-009)
-4. Excludes:
+3. Reads `wardline.implementedRules` from the run properties to get the scanner's declared implemented rule set — do NOT hardcode `PY-WL-001` through `PY-WL-009`; the scanner is the authority on what it implements
+4. Filters findings to those whose `ruleId` is in the implemented rules set
+5. Excludes:
    - Findings with `wardline.exceptionId` present in SARIF properties (active exceptions)
    - GOVERNANCE diagnostic pseudo-rules (ruleId starts with `GOVERNANCE-`)
    - TOOL-ERROR diagnostics
-5. Asserts zero remaining findings
+6. Asserts zero remaining findings
 
 If any implemented-rule finding exists without an active exception, self-hosting fails. The fix is either: fix the code, or add an exception (which requires reviewer approval via CODEOWNERS). Both are correct — the spec allows exceptions, it just requires the gate to be real.
 
