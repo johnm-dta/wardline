@@ -89,7 +89,7 @@ Rename all taint state tokens to the posture vocabulary:
 
 | Current | New | Rationale |
 |---------|-----|-----------|
-| `AUDIT_TRAIL` | `INTEGRAL` | Essential to system correctness — invariant violation is an integrity failure |
+| `AUDIT_TRAIL` | `INTEGRAL` | Auth decisions, safety-critical paths, data integrity gates — code where silent failure is not a recoverable condition |
 | `PIPELINE` | `ASSURED` | Values trusted within their declared validation scope |
 | `SHAPE_VALIDATED` | `GUARDED` | Structure trusted, semantic values not yet verified |
 | `EXTERNAL_RAW` | `EXTERNAL_RAW` | Keep — RAW describes data state (unexamined), EXTERNAL describes provenance |
@@ -230,6 +230,7 @@ and a deprecation cycle.
 | `TAINT_TO_TIER` mapping in `core/tiers.py` | 5 key renames |
 | `SEVERITY_MATRIX` in `core/matrix.py` | ~72 cell key updates |
 | JSON schemas (3 files) | Enum value lists |
+| `wardline.yaml` tier definitions | `id` values in `tiers:` block |
 | `wardline.yaml` module_tiers | `default_taint` values |
 | Corpus specimen directories | ~30 directory renames |
 | Corpus specimen YAML files | `taint_state` field values |
@@ -250,6 +251,7 @@ and a deprecation cycle.
 8. Regenerate `corpus_manifest.json`
 9. Delete §5.1 defensive NOTE from spec
 10. Update spec §5.1 canonical token list, §4.1 table, §1.1 glossary
+11. Rename spec §5.2.2 Group 2 from "Audit Primacy" to "Integrity Primacy" (see ADR-002)
 
 ### Verification
 
