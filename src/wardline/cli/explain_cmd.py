@@ -128,7 +128,10 @@ def explain(
         decorator_taint = taint_from_annotations(
             file_path_str, qualname, annotations
         )
-        module_default = resolve_module_default(file_path_str, manifest_model)
+        module_default = resolve_module_default(
+            file_path_str, manifest_model,
+            project_root=manifest_path.parent if manifest_path is not None else None,
+        )
 
         if decorator_taint is not None:
             # Find which decorator(s) matched

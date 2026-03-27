@@ -752,11 +752,19 @@ def publish(
     run_props = run.get("properties", {})
     implemented_rules = set(run_props.get("wardline.implementedRules", []))
 
-    # Count unexcepted findings for implemented rules
+    # Count unexcepted findings for implemented rules.
+    # SUPPRESS-severity findings (SARIF level "note") are excluded from the
+    # pass/fail count — the severity matrix declares them as intentionally
+    # silent at that taint state.  They're tracked as a separate diagnostic
+    # counter for tool-quality visibility.
     unexcepted = 0
+    suppressed_cell_findings = 0
     for result in run.get("results", []):
         rule_id = result.get("ruleId", "")
         if rule_id not in implemented_rules:
+            continue
+        if result.get("level") == "note":
+            suppressed_cell_findings += 1
             continue
         props = result.get("properties", {})
         if "wardline.exceptionId" in props:
@@ -822,6 +830,7 @@ def publish(
             if c["cell_verdict"] == "FAIL"
         ],
         "self_hosting_unexcepted_findings": unexcepted,
+        "self_hosting_suppressed_cell_findings": suppressed_cell_findings,
     }
 
     Path(output).write_text(

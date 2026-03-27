@@ -693,8 +693,10 @@ def _compute_taints(
 
         try:
             annotations = discover_annotations(tree, file_path)
+            project_root = Path(manifest_path).parent if manifest_path is not None else None
             taint_map, _return_taint_map, taint_sources, _conflicts, _overclaims = assign_function_taints(
                 tree, file_path, annotations, manifest,
+                project_root=project_root,
             )
         except (AttributeError, KeyError, TypeError, ValueError, OSError) as exc:
             logger.warning("Taint assignment failed for %s: %s", file_path, exc)

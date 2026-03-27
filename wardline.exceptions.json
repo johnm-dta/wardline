@@ -4,7 +4,7 @@
     {
       "id": "EXC-DC658B46",
       "rule": "PY-WL-004",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "SHAPE_VALIDATED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._scan_file",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -16,12 +16,14 @@
       "ast_fingerprint": "b98e6f53dc6ba255",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-2FAEA819",
       "rule": "PY-WL-004",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "SHAPE_VALIDATED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._build_project_indexes",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -33,12 +35,14 @@
       "ast_fingerprint": "5692437839a38c83",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-1844C974",
       "rule": "PY-WL-004",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "SHAPE_VALIDATED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._run_variable_taint",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -50,12 +54,14 @@
       "ast_fingerprint": "521bc749a88878a5",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-71EFE0FE",
       "rule": "PY-WL-004",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "SHAPE_VALIDATED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._run_callgraph_taint",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -67,12 +73,14 @@
       "ast_fingerprint": "49e93976d6631e93",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-91694583",
       "rule": "PY-WL-004",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "SHAPE_VALIDATED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._run_rule",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -84,12 +92,14 @@
       "ast_fingerprint": "4d994937e1c9c6e8",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-DEA61CBC",
       "rule": "PY-WL-004",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "EXTERNAL_RAW",
       "location": "src/wardline/cli/explain_cmd.py::_build_overlay_section",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -101,12 +111,14 @@
       "ast_fingerprint": "0e7aa37fcdeced17",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-D56566C2",
       "rule": "PY-WL-004",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "EXTERNAL_RAW",
       "location": "src/wardline/cli/regime_cmd.py::verify",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -118,7 +130,9 @@
       "ast_fingerprint": "2aaf2145bdcc4e17",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-7A9F49AB",
@@ -157,7 +171,7 @@
     {
       "id": "EXC-F696E4DB",
       "rule": "PY-WL-005",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "EXTERNAL_RAW",
       "location": "src/wardline/cli/explain_cmd.py::explain",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -169,12 +183,14 @@
       "ast_fingerprint": "615ca6b3d44130cb",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-83FBF050",
       "rule": "PY-WL-005",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "EXTERNAL_RAW",
       "location": "src/wardline/manifest/discovery.py::_is_within_allowed",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -186,12 +202,14 @@
       "ast_fingerprint": "6fee329f4f6c49dc",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-23437169",
       "rule": "PY-WL-005",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "SHAPE_VALIDATED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._is_excluded",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -203,7 +221,9 @@
       "ast_fingerprint": "849a4d7e5ef52e68",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-3E804EEB",
@@ -225,7 +245,7 @@
     {
       "id": "EXC-90D89A20",
       "rule": "PY-WL-005",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "PIPELINE",
       "location": "src/wardline/scanner/sarif.py::_normalize_artifact_uri",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -237,12 +257,14 @@
       "ast_fingerprint": "e840579829f6c200",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-371D2D2C",
       "rule": "PY-WL-005",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "PIPELINE",
       "location": "src/wardline/scanner/taint/function_level.py::resolve_module_default",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -254,12 +276,14 @@
       "ast_fingerprint": "7cc0c4347bb5d404",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-451939A6",
       "rule": "PY-WL-005",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "EXTERNAL_RAW",
       "location": "src/wardline/cli/explain_cmd.py::_build_exception_section",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -271,12 +295,14 @@
       "ast_fingerprint": "a835d8bf085957f2",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-EDD11C05",
       "rule": "PY-WL-005",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "EXTERNAL_RAW",
       "location": "src/wardline/cli/scan.py::scan",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -288,7 +314,9 @@
       "ast_fingerprint": "76829568263a833b",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-0689F558",
@@ -361,7 +389,7 @@
     {
       "id": "EXC-71FFD1E8",
       "rule": "PY-WL-005",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "EXTERNAL_RAW",
       "location": "src/wardline/cli/exception_cmds.py::_compute_taints",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -373,12 +401,14 @@
       "ast_fingerprint": "d783eac04016247e",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-56139FD5",
       "rule": "PY-WL-005",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "SHAPE_VALIDATED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._build_project_indexes",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -390,12 +420,14 @@
       "ast_fingerprint": "5692437839a38c83",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-5E545913",
       "rule": "PY-WL-005",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "EXTERNAL_RAW",
       "location": "src/wardline/cli/scan.py::_git_head_ref",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -407,12 +439,14 @@
       "ast_fingerprint": "e5c32344c38feb23",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-42C371C3",
       "rule": "PY-WL-005",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "EXTERNAL_RAW",
       "location": "src/wardline/cli/resolve_cmd.py::resolve",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -424,12 +458,14 @@
       "ast_fingerprint": "d6e310f37d6a95f2",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     },
     {
       "id": "EXC-F4C81B85",
       "rule": "PY-WL-005",
-      "taint_state": "UNKNOWN_RAW",
+      "taint_state": "EXTERNAL_RAW",
       "location": "src/wardline/cli/exception_cmds.py::migrate",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -441,7 +477,9 @@
       "ast_fingerprint": "7114cffb6656ec0d",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
+      "migrated_by": "Claude"
     }
   ],
   "last_batch_refresh": {
