@@ -725,9 +725,7 @@ class TestScanResolved:
             "manifest_hash": "sha256:abc",
             "tiers": [],
             "module_tiers": [],
-            "merged_rule_overrides": [
-                {"id": "PY-WL-001", "severity": "ERROR", "source": "base"},
-            ],
+            "merged_rule_overrides": None,
             "boundaries": [
                 {
                     "function": "test_fn",
@@ -785,6 +783,87 @@ class TestScanResolved:
         ])
         assert result.exit_code == 2
         assert "stale" in result.output or "stale" in (result.stderr or "")
+
+    def test_resolved_rejects_skip_promotion(self, tmp_path: Path) -> None:
+        """Resolved file with T4→T1 skip-promotion must exit 2."""
+        manifest = _minimal_manifest(tmp_path)
+
+        resolved = tmp_path / "wardline.resolved.json"
+        resolved.write_text(json.dumps({
+            "format_version": "0.2",
+            "manifest_hash": "sha256:wrong",
+            "boundaries": [
+                {
+                    "function": "bad_fn",
+                    "transition": "shape_validation",
+                    "from_tier": 4,
+                    "to_tier": 1,
+                },
+            ],
+            "overlays_discovered": [],
+        }), encoding="utf-8")
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--resolved", str(resolved),
+            "--allow-stale-resolved",
+        ])
+        assert result.exit_code == 2
+        assert "skip-promotion" in (result.output + (result.stderr or "")).lower()
+
+    def test_resolved_rejects_duplicate_boundary(self, tmp_path: Path) -> None:
+        """Resolved file with duplicate function boundaries must exit 2."""
+        manifest = _minimal_manifest(tmp_path)
+
+        resolved = tmp_path / "wardline.resolved.json"
+        resolved.write_text(json.dumps({
+            "format_version": "0.2",
+            "manifest_hash": "sha256:wrong",
+            "boundaries": [
+                {"function": "dup_fn", "transition": "shape_validation",
+                 "from_tier": 4, "to_tier": 3},
+                {"function": "dup_fn", "transition": "semantic_validation",
+                 "from_tier": 3, "to_tier": 2},
+            ],
+            "overlays_discovered": [],
+        }), encoding="utf-8")
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--resolved", str(resolved),
+            "--allow-stale-resolved",
+        ])
+        assert result.exit_code == 2
+        assert "duplicate" in (result.output + (result.stderr or "")).lower()
+
+    def test_resolved_rejects_uncovered_rule_override(self, tmp_path: Path) -> None:
+        """Resolved file introducing rule overrides absent from base must exit 2."""
+        manifest = _minimal_manifest(tmp_path)
+
+        resolved = tmp_path / "wardline.resolved.json"
+        resolved.write_text(json.dumps({
+            "format_version": "0.2",
+            "manifest_hash": "sha256:wrong",
+            "boundaries": [],
+            "merged_rule_overrides": [
+                {"id": "PY-WL-001", "severity": "OFF"},
+            ],
+            "overlays_discovered": [],
+        }), encoding="utf-8")
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--resolved", str(resolved),
+            "--allow-stale-resolved",
+        ])
+        assert result.exit_code == 2
+        assert "absent from base" in (result.output + (result.stderr or "")).lower()
 
 
 @pytest.mark.integration

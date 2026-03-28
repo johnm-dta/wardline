@@ -533,7 +533,11 @@ def scan(
     consumed_overlay_paths: tuple[Path, ...] = ()
 
     if resolved:
-        loaded = _load_resolved(resolved, manifest_path, allow_stale=allow_stale_resolved)
+        loaded = _load_resolved(
+            resolved, manifest_path,
+            manifest_model=manifest_model,
+            allow_stale=allow_stale_resolved,
+        )
         if loaded is None:
             sys.exit(EXIT_CONFIG_ERROR)
         boundaries, resolved_rule_overrides, optional_fields, consumed_overlay_paths = loaded
@@ -960,6 +964,7 @@ def _load_resolved(
     resolved_path: str,
     manifest_path: Path,
     *,
+    manifest_model: WardlineManifest | None = None,
     allow_stale: bool = False,
 ) -> tuple[
     tuple[_BoundaryEntry, ...],
@@ -969,6 +974,10 @@ def _load_resolved(
 ] | None:
     """Load boundaries, rule overrides, optional fields, and overlay paths.
 
+    Applies the same validation pipeline as the overlay load path:
+    schema validation, skip-promotion rejection, narrow-only rule-override
+    validation, and duplicate boundary detection.
+
     Returns ``None`` on error (after printing a structured error message).
     The fourth element is the tuple of consumed overlay file paths,
     reconstructed from the resolved JSON's ``overlays_discovered`` array.
@@ -976,6 +985,8 @@ def _load_resolved(
     import hashlib
     import json
 
+    from wardline.manifest.loader import ManifestPolicyError, reject_skip_promotions
+    from wardline.manifest.merge import ManifestWidenError, _severity_rank
     from wardline.manifest.models import BoundaryEntry, OptionalFieldEntry
 
     try:
@@ -1006,6 +1017,32 @@ def _load_resolved(
 
         project_root = manifest_path.parent
 
+        raw_boundaries = data.get("boundaries", [])
+
+        # V1: Structural validation — required fields
+        for i, b in enumerate(raw_boundaries):
+            if "function" not in b or "transition" not in b:
+                cli_error(
+                    f"resolved boundary [{i}] missing required field "
+                    f"'function' or 'transition'"
+                )
+                return None
+
+        # V2: Skip-promotion rejection (§13.1.2)
+        reject_skip_promotions(raw_boundaries)
+
+        # V3: Duplicate boundary detection
+        seen_functions: set[str] = set()
+        for b in raw_boundaries:
+            fn = b["function"]
+            if fn in seen_functions:
+                cli_error(
+                    f"resolved file contains duplicate boundary for "
+                    f"function '{fn}'"
+                )
+                return None
+            seen_functions.add(fn)
+
         boundaries = tuple(
             BoundaryEntry(
                 function=b["function"],
@@ -1020,12 +1057,43 @@ def _load_resolved(
                 ),
                 overlay_path=b.get("overlay_path", ""),
             )
-            for b in data.get("boundaries", [])
+            for b in raw_boundaries
         )
 
+        # V4: Rule override narrow-only validation
         raw_overrides = data.get("merged_rule_overrides")
         rule_overrides: tuple[dict[str, object], ...] | None = None
         if raw_overrides is not None:
+            if manifest_model is not None:
+                base_by_rule = {
+                    str(ovr.get("id")): ovr
+                    for ovr in manifest_model.rules.overrides
+                    if isinstance(ovr.get("id"), str)
+                }
+                for ovr in raw_overrides:
+                    rule_id = ovr.get("id")
+                    if not isinstance(rule_id, str):
+                        continue
+                    base_ovr = base_by_rule.get(rule_id)
+                    if base_ovr is None:
+                        cli_error(
+                            f"resolved file introduces rule override "
+                            f"'{rule_id}' absent from base manifest"
+                        )
+                        return None
+                    base_sev = base_ovr.get("severity")
+                    resolved_sev = ovr.get("severity")
+                    if (
+                        base_sev is not None
+                        and resolved_sev is not None
+                        and _severity_rank(str(resolved_sev))
+                        < _severity_rank(str(base_sev))
+                    ):
+                        cli_error(
+                            f"resolved file widens severity for rule "
+                            f"'{rule_id}': base={base_sev}, resolved={resolved_sev}"
+                        )
+                        return None
             rule_overrides = tuple(dict(ovr) for ovr in raw_overrides)
 
         optional_fields = tuple(
@@ -1048,6 +1116,12 @@ def _load_resolved(
         )
 
         return boundaries, rule_overrides, optional_fields, overlay_paths
+    except ManifestPolicyError as exc:
+        cli_error(f"resolved manifest policy violation: {exc}")
+        return None
+    except ManifestWidenError as exc:
+        cli_error(f"resolved manifest policy violation: {exc}")
+        return None
     except (json.JSONDecodeError, KeyError, TypeError, OSError) as exc:
         cli_error(f"resolved manifest invalid: {exc}")
         return None

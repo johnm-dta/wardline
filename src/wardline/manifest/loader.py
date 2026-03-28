@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from collections.abc import Iterable
 from typing import Any
 
 import jsonschema
@@ -297,10 +298,14 @@ def load_overlay(
     return _build_overlay(data)
 
 
-def _build_overlay(data: dict[str, Any]) -> WardlineOverlay:
-    """Construct a WardlineOverlay from validated data."""
-    # Reject skip-promotions: to_tier=1 is valid only from from_tier=2 (§13.1.2).
-    for b in data.get("boundaries", []):
+def reject_skip_promotions(boundaries: Iterable[dict[str, Any]]) -> None:
+    """Reject boundaries with to_tier=1 from any from_tier other than 2.
+
+    Raises ``ManifestPolicyError`` on the first invalid boundary found.
+    Called by both ``_build_overlay()`` and ``_load_resolved()`` to enforce
+    the skip-promotion invariant (§13.1.2) regardless of load path.
+    """
+    for b in boundaries:
         to_tier = b.get("to_tier")
         if to_tier == 1 and b.get("transition") != "restoration":
             from_tier = b.get("from_tier")
@@ -311,6 +316,11 @@ def _build_overlay(data: dict[str, Any]) -> WardlineOverlay:
                     f"Tier 1 are prohibited. Use composed steps: "
                     f"validation to T2, then T2→T1 construction (§13.1.2)."
                 )
+
+
+def _build_overlay(data: dict[str, Any]) -> WardlineOverlay:
+    """Construct a WardlineOverlay from validated data."""
+    reject_skip_promotions(data.get("boundaries", []))
 
     boundaries = tuple(
         BoundaryEntry(
