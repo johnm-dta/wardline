@@ -10,20 +10,18 @@ The tier model combines two orthogonal dimensions — trust classification (what
 
 | State | Trust Classification | Validation Status |
 |-------|---------------------|-------------------|
-| Audit Trail | Tier 1 | Not Applicable |
-| Pipeline | Tier 2 | Not Applicable |
-| Shape-Validated | Tier 3 | Shape-Validated |
+| Integral | Tier 1 | Not Applicable |
+| Assured | Tier 2 | Not Applicable |
+| Guarded | Tier 3 | Shape-Validated |
 | External Raw | Tier 4 | Raw |
 | Unknown Raw | Unknown | Raw |
-| Unknown Shape-Validated | Unknown | Shape-Validated |
-| Unknown Semantically-Validated | Unknown | Semantically Validated |
+| Unknown Guarded | Unknown | Shape-Validated |
+| Unknown Assured | Unknown | Semantically Validated |
 | Mixed Raw | Mixed | Raw |
 
 These eight states determine finding severity when pattern rules are evaluated: the same pattern may be an error in one state and suppressed in another (§7).
 
 **Canonical tokens.** The following identifiers are normative and MUST be used consistently in manifest schemas, SARIF output, configuration files, and implementation code: `INTEGRAL`, `ASSURED`, `GUARDED`, `EXTERNAL_RAW`, `UNKNOWN_RAW`, `UNKNOWN_GUARDED`, `UNKNOWN_ASSURED`, `MIXED_RAW`. Prose may use the human-readable labels from the table above; machine-facing artefacts MUST use these tokens.
-
-> **NOTE — Token names are canonical labels, not scope restrictions.** `INTEGRAL` encompasses all Tier 1 authoritative internal data (audit records, internal state, configuration), not only audit trails specifically. `ASSURED` encompasses all Tier 2 semantically validated data, not only pipeline-processed data. These names are historical; implementations MUST NOT narrow their semantics to match the everyday meaning of the token name.
 
 **Join operation.** When data from two different taint states merges at a program point (assignment, function parameter, container construction), the resulting state is determined by the join. The general rule: any merge of values from different trust classifications produces MIXED_RAW. The validation status of the result is RAW regardless of the inputs' validation status — mixing data resets the validation dimension because the composite's structural guarantees are weaker than those of its strongest input.
 
@@ -126,11 +124,11 @@ Three properties to note: (1) MIXED_RAW is the absorbing element of the join —
 
 | Classification | Not Applicable | Raw | Shape-Validated | Sem. Validated | Rationale |
 |----------------|----------------|-----|-----------------|----------------|-----------|
-| Tier 1 | **Audit Trail** | Impossible | Impossible | Impossible | Tier 1 artefacts are produced under institutional rules — they are not raw and validation is not applicable to them |
-| Tier 2 | **Pipeline** | Impossible | Collapsed to Pipeline | Collapsed to Pipeline | Tier 2 *is* the result of semantic validation — raw Tier 2 is contradictory; shape-only Tier 2 is contradictory (semantic validation requires prior shape validation); sem-validated Tier 2 is redundant |
-| Tier 3 | Impossible | Impossible | **Shape-Validated** | Collapsed to Pipeline | Tier 3 *is* the result of shape validation — raw Tier 3 is contradictory; semantically validated Tier 3 becomes Tier 2 |
-| Tier 4 | Impossible | **External Raw** | Collapsed to Shape-Validated | Collapsed to Pipeline | Tier 4 is by definition raw external data; shape-validated Tier 4 becomes Tier 3; semantically validated Tier 4 becomes Tier 2 (implying both validation steps occurred) |
-| Unknown | Impossible | **Unknown Raw** | **Unknown Shape-Validated** | **Unknown Semantically-Validated** | Not Applicable is reserved for data produced under institutional rules. Unknown-origin data has not been produced under such rules, so Not Applicable does not apply. Both validated states are reachable because validation establishes properties without resolving provenance |
+| Tier 1 | **Integral** | Impossible | Impossible | Impossible | Tier 1 artefacts are produced under institutional rules — they are not raw and validation is not applicable to them |
+| Tier 2 | **Assured** | Impossible | Collapsed to Assured | Collapsed to Assured | Tier 2 *is* the result of semantic validation — raw Tier 2 is contradictory; shape-only Tier 2 is contradictory (semantic validation requires prior shape validation); sem-validated Tier 2 is redundant |
+| Tier 3 | Impossible | Impossible | **Guarded** | Collapsed to Assured | Tier 3 *is* the result of shape validation — raw Tier 3 is contradictory; semantically validated Tier 3 becomes Tier 2 |
+| Tier 4 | Impossible | **External Raw** | Collapsed to Guarded | Collapsed to Assured | Tier 4 is by definition raw external data; shape-validated Tier 4 becomes Tier 3; semantically validated Tier 4 becomes Tier 2 (implying both validation steps occurred) |
+| Unknown | Impossible | **Unknown Raw** | **Unknown Guarded** | **Unknown Assured** | Not Applicable is reserved for data produced under institutional rules. Unknown-origin data has not been produced under such rules, so Not Applicable does not apply. Both validated states are reachable because validation establishes properties without resolving provenance |
 | Mixed | Impossible | **Mixed Raw** | Collapsed to Mixed Raw | Collapsed to Mixed Raw | Ordinary validation does not resolve mixed provenance — it establishes structure or semantics but cannot decompose the contributing tiers (see also the join table absorbing-element property: anything + MIXED_RAW = MIXED_RAW). A declared normalisation boundary may produce a new T2 artefact from mixed inputs |
 
 All sixteen non-reachable combinations are accounted for by the Impossible or Collapsed entries in the Rationale column. The normalisation boundary mechanism for MIXED data is specified in §5.2 (transition semantics).
@@ -142,7 +140,7 @@ Tier transitions are directional and constrained:
 ```mermaid
 graph LR
     T4["<b>Tier 4</b><br/>Raw Observation"]
-    T3["<b>Tier 3</b><br/>Shape-Validated Representation"]
+    T3["<b>Tier 3</b><br/>Guarded Representation"]
     T2["<b>Tier 2</b><br/>Semantically Validated Representation"]
     T1["<b>Tier 1</b><br/>Trusted Assertion"]
     RAW["Raw Representation<br/><i>(serialised bytes)</i>"]
@@ -205,7 +203,7 @@ The four evidence categories determine the restored tier:
 | Yes | Yes | — | Yes | **Tier 2 maximum.** Structure and domain validity verified, provenance institutionally attested, but integrity since serialisation is not established. |
 | Yes | — | — | Yes | **Tier 3 maximum.** Structure verified and provenance institutionally attested, but domain constraints have not been re-verified since serialisation. Appropriate when semantic validity may have been invalidated by time — business rules that have changed, domain constraints that depend on external state. |
 | Yes | Yes | — | — | **UNKNOWN_ASSURED.** Structure and domain constraints verified, but no institutional attestation of provenance. The data passes all technical checks but its origin is unverified. |
-| Yes | — | — | — | **UNKNOWN_GUARDED.** Structure verified but no provenance claim and no semantic re-verification. Shape-validated data of indeterminate origin. |
+| Yes | — | — | — | **UNKNOWN_GUARDED.** Structure verified but no provenance claim and no semantic re-verification. Guarded data of indeterminate origin. |
 | — | — | — | — | **UNKNOWN_RAW.** No evidence present. The data is treated as fully untrusted. **NOTE: this is not Tier 4 (EXTERNAL_RAW).** Tier 4 denotes data positively classified as external. A raw representation with no evidence is of indeterminate origin, not necessarily external — the UNKNOWN/EXTERNAL distinction matters because their severity matrix columns differ. |
 
 The key distinction: institutional evidence is the gate between known-provenance tiers (T1–T3) and unknown-provenance states (UNKNOWN_*). A mere assertion of internal provenance — without institutional attestation — does not elevate data above unknown-origin status. This prevents trust-classification uplift on assertion rather than evidence: an agent or developer claiming "this is internal data" without institutional backing receives no tier benefit from the claim.

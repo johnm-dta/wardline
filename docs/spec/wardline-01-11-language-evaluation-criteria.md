@@ -7,7 +7,7 @@ The wardline classification framework is language-agnostic; language-specific en
 | **Annotation expressiveness** | Can the language express all 17 annotation groups at function, class, and field level without runtime overhead? |
 | **Parse tree access** | Does the language provide AST or equivalent for static analysis? Is the parse tree stable across versions? |
 | **Type system metadata** | Can type annotations carry tier/trust metadata? Does the type checker propagate this metadata through assignments, calls, and returns? |
-| **Structural typing** | Can the type system distinguish raw, shape-validated, and semantically validated data with identical field structures? |
+| **Structural typing** | Can the type system distinguish raw, guarded, and assured data with identical field structures? |
 | **Runtime object model** | Can the language prevent invalid access patterns structurally (raising on access, not defaulting)? |
 | **Class hierarchy enforcement** | Can base classes constrain what subclasses may do — preventing unannotated method addition? |
 | **Serialisation boundary control** | Can the language detect or prevent tier violations at serialisation/deserialisation boundaries? |

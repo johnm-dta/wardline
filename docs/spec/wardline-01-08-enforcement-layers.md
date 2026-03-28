@@ -44,9 +44,9 @@ Requirements:
 
 Requirements:
 
-- SHOULD make tier mismatches visible at development time — passing raw data where shape-validated data is expected, or shape-validated data where semantically validated data is expected, SHOULD produce a type error or equivalent diagnostic *(binding requirement)*
+- SHOULD make tier mismatches visible at development time — passing raw data where guarded data is expected, or guarded data where assured data is expected, SHOULD produce a type error or equivalent diagnostic *(binding requirement)*
 - SHOULD support metadata on type annotations that carries tier information (1, 2, 3, 4) through the type system *(binding requirement)*
-- SHOULD enable structural typing that distinguishes raw, shape-validated, and semantically validated records — records at different tiers with identical field structures SHOULD be distinguishable types *(binding requirement)*
+- SHOULD enable structural typing that distinguishes raw, guarded, and assured records — records at different tiers with identical field structures SHOULD be distinguishable types *(binding requirement)*
 
 Where a binding's type system enforces tier distinctions at development time, WL-006 findings at the corresponding taint states may be narrowed through binding-level matrix deviations (§7.3), because runtime type-checking becomes structurally redundant rather than merely suspicious.
 
