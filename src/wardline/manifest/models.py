@@ -297,7 +297,10 @@ class ScannerConfig:
         with open(path, "rb") as f:
             data = tomllib.load(f)
 
-        wardline_section = data.get("wardline", data)
+        try:
+            wardline_section = data["wardline"]
+        except KeyError:
+            wardline_section = data
 
         # Validate: reject unknown keys
         unknown = set(wardline_section.keys()) - _KNOWN_KEYS
@@ -310,18 +313,30 @@ class ScannerConfig:
         # file's directory, not CWD, so paths work regardless of where
         # the user invokes ``wardline scan``.
         config_dir = path.resolve().parent
+        try:
+            _target_paths_raw = wardline_section["target_paths"]
+        except KeyError:
+            _target_paths_raw = []
         target_paths = tuple(
             (config_dir / p).resolve() if not Path(p).is_absolute() else Path(p)
-            for p in wardline_section.get("target_paths", [])
+            for p in _target_paths_raw
         )
+        try:
+            _exclude_paths_raw = wardline_section["exclude_paths"]
+        except KeyError:
+            _exclude_paths_raw = []
         exclude_paths = tuple(
             (config_dir / p).resolve() if not Path(p).is_absolute() else Path(p)
-            for p in wardline_section.get("exclude_paths", [])
+            for p in _exclude_paths_raw
         )
 
         # Parse and validate rule IDs
         enabled_rules: tuple[RuleId, ...] = ()
-        for r in wardline_section.get("enabled_rules", []):
+        try:
+            _enabled_rules_raw = wardline_section["enabled_rules"]
+        except KeyError:
+            _enabled_rules_raw = []
+        for r in _enabled_rules_raw:
             try:
                 enabled_rules = (*enabled_rules, RuleId(r))
             except ValueError:
@@ -330,7 +345,11 @@ class ScannerConfig:
                 ) from None
 
         disabled_rules: tuple[RuleId, ...] = ()
-        for r in wardline_section.get("disabled_rules", []):
+        try:
+            _disabled_rules_raw = wardline_section["disabled_rules"]
+        except KeyError:
+            _disabled_rules_raw = []
+        for r in _disabled_rules_raw:
             try:
                 disabled_rules = (*disabled_rules, RuleId(r))
             except ValueError:
@@ -349,7 +368,10 @@ class ScannerConfig:
                     f"invalid taint state: {raw_taint!r}"
                 ) from None
 
-        analysis_level = wardline_section.get("analysis_level", 1)
+        try:
+            analysis_level = wardline_section["analysis_level"]
+        except KeyError:
+            analysis_level = 1
         if isinstance(analysis_level, bool) or not isinstance(analysis_level, int):
             raise ScannerConfigError(
                 f"analysis_level must be 1, 2, or 3, got {analysis_level!r}"
@@ -390,9 +412,25 @@ class ScannerConfig:
                 raise ScannerConfigError("known_validators_extra must be a list of strings")
             known_validators_extra = tuple(str(v) for v in known_validators_extra_raw)
 
-        max_expansion_rounds = int(wardline_section.get("max_expansion_rounds", 1))
+        try:
+            max_expansion_rounds = int(wardline_section["max_expansion_rounds"])
+        except KeyError:
+            max_expansion_rounds = 1
         if max_expansion_rounds < 1:
             raise ScannerConfigError("max_expansion_rounds must be >= 1")
+
+        try:
+            _allow_registry_mismatch = wardline_section["allow_registry_mismatch"]
+        except KeyError:
+            _allow_registry_mismatch = False
+        try:
+            _allow_permissive_distribution = wardline_section["allow_permissive_distribution"]
+        except KeyError:
+            _allow_permissive_distribution = False
+        try:
+            _strict_governance = wardline_section["strict_governance"]
+        except KeyError:
+            _strict_governance = False
 
         return cls(
             target_paths=target_paths,
@@ -402,16 +440,10 @@ class ScannerConfig:
             default_taint=default_taint,
             analysis_level=analysis_level,
             max_unknown_raw_percent=max_pct,
-            allow_registry_mismatch=bool(
-                wardline_section.get("allow_registry_mismatch", False)
-            ),
-            allow_permissive_distribution=bool(
-                wardline_section.get("allow_permissive_distribution", False)
-            ),
+            allow_registry_mismatch=bool(_allow_registry_mismatch),
+            allow_permissive_distribution=bool(_allow_permissive_distribution),
             known_validators=known_validators,
             known_validators_extra=known_validators_extra,
             max_expansion_rounds=max_expansion_rounds,
-            strict_governance=bool(
-                wardline_section.get("strict_governance", False)
-            ),
+            strict_governance=bool(_strict_governance),
         )
