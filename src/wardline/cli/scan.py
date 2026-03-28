@@ -716,6 +716,22 @@ def scan(
     coverage_ratio = _read_coverage_ratio(manifest_path)
     conformance_gaps = _read_conformance_gaps(manifest_path, scan_path=scan_path)
 
+    # --- Compute control law (§9.5) ---
+    from wardline.scanner.sarif import compute_control_law
+    from wardline.manifest.regime import collect_manifest_metrics
+
+    manifest_metrics = collect_manifest_metrics(manifest_path)
+    canonical_rule_ids = frozenset(r for r in RuleId if r not in _PSEUDO_RULE_IDS)
+    disabled_rules = tuple(sorted(
+        r.value for r in canonical_rule_ids - loaded_rule_ids
+    ))
+    control_law, control_law_degradations = compute_control_law(
+        ratification_overdue=manifest_metrics.ratification_overdue,
+        conformance_gaps=conformance_gaps,
+        rules_disabled=disabled_rules,
+        stale_exception_count=stale_exception_count,
+    )
+
     # inputHash — hard failure if a scanned file becomes unreadable
     project_root = manifest_path.parent
     try:
@@ -758,6 +774,8 @@ def scan(
         overlay_hashes=overlay_hashes,
         coverage_ratio=coverage_ratio,
         conformance_gaps=conformance_gaps,
+        control_law=control_law,
+        control_law_degradations=control_law_degradations,
     )
 
     sarif_text = sarif_report.to_json_string() + "\n"
