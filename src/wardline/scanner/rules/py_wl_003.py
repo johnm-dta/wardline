@@ -40,6 +40,35 @@ _SUPPRESSED_BOUNDARY_TRANSITIONS = frozenset({
 })
 
 
+_SET_CONSTRUCTOR_NAMES = frozenset({"set", "frozenset"})
+_SET_OPERATORS = frozenset({ast.BitOr, ast.BitAnd, ast.Sub, ast.BitXor})
+
+
+def _rhs_is_set_typed(node: ast.expr) -> bool:
+    """Return True if the expression is recognisably a set/frozenset value.
+
+    Matches set literals (``{1, 2}``), set comprehensions, set/frozenset
+    constructor calls, and binary set operations (``|``, ``&``, ``-``, ``^``).
+    """
+    if isinstance(node, (ast.Set, ast.SetComp)):
+        return True
+    if isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Name) and node.func.id in _SET_CONSTRUCTOR_NAMES:
+            return True
+        if isinstance(node.func, ast.Attribute) and node.func.attr in _SET_CONSTRUCTOR_NAMES:
+            return True
+    return isinstance(node, ast.BinOp) and type(node.op) in _SET_OPERATORS
+
+
+def _annotation_is_set_type(ann: ast.expr) -> bool:
+    """Return True if a type annotation references set or frozenset."""
+    if isinstance(ann, ast.Name) and ann.id in _SET_CONSTRUCTOR_NAMES:
+        return True
+    if isinstance(ann, ast.Subscript) and isinstance(ann.value, ast.Name):
+        return ann.value.id in _SET_CONSTRUCTOR_NAMES
+    return False
+
+
 class RulePyWl003(RuleBase):
     """Detect existence-checking as structural gate patterns.
 
@@ -68,9 +97,10 @@ class RulePyWl003(RuleBase):
             )
             return
         taint = self._get_function_taint(self._current_qualname)
+        known_set_names = self._collect_set_variable_names(node)
         for child in walk_skip_nested_defs(node):
             if isinstance(child, ast.Compare):
-                self._check_compare(child, node, taint)
+                self._check_compare(child, node, taint, known_set_names)
             elif isinstance(child, ast.Call):
                 self._check_hasattr(child, node, taint)
             elif isinstance(child, ast.MatchMapping):
@@ -106,17 +136,53 @@ class RulePyWl003(RuleBase):
             for boundary in self._context.boundaries
         )
 
+    @staticmethod
+    def _collect_set_variable_names(
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> frozenset[str]:
+        """Pre-scan function body for local names assigned from set-typed expressions.
+
+        Tracks names assigned from:
+        - Set literals: ``s = {1, 2, 3}``
+        - Set/frozenset constructors: ``s = set(items)``, ``s = frozenset(items)``
+        - Set comprehensions: ``s = {x for x in items}``
+        - Set operations (``|``, ``&``, ``-``, ``^``): ``s = a | b``
+        - Parameter annotations containing ``set`` or ``frozenset``
+
+        These names represent value-classification collections, not
+        mapping-key-existence targets.  ``x in my_set`` is value membership,
+        not a structural gate.
+        """
+        set_names: set[str] = set()
+
+        # Check parameter annotations for set/frozenset type hints
+        for arg in node.args.args + node.args.kwonlyargs:
+            if arg.annotation is not None and _annotation_is_set_type(arg.annotation):
+                set_names.add(arg.arg)
+
+        for child in walk_skip_nested_defs(node):
+            if not isinstance(child, ast.Assign):
+                continue
+            if not _rhs_is_set_typed(child.value):
+                continue
+            for target in child.targets:
+                if isinstance(target, ast.Name):
+                    set_names.add(target.id)
+
+        return frozenset(set_names)
+
     def _check_compare(
         self,
         compare: ast.Compare,
         enclosing_func: ast.FunctionDef | ast.AsyncFunctionDef,
         taint: TaintState,
+        known_set_names: frozenset[str] = frozenset(),
     ) -> None:
         """Check a Compare node for ``in`` / ``not in`` operators."""
         for op, comparator in zip(compare.ops, compare.comparators, strict=False):
             if (
                 isinstance(op, (ast.In, ast.NotIn))
-                and self._looks_like_existence_check(compare.left, comparator)
+                and self._looks_like_existence_check(compare.left, comparator, known_set_names)
             ):
                 self._emit_finding(
                     compare,
@@ -131,14 +197,22 @@ class RulePyWl003(RuleBase):
         self,
         left: ast.expr,
         comparator: ast.expr,
+        known_set_names: frozenset[str] = frozenset(),
     ) -> bool:
         """Heuristically distinguish key-presence checks from value membership.
 
         We still accept mapping-like shapes such as ``key in data`` and
         ``key in data.keys()``, but suppress obvious value-membership cases
         like ``x in [1, 2, 3]`` and ``x in values``.
+
+        ``known_set_names`` is the set of local variable names pre-identified
+        as holding set/frozenset values by ``_collect_set_variable_names``.
         """
         if self._is_obvious_value_membership(comparator):
+            return False
+        # Suppress membership tests against known set-typed variables.
+        # ``x in my_set`` is value classification, not structural gating.
+        if isinstance(comparator, ast.Name) and comparator.id in known_set_names:
             return False
         if isinstance(comparator, ast.Call):
             return self._is_mapping_keys_call(comparator)
