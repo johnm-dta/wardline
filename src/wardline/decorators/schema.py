@@ -28,11 +28,25 @@ def schema_default[T](expr: T) -> T:
     return expr
 
 
-all_fields_mapped = wardline_decorator(
-    5,
-    "all_fields_mapped",
-    _wardline_all_fields_mapped=True,
-)
+def all_fields_mapped(fn=None, *, source: str | None = None):  # type: ignore[no-redef]
+    """Mark a function as mapping all fields from a source type.
+
+    Usage::
+
+        @all_fields_mapped              -- marker only
+        @all_fields_mapped(source="DTO") -- with source class for verification
+    """
+    def _apply(f):  # type: ignore[no-untyped-def]
+        base = wardline_decorator(5, "all_fields_mapped", _wardline_all_fields_mapped=True)
+        decorated = base(f)
+        decorated._wardline_source = source  # always set (None when bare)
+        return decorated
+
+    if fn is not None:
+        # Called as @all_fields_mapped (no parens) -- fn is the decorated function
+        return _apply(fn)
+    # Called as @all_fields_mapped(source="X") -- return a decorator
+    return _apply
 
 output_schema = wardline_decorator(
     5,

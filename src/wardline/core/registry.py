@@ -99,7 +99,14 @@ REGISTRY: MappingProxyType[str, RegistryEntry] = MappingProxyType({
     # --- Group 4: Internal Data Provenance ---
     "int_data": _bool_entry("int_data", 4),
     # --- Group 5: Schema ---
-    "all_fields_mapped": _bool_entry("all_fields_mapped", 5),
+    "all_fields_mapped": RegistryEntry(
+        canonical_name="all_fields_mapped",
+        group=5,
+        attrs={  # type: ignore[arg-type]  # __post_init__ converts
+            "_wardline_all_fields_mapped": bool,
+            "_wardline_source": object,  # str | None — object allows both
+        },
+    ),
     "output_schema": _bool_entry("output_schema", 5),
     # --- Group 6: Boundaries ---
     "trust_boundary": _bool_entry("trust_boundary", 6),

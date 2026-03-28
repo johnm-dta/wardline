@@ -36,6 +36,42 @@ class TestAllFieldsMapped:
 
         assert my_func.__name__ == "my_func"
 
+    def test_source_parameter_stored(self) -> None:
+        @all_fields_mapped(source="MyDTO")
+        def f(dto: object) -> dict:  # type: ignore[type-arg]
+            return {}
+
+        assert f._wardline_all_fields_mapped is True  # type: ignore[attr-defined]
+        assert f._wardline_source == "MyDTO"  # type: ignore[attr-defined]
+
+    def test_source_parameter_none_when_bare(self) -> None:
+        @all_fields_mapped
+        def f() -> None:
+            pass
+
+        assert f._wardline_source is None  # type: ignore[attr-defined]
+
+    def test_source_callable(self) -> None:
+        @all_fields_mapped(source="MyDTO")
+        def f() -> int:
+            return 42
+
+        assert f() == 42
+
+    def test_source_preserves_name(self) -> None:
+        @all_fields_mapped(source="MyDTO")
+        def my_func() -> int:
+            return 1
+
+        assert my_func.__name__ == "my_func"
+
+    def test_source_sets_group_5(self) -> None:
+        @all_fields_mapped(source="MyDTO")
+        def f() -> int:
+            return 1
+
+        assert 5 in f._wardline_groups  # type: ignore[attr-defined]
+
 
 class TestOutputSchema:
     """@output_schema decorator behaviour."""
