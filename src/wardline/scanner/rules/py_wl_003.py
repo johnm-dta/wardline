@@ -148,6 +148,9 @@ class RulePyWl003(RuleBase):
         - Set comprehensions: ``s = {x for x in items}``
         - Set operations (``|``, ``&``, ``-``, ``^``): ``s = a | b``
         - Parameter annotations containing ``set`` or ``frozenset``
+        - Names that receive ``.add()`` / ``.discard()`` / ``.update()``
+          method calls (implies the receiver is a set)
+        - Augmented assignment with set operators: ``s |= other``
 
         These names represent value-classification collections, not
         mapping-key-existence targets.  ``x in my_set`` is value membership,
@@ -161,13 +164,31 @@ class RulePyWl003(RuleBase):
                 set_names.add(arg.arg)
 
         for child in walk_skip_nested_defs(node):
-            if not isinstance(child, ast.Assign):
-                continue
-            if not _rhs_is_set_typed(child.value):
-                continue
-            for target in child.targets:
-                if isinstance(target, ast.Name):
-                    set_names.add(target.id)
+            # Direct assignment from set-typed expression
+            if isinstance(child, ast.Assign):
+                if _rhs_is_set_typed(child.value):
+                    for target in child.targets:
+                        if isinstance(target, ast.Name):
+                            set_names.add(target.id)
+
+            # Method calls that imply the receiver is a set:
+            # s.add(x), s.discard(x), s.update(other)
+            elif (
+                isinstance(child, ast.Expr)
+                and isinstance(child.value, ast.Call)
+                and isinstance(child.value.func, ast.Attribute)
+                and child.value.func.attr in {"add", "discard", "update", "difference_update", "intersection_update", "symmetric_difference_update"}
+                and isinstance(child.value.func.value, ast.Name)
+            ):
+                set_names.add(child.value.func.value.id)
+
+            # Augmented assignment with set operators: s |= other, s -= other
+            elif (
+                isinstance(child, ast.AugAssign)
+                and type(child.op) in _SET_OPERATORS
+                and isinstance(child.target, ast.Name)
+            ):
+                set_names.add(child.target.id)
 
         return frozenset(set_names)
 
