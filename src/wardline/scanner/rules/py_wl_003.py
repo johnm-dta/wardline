@@ -103,6 +103,9 @@ def _name_suggests_set(name: str) -> bool:
 
 _STRING_NAME_SUFFIXES = ("_lower", "_upper", "_name", "_text", "_str", "_msg", "_message", "_label")
 
+# Exact names that unambiguously hold string values (e.g., lowered = name.lower()).
+_STRING_EXACT_NAMES = frozenset({"lowered", "uppered", "lower", "upper"})
+
 
 def _comparator_looks_like_string(node: ast.expr) -> bool:
     """Heuristic: does the comparator look like it holds a string value?
@@ -119,6 +122,8 @@ def _comparator_looks_like_string(node: ast.expr) -> bool:
     if name is None:
         return False
     lower = name.lower()
+    if lower in _STRING_EXACT_NAMES:
+        return True
     return any(lower.endswith(suffix) for suffix in _STRING_NAME_SUFFIXES)
 
 
@@ -134,6 +139,9 @@ class RulePyWl003(RuleBase):
     def __init__(self, *, file_path: str = "") -> None:
         super().__init__()
         self._file_path = file_path
+        # Set-typed names from the most recently visited enclosing function.
+        # Updated per visit_function call; nested functions inherit from parent.
+        self._enclosing_set_names: frozenset[str] = frozenset()
 
     def visit_function(
         self,
@@ -150,7 +158,15 @@ class RulePyWl003(RuleBase):
             )
             return
         taint = self._get_function_taint(self._current_qualname)
-        known_set_names = self._collect_set_variable_names(node)
+        # For top-level functions, reset enclosing names to prevent
+        # leaking between sibling functions in the same file.
+        if "." not in self._current_qualname:
+            self._enclosing_set_names = frozenset()
+        # Inherit set-typed names from enclosing scope (closure variables).
+        known_set_names = self._collect_set_variable_names(node) | self._enclosing_set_names
+        # Propagate to nested functions visited by generic_visit
+        # (called by _dispatch after visit_function returns).
+        self._enclosing_set_names = known_set_names
         for child in walk_skip_nested_defs(node):
             if isinstance(child, ast.Compare):
                 self._check_compare(child, node, taint, known_set_names)
@@ -216,6 +232,10 @@ class RulePyWl003(RuleBase):
             if arg.annotation is not None and _annotation_is_set_type(arg.annotation):
                 set_names.add(arg.arg)
 
+        # Names assigned from calls that return collections-of-sets
+        # (e.g., sccs = compute_sccs(g)). Iterating these yields sets.
+        yields_sets_names: set[str] = set()
+
         for child in walk_skip_nested_defs(node):
             # Direct assignment from set-typed expression
             if isinstance(child, ast.Assign):
@@ -223,6 +243,13 @@ class RulePyWl003(RuleBase):
                     for target in child.targets:
                         if isinstance(target, ast.Name):
                             set_names.add(target.id)
+                # Track assignments from calls that yield set collections
+                # (e.g., sccs = compute_sccs(graph))
+                elif isinstance(child.value, ast.Call):
+                    if _iter_likely_yields_sets(child.value):
+                        for target in child.targets:
+                            if isinstance(target, ast.Name):
+                                yields_sets_names.add(target.id)
 
             # Method calls that imply the receiver is a set:
             # s.add(x), s.discard(x), s.update(other)
@@ -248,16 +275,13 @@ class RulePyWl003(RuleBase):
             #   for item in set_items  (name suggests set content)
             elif isinstance(child, ast.For) and isinstance(child.target, ast.Name):
                 iter_val = child.iter
-                # Iterating a known set variable → loop var elements are set items (not sets themselves)
-                # But iterating a *collection of sets* → loop var IS a set
-                # We can't distinguish these at AST level, so check if the iterable
-                # is a known set variable — if so, items aren't sets.
-                # Instead, check if the iterable NAME suggests it's a collection of sets
-                # or if the iterable was assigned from a call returning sets.
+                # Iterating a set itself — items are values, not sets. Skip.
                 if isinstance(iter_val, ast.Name) and iter_val.id in set_names:
-                    # Iterating a set itself — items are values, not sets. Skip.
                     pass
+                # Iterating a collection-of-sets (direct call or intermediate variable)
                 elif _iter_likely_yields_sets(iter_val):
+                    set_names.add(child.target.id)
+                elif isinstance(iter_val, ast.Name) and iter_val.id in yields_sets_names:
                     set_names.add(child.target.id)
 
         # Second pass: track names assigned from calls to methods whose names
@@ -319,22 +343,20 @@ class RulePyWl003(RuleBase):
         # ``x in my_set`` is value classification, not structural gating.
         if isinstance(comparator, ast.Name) and comparator.id in known_set_names:
             return False
-        # Suppress membership tests against self.attr — these are typically
+        # Suppress membership tests against obj.attr — these are typically
         # frozenset/set instance attributes used for classification.
+        # Covers self.attr, analysis.continue_states, result.names, etc.
         if (
             isinstance(comparator, ast.Attribute)
             and isinstance(comparator.value, ast.Name)
-            and comparator.value.id == "self"
         ):
             return False
-        # Suppress substring containment: "literal" in string_var where
+        # Suppress substring containment: X in string_var where
         # the comparator name suggests it holds a string (e.g., _lower,
         # _name, _text).  This is substring search, not key existence.
-        if (
-            isinstance(left, ast.Constant)
-            and isinstance(left.value, str)
-            and _comparator_looks_like_string(comparator)
-        ):
+        # Works for both literal LHS ("key" in lowered) and variable LHS
+        # (hint in lowered) — the comparator name is sufficient evidence.
+        if _comparator_looks_like_string(comparator):
             return False
         if isinstance(comparator, ast.Call):
             return self._is_mapping_keys_call(comparator)
@@ -409,6 +431,12 @@ class RulePyWl003(RuleBase):
             and comparator.func.attr in {"values", "items", "split"}
         )
 
+    # AST position attributes that not all node types have — checking
+    # them with hasattr() is introspection, not structural gating.
+    _AST_INTROSPECTION_ATTRS = frozenset({
+        "lineno", "col_offset", "end_lineno", "end_col_offset",
+    })
+
     def _check_hasattr(
         self,
         call: ast.Call,
@@ -416,14 +444,23 @@ class RulePyWl003(RuleBase):
         taint: TaintState,
     ) -> None:
         """Check a Call node for ``hasattr(obj, name)``."""
-        if isinstance(call.func, ast.Name) and call.func.id == "hasattr":
-            self._emit_finding(
-                call,
-                enclosing_func,
-                "Existence check as structural gate — "
-                "hasattr() used for attribute presence check",
-                taint,
-            )
+        if not (isinstance(call.func, ast.Name) and call.func.id == "hasattr"):
+            return
+        # Suppress hasattr(node, "lineno") — AST introspection, not structural gating
+        if (
+            len(call.args) >= 2
+            and isinstance(call.args[1], ast.Constant)
+            and isinstance(call.args[1].value, str)
+            and call.args[1].value in self._AST_INTROSPECTION_ATTRS
+        ):
+            return
+        self._emit_finding(
+            call,
+            enclosing_func,
+            "Existence check as structural gate — "
+            "hasattr() used for attribute presence check",
+            taint,
+        )
 
     def _emit_finding(
         self,

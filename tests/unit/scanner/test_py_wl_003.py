@@ -315,3 +315,122 @@ class TestDeclaredValidationBoundarySuppression:
 
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_003
+
+
+# ── RC1: Closure frozenset params suppress inner `in` ──────────
+
+
+class TestClosureFrozensetParams:
+    """Frozenset params from outer function should suppress `in` in nested defs."""
+
+    def test_frozenset_closure_param_silent(self) -> None:
+        """node.id in names where names: frozenset[str] is outer param."""
+        rule = _run_rule_match(
+            '''\
+            def outer(*, names: frozenset[str]) -> bool:
+                def _walk(node):
+                    if node.id in names:
+                        return True
+                return _walk(root)
+            '''
+        )
+        assert len(rule.findings) == 0
+
+    def test_non_frozenset_closure_param_still_fires(self) -> None:
+        """node.id in data where data: dict[str, str] is outer param."""
+        rule = _run_rule_match(
+            '''\
+            def outer(*, data: dict[str, str]) -> bool:
+                def _walk(node):
+                    if node.id in data:
+                        return True
+                return _walk(root)
+            '''
+        )
+        assert len(rule.findings) == 1
+
+
+# ── RC2: Variable LHS substring suppression ────────────────────
+
+
+class TestVariableLhsSubstring:
+    """Variable `in` string-named comparator should be suppressed."""
+
+    def test_variable_in_lowered_string_silent(self) -> None:
+        """hint in lowered where lowered = name.lower()."""
+        rule = _run_rule(
+            'lowered = name.lower()\n'
+            'for hint in hints:\n'
+            '    if hint in lowered:\n'
+            '        return True\n'
+        )
+        assert len(rule.findings) == 0
+
+    def test_variable_in_receiver_lower_silent(self) -> None:
+        """sub in receiver_lower where receiver_lower = receiver.lower()."""
+        rule = _run_rule(
+            'receiver_lower = receiver.lower()\n'
+            'if sub in receiver_lower:\n'
+            '    return True\n'
+        )
+        assert len(rule.findings) == 0
+
+    def test_variable_in_dict_still_fires(self) -> None:
+        """Variable in non-string-named comparator still fires."""
+        rule = _run_rule(
+            'if key in data:\n'
+            '    return True\n'
+        )
+        assert len(rule.findings) == 1
+
+
+# ── RC3: obj.attr suppression generalised beyond self ──────────
+
+
+class TestObjAttrSuppression:
+    """Membership test against any local.frozenset_attr should suppress."""
+
+    def test_false_in_analysis_continue_states_silent(self) -> None:
+        """False in analysis.continue_states — analysis is a local."""
+        rule = _run_rule(
+            'analysis = self._analyze_block(body)\n'
+            'if False in analysis.continue_states:\n'
+            '    nodes.append(node)\n'
+        )
+        assert len(rule.findings) == 0
+
+    def test_self_attr_still_silent(self) -> None:
+        """Existing: x in self.names is already suppressed."""
+        rule = _run_rule(
+            'if x in self.names:\n'
+            '    return True\n'
+        )
+        assert len(rule.findings) == 0
+
+
+# ── RC4: Intermediate variable from set-returning call ─────────
+
+
+class TestIntermediateSetVariable:
+    """sccs = compute_sccs(g); for scc in sccs — scc should be known set."""
+
+    def test_for_loop_over_intermediate_scc_call_silent(self) -> None:
+        """caller in scc where scc comes from for scc in sccs, sccs = compute_sccs(g)."""
+        rule = _run_rule(
+            'sccs = compute_sccs(graph)\n'
+            'for scc in sccs:\n'
+            '    for caller in callers:\n'
+            '        if caller in scc:\n'
+            '            worklist.add(caller)\n'
+        )
+        assert len(rule.findings) == 0
+
+    def test_for_loop_over_dict_values_still_fires(self) -> None:
+        """caller in chunk where chunk is not from a set-yielding call."""
+        rule = _run_rule(
+            'chunks = partition(items)\n'
+            'for chunk in chunks:\n'
+            '    if caller in chunk:\n'
+            '        found = True\n'
+        )
+        assert len(rule.findings) == 1
