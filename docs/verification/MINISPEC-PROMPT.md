@@ -86,8 +86,8 @@ Each requirement has:
    State the exact values.
 
 3. **Preserve exact values.** If the spec says the taint states are
-   `AUDIT_TRAIL`, `PIPELINE`, `SHAPE_VALIDATED`, `EXTERNAL_RAW`,
-   `UNKNOWN_RAW`, `UNKNOWN_SHAPE_VALIDATED`, `UNKNOWN_SEM_VALIDATED`,
+   `INTEGRAL`, `ASSURED`, `GUARDED`, `EXTERNAL_RAW`,
+   `UNKNOWN_RAW`, `UNKNOWN_GUARDED`, `UNKNOWN_ASSURED`,
    `MIXED_RAW` — list all eight. Don't say "8 taint states."
 
 4. **Criteria must be mechanically checkable.** A verification agent should

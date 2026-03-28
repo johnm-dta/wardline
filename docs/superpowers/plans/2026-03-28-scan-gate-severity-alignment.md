@@ -306,8 +306,8 @@ class TestScanGateSeverity:
 
     def test_error_findings_exit_nonzero(self, tmp_path: Path) -> None:
         """A scan with ERROR-severity findings exits 1."""
-        # Create a T1 (AUDIT_TRAIL) module with a .get() call —
-        # PY-WL-001 at AUDIT_TRAIL = ERROR/UNCONDITIONAL
+        # Create a T1 (INTEGRAL) module with a .get() call —
+        # PY-WL-001 at INTEGRAL = ERROR/UNCONDITIONAL
         manifest = tmp_path / "wardline.yaml"
         manifest.write_text(
             "tiers:\n"
@@ -316,7 +316,7 @@ class TestScanGateSeverity:
             '    description: "audit trail"\n'
             "module_tiers:\n"
             '  - path: "."\n'
-            "    taint_state: AUDIT_TRAIL\n"
+            "    taint_state: INTEGRAL\n"
             "metadata:\n"
             '  organisation: "TestOrg"\n'
         )
