@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Sequence
 
 import click
 
+from wardline.cli._gate import count_gate_blocking, severity_breakdown
+from wardline.cli._helpers import cli_error
 from wardline.core.severity import (
     Exceptionability,
     RuleId,
@@ -21,7 +23,6 @@ from wardline.core.severity import (
 )
 from wardline.scanner.context import Finding, make_governance_finding
 from wardline.scanner.rules import make_rules
-from wardline.cli._helpers import cli_error
 from wardline.scanner.sarif import _PSEUDO_RULE_IDS, SarifReport
 
 if TYPE_CHECKING:
@@ -694,10 +695,10 @@ def scan(
         has_tool_error = any(
             f.rule_id == RuleId.TOOL_ERROR for f in result.findings
         )
-        scan_finding_count = len(result.findings)
+        preview_blocking = count_gate_blocking(result.findings)
         if has_tool_error:
             sys.exit(EXIT_TOOL_ERROR)
-        elif exceeded_pct or scan_finding_count > 0:
+        elif exceeded_pct or preview_blocking > 0:
             sys.exit(EXIT_FINDINGS)
         else:
             sys.exit(EXIT_CLEAN)
@@ -771,10 +772,13 @@ def scan(
         click.echo(sarif_text, nl=False)
 
     # --- Summary to stderr ---
-    scan_finding_count = len(result.findings)
+    bd = severity_breakdown(result.findings)
     click.echo(
         f"{result.files_scanned} file(s) scanned, "
-        f"{scan_finding_count} finding(s).",
+        f"{len(result.findings)} finding(s) "
+        f"({bd.error_count} error, {bd.warning_count} warning, "
+        f"{bd.suppress_count} suppressed"
+        f"{f', {bd.excepted_count} excepted' if bd.excepted_count else ''}).",
         err=True,
     )
 
@@ -782,10 +786,15 @@ def scan(
     # Exit code priority (highest wins):
     #   EXIT_TOOL_ERROR (3) — a rule or scanner component raised an
     #       unhandled exception; signals infrastructure failure.
-    #   EXIT_FINDINGS   (1) — at least one scan finding exists, or the
-    #       max_unknown_raw_percent ceiling was exceeded, or
-    #       --strict-governance is set and GOVERNANCE findings exist.
-    #   EXIT_CLEAN      (0) — no findings, no errors.
+    #   EXIT_FINDINGS   (1) — at least one unexcepted ERROR finding
+    #       exists, or the max_unknown_raw_percent ceiling was exceeded,
+    #       or --strict-governance is set and GOVERNANCE findings exist.
+    #   EXIT_CLEAN      (0) — no gate-blocking findings.
+    #
+    # The three-tier signal model (§7.3–§7.5):
+    #   SUPPRESS findings are excluded (pattern is expected at this tier).
+    #   WARNING findings are excluded (suspicious, non-blocking).
+    #   Only ERROR findings block the gate.
     has_tool_error = any(
         f.rule_id == RuleId.TOOL_ERROR for f in all_findings
     )
@@ -795,7 +804,7 @@ def scan(
 
     if has_tool_error:
         sys.exit(EXIT_TOOL_ERROR)
-    elif exceeded_pct or scan_finding_count > 0 or has_governance_findings:
+    elif exceeded_pct or bd.gate_blocking > 0 or has_governance_findings:
         sys.exit(EXIT_FINDINGS)
     else:
         sys.exit(EXIT_CLEAN)
