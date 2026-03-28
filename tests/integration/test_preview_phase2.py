@@ -32,7 +32,7 @@ def _write_manifest(tmp_path: Path) -> Path:
         '    description: "application tier"\n'
         "module_tiers:\n"
         '  - path: "src/"\n'
-        '    default_taint: "EXTERNAL_RAW"\n'
+        '    default_taint: "ASSURED"\n'
         "metadata:\n"
         '  organisation: "TestOrg"\n',
         encoding="utf-8",
@@ -99,7 +99,7 @@ def _write_exceptions(
             {
                 "id": "EXC-A",
                 "rule": "PY-WL-001",
-                "taint_state": "UNKNOWN_RAW",
+                "taint_state": "ASSURED",
                 "location": "src/app.py::get_fn",
                 "exceptionability": "STANDARD",
                 "severity_at_grant": "ERROR",
@@ -113,7 +113,7 @@ def _write_exceptions(
             {
                 "id": "EXC-B",
                 "rule": "PY-WL-001",
-                "taint_state": "UNKNOWN_RAW",
+                "taint_state": "ASSURED",
                 "location": "src/app.py::ungoverned_fn",
                 "exceptionability": "STANDARD",
                 "severity_at_grant": "ERROR",
@@ -145,10 +145,10 @@ def _build_fixture(tmp_path: Path) -> tuple[Path, Path]:
     # tries to match the get_fn PY-WL-001 finding.
     fingerprint_a = "0000000000000000"
 
-    # EXC-B: empty fingerprint is also stale, but we only care about the
+    # EXC-B: wrong fingerprint makes it stale, but we only care about the
     # register-level governance (unknown_provenance + recurring) which fires
     # regardless of finding matches.
-    fingerprint_b = ""
+    fingerprint_b = "wrong_fp_for_staleness"
 
     _write_exceptions(tmp_path, fingerprint_a=fingerprint_a, fingerprint_b=fingerprint_b)
 

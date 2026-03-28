@@ -183,17 +183,15 @@ class TestSeverityReduction:
         merged = {o["id"]: o for o in result.rules.overrides}
         assert merged["PY-WL-003"]["severity"] == "ERROR"
 
-    def test_no_base_override_accepted(self) -> None:
-        """New rule override with no base entry is accepted."""
+    def test_no_base_override_rejected(self) -> None:
+        """Overlay cannot introduce rule overrides absent from base."""
         base = _base_manifest()
         overlay = _overlay(
             rule_overrides=({"id": "PY-WL-004", "severity": "WARNING"},),
         )
 
-        result = merge(base, overlay)
-
-        merged = {o["id"]: o for o in result.rules.overrides}
-        assert merged["PY-WL-004"]["severity"] == "WARNING"
+        with pytest.raises(ManifestWidenError, match="no base override"):
+            merge(base, overlay)
 
 
 # ---------------------------------------------------------------------------

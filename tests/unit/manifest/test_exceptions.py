@@ -32,6 +32,7 @@ def _valid_entry(**overrides) -> dict:
         "severity_at_grant": "ERROR",
         "rationale": "Schema fallback approved",
         "reviewer": "jsmith",
+        "ast_fingerprint": "a1b2c3d4e5f6",
     }
     base.update(overrides)
     return base
@@ -48,10 +49,11 @@ class TestLoadExceptions:
         assert result[0].id == "EXC-001"
         assert result[0].rule == "PY-WL-001"
 
-    def test_missing_ast_fingerprint_defaults_empty(self, tmp_path: Path) -> None:
-        _write_exceptions(tmp_path / "wardline.exceptions.json", [_valid_entry()])
-        result = load_exceptions(tmp_path)
-        assert result[0].ast_fingerprint == ""
+    def test_blank_ast_fingerprint_raises(self, tmp_path: Path) -> None:
+        entry = _valid_entry(ast_fingerprint="")
+        _write_exceptions(tmp_path / "wardline.exceptions.json", [entry])
+        with pytest.raises(ManifestLoadError, match="blank ast_fingerprint"):
+            load_exceptions(tmp_path)
 
     def test_ast_fingerprint_preserved(self, tmp_path: Path) -> None:
         entry = _valid_entry(ast_fingerprint="abcdef0123456789")

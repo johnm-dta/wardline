@@ -249,6 +249,22 @@ class ScanEngine:
             logger.warning("Syntax error in %s: %s", file_path, exc)
             result.files_skipped += 1
             result.errors.append(f"Syntax error in {file_path}: {exc}")
+            result.findings.append(
+                Finding(
+                    rule_id=RuleId.GOVERNANCE_FILE_SKIPPED,
+                    file_path=str(file_path),
+                    line=getattr(exc, "lineno", 1) or 1,
+                    col=getattr(exc, "offset", 0) or 0,
+                    end_line=None,
+                    end_col=None,
+                    message=f"File skipped due to syntax error: {exc}",
+                    severity=Severity.WARNING,
+                    exceptionability=Exceptionability.UNCONDITIONAL,
+                    taint_state=None,
+                    analysis_level=1,
+                    source_snippet=None,
+                ),
+            )
             return
 
         result.files_scanned += 1

@@ -67,6 +67,7 @@ _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
     RuleId.GOVERNANCE_MODULE_TIERS_BLANKET: "Module-level taint default covers >80% of functions with no decorator evidence",
     RuleId.GOVERNANCE_MODULE_TIERS_UNDECORATED: "High-trust module_tiers entry with zero wardline decorator usage in file",
     RuleId.GOVERNANCE_CUSTOM_KNOWN_VALIDATOR: "Custom known_validators entry (governance)",
+    RuleId.GOVERNANCE_FILE_SKIPPED: "File skipped due to parse failure (governance)",
     RuleId.L3_LOW_RESOLUTION: "L3 call-graph taint based on minority of call edges (>70% unresolved)",
     RuleId.L3_CONVERGENCE_BOUND: "L3 propagation hit iteration safety bound — results may be incomplete",
 }
@@ -96,6 +97,7 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
         RuleId.GOVERNANCE_MODULE_TIERS_BLANKET,
         RuleId.GOVERNANCE_MODULE_TIERS_UNDECORATED,
         RuleId.GOVERNANCE_CUSTOM_KNOWN_VALIDATOR,
+        RuleId.GOVERNANCE_FILE_SKIPPED,
         RuleId.L3_LOW_RESOLUTION,
         RuleId.L3_CONVERGENCE_BOUND,
         RuleId.TEST_STUB,

@@ -102,27 +102,36 @@ def merge(
         if not isinstance(rule_id, str):
             continue
         base_ovr = base_overrides_by_rule.get(rule_id)
-        if base_ovr is not None:
-            base_severity = base_ovr.get("severity")
-            overlay_severity = ovr.get("severity")
-            if (
-                base_severity is not None
-                and overlay_severity is not None
-                and _severity_rank(str(overlay_severity))
-                < _severity_rank(str(base_severity))
-            ):
-                raise ManifestWidenError(
-                    overlay_name=overlay.overlay_for,
-                    field_name="severity",
-                    base_value=base_severity,
-                    attempted_value=overlay_severity,
-                )
-        # Overlay wins — update or insert.
-        # NOTE: narrow-only semantics — the overlay can add or tighten fields
+        if base_ovr is None:
+            # Overlays cannot introduce rule overrides absent from the base
+            # manifest — that would allow silently disabling rules via
+            # severity: OFF without any base-level governance.
+            raise ManifestWidenError(
+                overlay_name=overlay.overlay_for,
+                field_name="rule_override",
+                base_value="(no base override)",
+                attempted_value=str(ovr),
+            )
+        base_severity = base_ovr.get("severity")
+        overlay_severity = ovr.get("severity")
+        if (
+            base_severity is not None
+            and overlay_severity is not None
+            and _severity_rank(str(overlay_severity))
+            < _severity_rank(str(base_severity))
+        ):
+            raise ManifestWidenError(
+                overlay_name=overlay.overlay_for,
+                field_name="severity",
+                base_value=base_severity,
+                attempted_value=overlay_severity,
+            )
+        # Overlay wins — update or tighten fields.
+        # NOTE: narrow-only semantics — the overlay can tighten fields
         # but can never *remove* a field present in the base override.  This is
         # intentional: overlays are additive refinements.  To "undo" a base
         # field, the base manifest itself must be changed.
-        merged = dict(base_ovr) if base_ovr else {}
+        merged = dict(base_ovr)
         merged.update(ovr)
         merged["source"] = f"overlay:{overlay.overlay_for}"
         base_overrides_by_rule[rule_id] = merged

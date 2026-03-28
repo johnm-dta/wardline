@@ -75,6 +75,7 @@ def load_exceptions(manifest_dir: Path) -> tuple[ExceptionEntry, ...]:
             migrated_from=raw.get("migrated_from"),
         )
         _validate_not_unconditional(entry, path)
+        _validate_ast_fingerprint(entry, path)
         entries.append(entry)
 
     return tuple(entries)
@@ -94,4 +95,13 @@ def _validate_not_unconditional(entry: ExceptionEntry, path: Path) -> None:
             f"Exception '{entry.id}' targets UNCONDITIONAL cell "
             f"({entry.rule}, {entry.taint_state}) in {path}. "
             f"UNCONDITIONAL findings cannot be excepted."
+        )
+
+
+def _validate_ast_fingerprint(entry: ExceptionEntry, path: Path) -> None:
+    """Reject exceptions with blank ast_fingerprint."""
+    if not entry.ast_fingerprint:
+        raise ManifestLoadError(
+            f"Exception '{entry.id}' has blank ast_fingerprint in {path}. "
+            f"Run 'wardline exception refresh {entry.id}' to compute one."
         )

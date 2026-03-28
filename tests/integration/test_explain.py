@@ -275,7 +275,7 @@ def _build_governance_fixture(tmp_path: Path, *, with_overlay: bool = False) -> 
                         "expires": "2027-01-01",
                         "provenance": None,
                         "agent_originated": False,
-                        "ast_fingerprint": "",
+                        "ast_fingerprint": "test_fixture_fp",
                         "recurrence_count": 0,
                         "governance_path": "standard",
                         "last_refreshed_by": None,

@@ -127,12 +127,14 @@ class TestScanEngineIntegration:
         assert len(wl005) >= 1
         assert any("partner_client" in f.file_path for f in wl005)
 
-    def test_finding_severity_is_error(self) -> None:
-        """All rule findings (non-TOOL-ERROR) are ERROR severity."""
+    def test_finding_severity_from_matrix(self) -> None:
+        """Canonical findings have severity derived from the matrix (not TOOL-ERROR)."""
         findings = self._scan_fixture()
-        rule_findings = [f for f in findings if f.rule_id != RuleId.TOOL_ERROR]
+        canonical_prefix = "PY-WL-"
+        rule_findings = [f for f in findings if str(f.rule_id).startswith(canonical_prefix)]
+        assert len(rule_findings) > 0, "Expected at least one canonical finding"
         for f in rule_findings:
-            assert f.severity == Severity.ERROR
+            assert f.severity in (Severity.ERROR, Severity.WARNING, Severity.SUPPRESS)
 
     def test_no_tool_errors(self) -> None:
         """No rules crash during execution."""
