@@ -389,3 +389,75 @@ class TestTryExceptBranchMerge:
         """)
         result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
         assert result["e"] == TaintState.EXTERNAL_RAW
+
+
+# ── Serialisation shedding ──────────────────────────────────────
+
+
+class TestSerialisationShedding:
+    """§5.2 invariant 5: serialisation sheds direct authority."""
+
+    def test_json_dumps_sheds_to_unknown_raw(self) -> None:
+        func = _parse_func("""
+            def f():
+                x = json.dumps(data)
+        """)
+        result = compute_variable_taints(func, TaintState.INTEGRAL, {})
+        assert result["x"] == TaintState.UNKNOWN_RAW
+
+    def test_json_loads_sheds_to_unknown_raw(self) -> None:
+        func = _parse_func("""
+            def f():
+                x = json.loads(raw)
+        """)
+        result = compute_variable_taints(func, TaintState.INTEGRAL, {})
+        assert result["x"] == TaintState.UNKNOWN_RAW
+
+    def test_pickle_dumps_sheds(self) -> None:
+        func = _parse_func("""
+            def f():
+                x = pickle.dumps(obj)
+        """)
+        result = compute_variable_taints(func, TaintState.INTEGRAL, {})
+        assert result["x"] == TaintState.UNKNOWN_RAW
+
+    def test_yaml_safe_load_sheds(self) -> None:
+        func = _parse_func("""
+            def f():
+                x = yaml.safe_load(text)
+        """)
+        result = compute_variable_taints(func, TaintState.INTEGRAL, {})
+        assert result["x"] == TaintState.UNKNOWN_RAW
+
+    def test_bare_name_loads_via_import(self) -> None:
+        """from json import dumps; x = dumps(data) — bare name in taint_map."""
+        func = _parse_func("""
+            def f():
+                x = dumps(data)
+        """)
+        # If 'dumps' is in taint_map (from import resolution), that takes priority.
+        # If not, it falls through to function_taint. The serialisation check
+        # uses the dotted form (json.dumps) which requires ast.Attribute.
+        # Bare names go through taint_map lookup, which is correct.
+        result = compute_variable_taints(func, TaintState.INTEGRAL, {})
+        # Bare 'dumps' is not in SERIALISATION_SINKS (those use dotted names).
+        # Falls to function_taint — this is acceptable for L1.
+        assert result["x"] == TaintState.INTEGRAL
+
+    def test_non_serialisation_method_inherits_taint(self) -> None:
+        """obj.process() is not a serialisation sink — inherits function taint."""
+        func = _parse_func("""
+            def f():
+                x = obj.process()
+        """)
+        result = compute_variable_taints(func, TaintState.INTEGRAL, {})
+        assert result["x"] == TaintState.INTEGRAL
+
+    def test_external_raw_not_affected(self) -> None:
+        """Serialisation at EXTERNAL_RAW stays UNKNOWN_RAW (already untrusted)."""
+        func = _parse_func("""
+            def f():
+                x = json.dumps(data)
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        assert result["x"] == TaintState.UNKNOWN_RAW

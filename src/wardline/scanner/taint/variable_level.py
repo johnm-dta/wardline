@@ -159,6 +159,33 @@ def _resolve_expr(
     return function_taint
 
 
+# Serialisation sinks — calls that cross the representation boundary (§5.2).
+# Results shed direct authority: output is raw bytes/string, not typed objects.
+_SERIALISATION_SINKS: frozenset[str] = frozenset({
+    # JSON
+    "json.dumps", "json.dump", "json.loads", "json.load",
+    # pickle
+    "pickle.dumps", "pickle.dump", "pickle.loads", "pickle.load",
+    # YAML
+    "yaml.dump", "yaml.safe_dump", "yaml.dump_all",
+    "yaml.safe_load", "yaml.load", "yaml.safe_load_all", "yaml.load_all",
+    # marshal
+    "marshal.dumps", "marshal.dump", "marshal.loads", "marshal.load",
+    # tomllib (read-only in stdlib) / tomli_w (write)
+    "tomllib.loads", "tomllib.load", "tomli_w.dumps", "tomli_w.dump",
+})
+
+
+def _dotted_name(node: ast.expr) -> str | None:
+    """Extract a dotted name from an attribute chain (e.g. json.dumps → 'json.dumps')."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _dotted_name(node.value)
+        return f"{parent}.{node.attr}" if parent else None
+    return None
+
+
 def _resolve_call(
     node: ast.Call,
     function_taint: TaintState,
@@ -168,14 +195,21 @@ def _resolve_call(
     """Resolve taint for a function call expression.
 
     Simple name calls (``foo()``) look up in taint_map.
+    Dotted calls to serialisation sinks (§5.2) → UNKNOWN_RAW.
     Everything else (method calls, complex expressions) → function_taint.
     """
+    # Dotted calls: check serialisation sinks before fallback.
+    if isinstance(node.func, ast.Attribute):
+        dotted = _dotted_name(node.func)
+        if dotted is not None and dotted in _SERIALISATION_SINKS:
+            return TaintState.UNKNOWN_RAW
+
     if isinstance(node.func, ast.Name):
         callee_name = node.func.id
         try:
             return taint_map[callee_name]
         except KeyError:
-            callee_name = None  # callee not in taint_map — fall back to function_taint
+            pass
     return function_taint
 
 
