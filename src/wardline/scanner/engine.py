@@ -485,7 +485,8 @@ class ScanEngine:
         # Build per-file import alias map for two-hop rejection path resolution
         import_alias_map = build_import_alias_map(tree)
 
-        assert self._project_index is not None  # set in scan() before _scan_file
+        if self._project_index is None:
+            raise RuntimeError("_project_index is None — scan() must be called before _scan_file")
         ctx = ScanContext(
             file_path=str(file_path),
             function_level_taint_map=body_taint_map,  # type: ignore[arg-type]  # __post_init__ converts dict → MappingProxyType

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from wardline.decorators._base import wardline_decorator
 
 __all__ = [
@@ -13,7 +15,7 @@ __all__ = [
 test_only = wardline_decorator(15, "test_only", _wardline_test_only=True)
 
 
-def deprecated_by(*, date: str, replacement: str) -> object:
+def deprecated_by(*, date: str, replacement: str) -> Any:
     """Mark a callable as deprecated after a date with a replacement."""
     return wardline_decorator(
         15,
@@ -24,7 +26,7 @@ def deprecated_by(*, date: str, replacement: str) -> object:
     )
 
 
-def feature_gated(*, flag: str) -> object:
+def feature_gated(*, flag: str) -> Any:
     """Mark a callable as controlled by a feature flag."""
     return wardline_decorator(
         15,

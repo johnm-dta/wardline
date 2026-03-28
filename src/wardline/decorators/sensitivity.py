@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from wardline.decorators._base import wardline_decorator
 
 __all__ = [
@@ -11,7 +13,7 @@ __all__ = [
 ]
 
 
-def handles_pii(*, fields: list[str] | tuple[str, ...]) -> object:
+def handles_pii(*, fields: list[str] | tuple[str, ...]) -> Any:
     """Mark a callable as handling named PII fields."""
     return wardline_decorator(
         11,
@@ -21,7 +23,7 @@ def handles_pii(*, fields: list[str] | tuple[str, ...]) -> object:
     )
 
 
-def handles_classified(*, level: str) -> object:
+def handles_classified(*, level: str) -> Any:
     """Mark a callable as handling classified data at a given level."""
     return wardline_decorator(
         11,
@@ -31,7 +33,7 @@ def handles_classified(*, level: str) -> object:
     )
 
 
-def declassifies(*, from_level: str, to_level: str) -> object:
+def declassifies(*, from_level: str, to_level: str) -> Any:
     """Mark a callable as declassifying from one level to another."""
     return wardline_decorator(
         11,

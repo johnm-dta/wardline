@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from wardline.decorators._base import wardline_decorator
 
 __all__ = [
@@ -21,7 +23,7 @@ idempotent = wardline_decorator(9, "idempotent", _wardline_idempotent=True)
 atomic = wardline_decorator(9, "atomic", _wardline_atomic=True)
 
 
-def compensatable(*, rollback: object) -> object:
+def compensatable(*, rollback: object) -> Any:
     """Mark a function as compensatable with a rollback target."""
     return wardline_decorator(
         9,

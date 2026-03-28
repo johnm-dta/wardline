@@ -182,9 +182,8 @@ def wardline_decorator(
         try:
             existing_groups = wrapper._wardline_groups  # type: ignore[attr-defined]
         except AttributeError:
-            existing_groups = set()
-        wrapper._wardline_groups = set(existing_groups)  # type: ignore[attr-defined]
-        wrapper._wardline_groups.add(group)  # type: ignore[attr-defined]
+            existing_groups = frozenset()
+        wrapper._wardline_groups = frozenset(existing_groups) | {group}  # type: ignore[attr-defined]
 
         # Set semantic attributes
         for key, value in semantic_attrs.items():
