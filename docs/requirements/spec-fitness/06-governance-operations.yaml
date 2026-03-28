@@ -218,10 +218,13 @@ requirements:
     title: Manifest threat model anomaly detection
     statement: >
       Enforcement tools SHOULD implement anomaly detection signals for
-      governance-layer attack vectors: tier reassignment volume spikes,
+      governance-layer attack vectors as defined in the manifest threat
+      model table (§9.3.2), including: tier reassignment volume spikes,
       tier downgrades, tier upgrades without evidence, boundary widening,
-      annotation volume spikes, SUPPRESS activation changes, and
-      agent-originated policy changes.
+      boundary widening without corresponding code, annotation volume
+      spikes, SUPPRESS activation changes, agent-originated policy changes,
+      new dependency taint above UNKNOWN_RAW, and dependency taint finding
+      suppression.
     normative_sources:
       - file: docs/spec/wardline-01-09-governance-model.md
         section: "9.3.2 Manifest threat model"

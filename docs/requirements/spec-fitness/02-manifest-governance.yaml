@@ -45,7 +45,8 @@ requirements:
       assignments or weaken enforcement relative to the governing manifest.
     normative_sources:
       - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
-        section: "Merge semantics"
+        section: "13.1 Wardline manifest format"
+        subsection: "Merge semantics"
     verification:
       method: merge_and_loader_tests
       target_paths:
@@ -164,7 +165,7 @@ requirements:
       - file: docs/spec/wardline-01-14-conformance.md
         section: "14.3.2 Governance profiles"
       - file: docs/spec/wardline-01-09-governance-model.md
-        section: "Governance artefact exclusion"
+        section: "9.5 Enforcement availability (control law)"
     verification:
       method: repository_configuration_review
       target_paths:
@@ -233,7 +234,7 @@ requirements:
         - src/wardline/manifest/coherence.py
         - src/wardline/cli/manifest_cmds.py
         - tests/unit/manifest/test_coherence.py
-        - tests/integration/test_coherence_cmd.py
+        - tests/unit/cli/test_coherence_cmd.py
     fitness_dimensions: [governance, correctness]
     notes: >
       Coherence check findings appear in SARIF with ruleId prefix COHERENCE-.
@@ -334,7 +335,8 @@ requirements:
       MUST be rejected with an error, not a warning.
     normative_sources:
       - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
-        section: "Merge semantics"
+        section: "13.1 Wardline manifest format"
+        subsection: "Merge semantics"
     verification:
       method: loader_and_merge_tests
       target_paths:

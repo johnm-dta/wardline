@@ -143,6 +143,8 @@ requirements:
     normative_sources:
       - file: docs/spec/wardline-01-01-what-a-wardline-is.md
         section: "1.1 Terms and definitions"
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.1 Trust classification and validation status"
     verification:
       method: static_review_and_unit_tests
       target_paths:
@@ -160,6 +162,8 @@ requirements:
       the token name. INTEGRAL encompasses all Tier 1 authoritative data,
       not only audit trails.
     normative_sources:
+      - file: docs/spec/wardline-01-04-authority-tier-model.md
+        section: "4.1 Four tiers"
       - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
         section: "5.1 Trust classification and validation status"
     verification:
@@ -199,7 +203,7 @@ requirements:
       UNKNOWN_RAW.
     normative_sources:
       - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
-        section: "5.5 Third-party dependency taint"
+        section: "5.5 Third-party in-process dependency taint"
     verification:
       method: unit_tests
       target_paths:
@@ -327,7 +331,7 @@ requirements:
       scan time.
     normative_sources:
       - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
-        section: "5.5 Third-party dependency taint"
+        section: "5.5 Third-party in-process dependency taint"
     verification:
       method: unit_tests
       target_paths:

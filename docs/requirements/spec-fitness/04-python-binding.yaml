@@ -3,8 +3,8 @@ requirements:
     title: Decorator discovery is AST-based
     statement: >
       The Python Wardline-Core implementation MUST discover wardline decorators
-      from the target codebase's AST and MUST NOT rely on runtime introspection
-      as its primary discovery mechanism.
+      from the target codebase's AST and SHALL NOT rely on runtime introspection
+      or dynamic attribute inspection as its primary discovery mechanism.
     normative_sources:
       - file: docs/spec/wardline-02-A-python-binding.md
         section: "A.3 Interface contract (Wardline-Core)"
@@ -80,10 +80,10 @@ requirements:
   - id: WL-FIT-PY-005
     title: Unresolvable third-party delegation is handled conservatively
     statement: >
-      When third-party source is unavailable or delegation resolution is not
-      implemented, the Python implementation MUST treat the delegation as
-      unresolvable for minimum-conformance purposes and evaluate the boundary
-      conservatively.
+      For PY-WL-008 / framework WL-007 delegation analysis, when third-party
+      source is unavailable or delegation resolution is not implemented, the
+      Python implementation MUST treat the delegation as unresolvable for
+      minimum-conformance purposes and evaluate the boundary conservatively.
     normative_sources:
       - file: docs/spec/wardline-02-A-python-binding.md
         section: "A.3 Interface contract (Wardline-Core)"
@@ -100,7 +100,7 @@ requirements:
     title: Implemented rules and binding corpus are declared
     statement: >
       The Python implementation MUST declare which rules it implements and MUST
-      maintain corpus specimens for those rules.
+      maintain golden corpus specimens for those rules.
     normative_sources:
       - file: docs/spec/wardline-02-A-python-binding.md
         section: "A.3 Interface contract (Wardline-Core)"
@@ -183,12 +183,15 @@ requirements:
     title: Contradictory decorator combinations are detected
     statement: >
       The scanner MUST detect mutually exclusive decorator combinations as
-      ERROR findings (SCN-021). The Python binding defines 29 specific
-      contradictory pairs including tier conflicts (e.g., @integral_read with
-      @validates_shape), semantic conflicts (e.g., @fail_closed with
-      @fail_open), and scope conflicts (e.g., @deterministic with
-      @not_reentrant).
+      ERROR findings (SCN-021). The Python binding defines 29 detected
+      combinations (26 contradictory, 3 suspicious) including tier conflicts
+      (e.g., @integral_read with @validates_shape), semantic conflicts
+      (e.g., @fail_closed with @fail_open), and determinism conflicts
+      (e.g., @deterministic with @time_dependent).
     normative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.3 Interface contract (Wardline-Core)"
+    informative_sources:
       - file: docs/spec/wardline-02-A-python-binding.md
         section: "A.4.3 Non-obvious design rationale"
     verification:
@@ -211,7 +214,8 @@ requirements:
       Tier 1 modules escalate from WARNING to ERROR, and deleted baseline
       files produce ERROR (not silent re-establishment). Exit codes MUST
       be: 0 (no ERROR findings), 1 (at least one ERROR), 2 (internal error),
-      3 (direct law — regime cannot produce meaningful output).
+      3 (direct law — regime cannot produce meaningful enforcement output;
+      `wardline regime` only).
     normative_sources:
       - file: docs/spec/wardline-02-A-python-binding.md
         section: "A.10 Error handling and control law"

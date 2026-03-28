@@ -319,14 +319,18 @@ requirements:
     title: Group 5 schema contract field-completeness verification
     statement: >
       Conformant scanners SHALL verify that all fields of the source type
-      are accessed in @all_fields_mapped functions. Unmapped fields produce
-      a finding. Multiple functions declaring the same output field produce
-      a collision finding. Schema-level defaults on fields in tier-classified
-      flows MUST be treated as implicit optional-field declarations under
-      the Assurance governance profile.
+      are accessed in functions declared as performing complete field mapping
+      (e.g., @all_fields_mapped in the Python binding). Unmapped fields
+      produce a finding. Multiple functions declaring the same output field
+      produce a collision finding. Schema-level defaults on fields in
+      tier-classified flows MUST be treated as implicit optional-field
+      declarations under the Assurance governance profile.
     normative_sources:
       - file: docs/spec/wardline-01-06-annotation-vocabulary.md
         section: "6. Annotation vocabulary"
+    informative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4.2 Decorator mapping table"
     verification:
       method: unit_tests
       target_paths:

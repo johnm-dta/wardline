@@ -248,8 +248,9 @@ requirements:
     title: Type system tier metadata (SHOULD)
     statement: >
       Bindings SHOULD make tier mismatches visible at development time —
-      passing raw data where shape-validated data is expected SHOULD produce
-      a type error. Type annotations SHOULD carry tier information.
+      passing raw data where guarded data is expected, or guarded data
+      where assured data is expected, SHOULD produce a type error or
+      equivalent diagnostic. Type annotations SHOULD carry tier information.
     normative_sources:
       - file: docs/spec/wardline-01-08-enforcement-layers.md
         section: "8.2 Type system"

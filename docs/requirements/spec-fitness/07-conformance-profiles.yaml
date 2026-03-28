@@ -30,7 +30,7 @@ requirements:
   - id: WL-FIT-CONF-002
     title: Enforcement profile is declared
     statement: >
-      Each tool in the enforcement regime MUST declare which enforcement
+      Each tool in the enforcement regime declares which enforcement
       profile(s) it satisfies: Wardline-Core, Wardline-Type,
       Wardline-Governance, or Wardline-Full. A Wardline-Core tool's
       documentation MUST declare which rules it implements.
@@ -93,10 +93,10 @@ requirements:
   - id: WL-FIT-CONF-005
     title: Supplementary group enforcement scope is documented
     statement: >
-      The regime documentation SHOULD document which supplementary groups
-      (5–15) have enforcement rules and which are expressiveness-only. The
-      overlay supplementary section provides the structured location for this
-      documentation.
+      An assessor evaluating a regime SHOULD document which supplementary
+      groups (5–15) have enforcement rules and which are
+      expressiveness-only. The overlay supplementary section provides the
+      structured location for this documentation.
     normative_sources:
       - file: docs/spec/wardline-01-14-conformance.md
         section: "14.5 Supplementary group enforcement scope"
@@ -114,7 +114,7 @@ requirements:
   - id: WL-FIT-CONF-006
     title: Assessment procedure is supportable
     statement: >
-      The implementation MUST support the six-step assessment procedure
+      The implementation MUST support the seven-step assessment procedure
       defined in §14.6: (1) regime documentation review, (2) manifest
       validation, (2.5) manifest coherence verification, (3) golden corpus
       verification, (4) enforcement execution with SARIF property bag
