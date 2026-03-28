@@ -87,6 +87,7 @@ def _reset_enforcement_state() -> None:
     except KeyError:
         _enforcement_enabled = False
     _first_check_done = False
+    _callback_failures.clear()
 
 
 # ── Optional violation callback ──────────────────────────────
@@ -304,18 +305,68 @@ def check_tier_boundary(
         )
 
 
+# Callback failure log — observable state for monitoring.
+# Each entry is (exception_type, message). Cleared by _reset_enforcement_state().
+_callback_failures: list[tuple[str, str]] = []
+
+
 def _invoke_on_violation(
     obj: object,
     expected_tier: int,
     actual_tier: int | None,
 ) -> None:
-    """Call the on_violation callback if set."""
+    """Call the on_violation callback if set.
+
+    PY-WL-004 design note (broad exception handler in T1 code):
+    ─────────────────────────────────────────────────────────────
+    This function invokes a user-supplied callback — essentially a
+    T4→T1 boundary call.  The previous implementation used
+    ``except Exception: logger.warning()``, which PY-WL-004 correctly
+    flagged: a warning log notes the failure but doesn't handle it.
+    The exception is still swallowed — execution continues as if the
+    callback ran.  A broken callback is itself an integrity signal:
+    if the violation handler can't run, the system's response to
+    boundary violations is degraded.
+
+    The fix separates two failure modes:
+
+    - **TypeError** (wrong callback signature): re-raised immediately.
+      This is a registration-time bug — the caller passed a handler
+      that doesn't match the ``(obj, expected_tier, actual_tier)``
+      contract.  Configuration errors should fail loudly.
+
+    - **All other exceptions**: logged at ERROR (not WARNING), recorded
+      in ``_callback_failures`` for programmatic observability, and then
+      execution continues so the caller can still raise its
+      ``TierViolationError``.  The enforcement violation must not be
+      masked by a callback bug — both signals need to surface.
+
+    The handler is still broad for the second case because user code can
+    throw anything.  But the action is substantive (error log + observable
+    state mutation), not a silent swallow.  This is the correct T1 posture
+    for an external-code boundary: fail loudly for structural errors
+    (TypeError), record and continue for runtime errors so the primary
+    enforcement signal is preserved.
+
+    Raises:
+        TypeError: If the callback has the wrong signature.
+    """
     if _on_violation is not None:
         try:
             _on_violation(obj, expected_tier, actual_tier)
+        except TypeError:
+            # Wrong callback signature is a configuration error, not a
+            # runtime data issue.  Re-raise: the caller registered a
+            # handler that doesn't match the documented contract.
+            raise
         except Exception as exc:
-            logging.getLogger("wardline").warning(
-                "on_violation callback raised %s — enforcement continues",
+            # Record the failure for programmatic inspection.
+            _callback_failures.append((type(exc).__name__, str(exc)))
+            logger.error(
+                "on_violation callback failed (%s: %s) — "
+                "enforcement violation will still be raised, but "
+                "callback response is lost",
+                type(exc).__name__,
                 exc,
             )
 
