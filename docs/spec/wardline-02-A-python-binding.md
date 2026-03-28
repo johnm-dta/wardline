@@ -280,7 +280,7 @@ The Python binding matrix for PY-WL-001 through PY-WL-009 (72 cells) is:
 | **PY-WL-002** | Attribute access with fallback default | E/U | E/St | W/R | W/R | W/R | W/R | E/St | W/St |
 | **PY-WL-003** | Existence-checking as structural gate | E/U | E/U | E/St | Su/T | Su/T | E/St | E/St | Su/T |
 | **PY-WL-004** | Catching all exceptions broadly | E/U | E/St | W/St | W/R | E/St | W/St | W/St | E/St |
-| **PY-WL-005** | Catching exceptions silently | E/U | E/St | E/St | E/St | E/St | E/St | E/St | E/St |
+| **PY-WL-005** | Catching exceptions silently | E/U | E/St | W/St | W/R | E/St | W/St | W/St | E/St |
 | **PY-WL-006** | Audit-critical writes in broad handlers | E/U | E/U | E/St | E/St | E/St | E/St | E/St | E/St |
 | **PY-WL-007** | Runtime type-checking internal data | E/St | W/R | W/R | Su/T | Su/T | W/R | W/R | W/St |
 | **PY-WL-008** | Validation with no rejection path | E/U | E/U | E/U | E/U | E/U | E/U | E/U | E/U |
