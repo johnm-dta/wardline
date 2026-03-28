@@ -293,12 +293,26 @@ class SarifReport:
                    if self.manifest_hash is not None
                    else {}),
                 "wardline.overlayHashes": list(self.overlay_hashes),
-                "wardline.propertyBagVersion": "0.3",
+                "wardline.propertyBagVersion": "0.4",
                 **({"wardline.scanTimestamp": self.scan_timestamp}
                    if not self.verification_mode and self.scan_timestamp
                    else {}),
-                "wardline.suppressedFindingCount": sum(
+                "wardline.errorFindingCount": sum(
+                    1 for f in self.findings if f.severity == Severity.ERROR
+                ),
+                "wardline.exceptedFindingCount": sum(
                     1 for f in self.findings if f.exception_id is not None
+                ),
+                "wardline.gateBlockingCount": sum(
+                    1
+                    for f in self.findings
+                    if f.severity == Severity.ERROR and f.exception_id is None
+                ),
+                "wardline.suppressedCellFindingCount": sum(
+                    1 for f in self.findings if f.severity == Severity.SUPPRESS
+                ),
+                "wardline.warningFindingCount": sum(
+                    1 for f in self.findings if f.severity == Severity.WARNING
                 ),
                 "wardline.unknownRawFunctionCount": self.unknown_raw_count,
                 "wardline.unresolvedDecoratorCount": self.unresolved_decorator_count,

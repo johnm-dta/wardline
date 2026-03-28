@@ -327,7 +327,7 @@ class TestSarifPropertyBags:
     def test_property_bag_version(self) -> None:
         report = SarifReport(findings=[])
         props = report.to_dict()["runs"][0]["properties"]
-        assert props["wardline.propertyBagVersion"] == "0.3"
+        assert props["wardline.propertyBagVersion"] == "0.4"
 
     def test_input_hash_always_emitted(self) -> None:
         """wardline.inputHash is always present in run properties."""
