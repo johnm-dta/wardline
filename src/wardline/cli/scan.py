@@ -413,6 +413,8 @@ def _custom_known_validator_findings(
               help="Pre-resolved manifest (wardline.resolved.json)")
 @click.option("--strict-governance", is_flag=True, default=False,
               help="Treat GOVERNANCE findings as scan failures (exit 1).")
+@click.option("--retrospective", default=None, type=str,
+              help="Retrospective scan for degraded-law window (commit range, e.g. abc123..def456).")
 def scan(
     path: str,
     manifest: str | None,
@@ -427,6 +429,7 @@ def scan(
     preview_phase2: bool,
     resolved: str | None,
     strict_governance: bool,
+    retrospective: str | None,
 ) -> None:
     """Scan Python files for boundary violations."""
     cli_handler = _setup_logging(verbose=verbose, debug=debug)
@@ -750,6 +753,14 @@ def scan(
         input_hash = ""
         input_files = 0
 
+    # --- Retrospective scan mode (§9.5) ---
+    if retrospective:
+        import dataclasses as _dc_retro
+
+        all_findings = [
+            _dc_retro.replace(f, retroactive_scan=True) for f in all_findings
+        ]
+
     import wardline as _wardline_pkg
 
     sarif_report = SarifReport(
@@ -776,6 +787,8 @@ def scan(
         conformance_gaps=conformance_gaps,
         control_law=control_law,
         control_law_degradations=control_law_degradations,
+        retroactive_scan=bool(retrospective),
+        retroactive_scan_range=retrospective,
     )
 
     sarif_text = sarif_report.to_json_string() + "\n"
