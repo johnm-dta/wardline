@@ -74,7 +74,7 @@ WL-007 and WL-008 are structural verification rules (not pattern rules) and appl
 
 **Matrix key.** Severity: **E** = Error (wrong in this context), **W** = Warning (suspicious), **Su** = Suppress (expected). Exceptionability: **U** = Unconditional, **St** = Standard, **R** = Relaxed, **T** = Transparent.
 
-| Rule | Pattern | Audit Trail | Pipeline | Shape Val. | Ext. Raw | Unk. Raw | Unk. Shape V. | Unk. Sem. V. | Mixed Raw |
+| Rule | Pattern | Integral | Assured | Guarded | Ext. Raw | Unk. Raw | Unk. Guarded | Unk. Assured | Mixed Raw |
 |------|---------|---|---|---|---|---|---|---|---|
 | **WL-001** | Member access with fallback default[^wl001-suppress] | E/U | E/St | W/R | Su/T | Su/T | W/R | E/St | Su/T |
 | **WL-002** | Existence-checking as structural gate | E/U | E/U | E/St | Su/T | Su/T | E/St | E/St | Su/T |

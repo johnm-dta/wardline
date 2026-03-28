@@ -138,11 +138,11 @@ The following table maps each of the 17 abstract annotation groups (Part I §6) 
 | | | `@ValidatesShape` | `@Target(METHOD)` | T4 → T3 transition. Body MUST contain rejection path (JV-WL-007) |
 | | | `@ValidatesSemantic` | `@Target(METHOD)` | T3 → T2 transition. Body MUST contain rejection path. Scanner verifies validation ordering (JV-WL-008) |
 | | | `@ValidatesExternal` | `@Target(METHOD)` | Combined T4 → T2. Body MUST satisfy both shape and semantic validation requirements |
-| | | `@Tier1Read` | `@Target(METHOD)` | Returns T1 (INTEGRAL) data. Body rules at INTEGRAL severity |
-| | | `@AuthoritativeConstruction` | `@Target(METHOD)` | T2 → T1 transition. All return type fields MUST be explicitly supplied |
-| | | `@AuditWriter` | `@Target(METHOD)` | Audit-sensitive write. INTEGRAL severity. MUST precede `@EmitsTelemetry`. Fallback paths that bypass the audit call produce a finding |
-| **2** | Audit primacy | `@AuditCritical` | `@Target(METHOD)` | All `@AuditWriter` rules plus implicit `@MustPropagate` on exception paths |
-| | | `@EmitsTelemetry` | `@Target(METHOD)` | Telemetry emission. MUST NOT precede `@AuditWriter` on shared code paths |
+| | | `@IntegralRead` | `@Target(METHOD)` | Returns T1 (INTEGRAL) data. Body rules at INTEGRAL severity |
+| | | `@IntegralConstruction` | `@Target(METHOD)` | T2 → T1 transition. All return type fields MUST be explicitly supplied |
+| | | `@IntegralWriter` | `@Target(METHOD)` | Integrity-sensitive write. INTEGRAL severity. MUST precede `@EmitsTelemetry`. Fallback paths that bypass the integrity write produce a finding |
+| **2** | Integrity primacy | `@IntegrityCritical` | `@Target(METHOD)` | All `@IntegralWriter` rules plus implicit `@MustPropagate` on exception paths |
+| | | `@EmitsTelemetry` | `@Target(METHOD)` | Telemetry emission. MUST NOT precede `@IntegralWriter` on shared code paths |
 | **3** | Plugin/component contract | `@SystemComponent` | `@Target(METHOD)` | System-owned contract. Crash-not-catch semantics; exceptions MUST propagate |
 | **4** | Internal data provenance | `@IntData` | `@Target(METHOD)` | Declares internal provenance. INTEGRAL body restrictions. Return tagged UNKNOWN_RAW without `@RestorationBoundary` |
 | **5** | Schema contracts | `@AllFieldsMapped` | `@Target(METHOD)` | Every field of return type MUST be explicitly supplied or wrapped in `SchemaDefault.of()` |
@@ -308,7 +308,7 @@ Enterprise Java frameworks generate runtime proxies that wrap annotated methods 
 
 | Spring Annotation | Safe With | Rationale |
 |---|---|---|
-| `@Transactional` (default propagation) | `@FailClosed`, `@ValidatesShape`, `@ValidatesSemantic`, `@AuthoritativeConstruction` | Unchecked exceptions → rollback, normal return → commit. Does not alter exception or return semantics |
+| `@Transactional` (default propagation) | `@FailClosed`, `@ValidatesShape`, `@ValidatesSemantic`, `@IntegralConstruction` | Unchecked exceptions → rollback, normal return → commit. Does not alter exception or return semantics |
 | `@Validated` / `@Valid` | All wardline annotations | Bean Validation runs before method body |
 | `@PreAuthorize` / `@PostAuthorize` | All wardline annotations | Security checks before/after method. Rejection is an exception, compatible with `@FailClosed` |
 
@@ -350,7 +350,7 @@ A build tool or obfuscator (ProGuard, R8) may strip annotations from bytecode. A
 
 ##### Spring-specific residual risks
 
-**`@Async void` exception swallowing.** Exceptions are dispatched to `AsyncUncaughtExceptionHandler`, which by default logs and discards. Scanner SHOULD emit BLOCKING when `@Async` (without `CompletableFuture` return) appears with `@FailClosed`, `@MustPropagate`, or `@AuditCritical`. The same applies to `@Scheduled` and `@EventListener` / `@TransactionalEventListener` methods.
+**`@Async void` exception swallowing.** Exceptions are dispatched to `AsyncUncaughtExceptionHandler`, which by default logs and discards. Scanner SHOULD emit BLOCKING when `@Async` (without `CompletableFuture` return) appears with `@FailClosed`, `@MustPropagate`, or `@IntegrityCritical`. The same applies to `@Scheduled` and `@EventListener` / `@TransactionalEventListener` methods.
 
 **`@Retryable` + `@Recover`.** `@Retryable` alone is compatible with `@FailClosed`. `@Recover` provides an implicit `@FailOpen`. Scanner SHOULD emit BLOCKING when a `@FailClosed` method's class contains a `@Recover` with compatible return type.
 
@@ -514,7 +514,7 @@ public record RiskAssessment(
     }
 }
 
-@AuthoritativeConstruction
+@IntegralConstruction
 public RiskAssessment createRiskAssessment(
         ValidatedPartner partner, AuditContext context) {
     return new RiskAssessment(
@@ -586,7 +586,7 @@ Each line is a tier transition. Each method has one annotation declaring one tra
         "wardline.exceptionability": "UNCONDITIONAL",
         "wardline.excepted": false,
         "wardline.annotationGroups": [1, 16],
-        "wardline.enclosingAnnotation": "@AuthoritativeConstruction",
+        "wardline.enclosingAnnotation": "@IntegralConstruction",
         "wardline.boundaryFunction": "com.myorg.service.PartnerService.createRiskAssessment"
       }
     }],
