@@ -102,15 +102,21 @@ def propagate_callgraph_taints(
     reverse_edges: dict[str, set[str]] = {f: set() for f in taint_map}
     for caller, callees in edges.items():
         for callee in callees:
-            if callee in reverse_edges:
+            try:
                 reverse_edges[callee].add(caller)
+            except KeyError:
+                _rev = None  # callee not in taint_map — external call, skip reverse edge
 
     # --- 4. SCC decomposition -------------------------------------------------
     # Only include nodes that are in taint_map
     taint_keys = set(taint_map)
     scc_graph: dict[str, set[str]] = {}
     for func in taint_map:
-        scc_graph[func] = edges.get(func, set()) & taint_keys
+        try:
+            func_edges = edges[func]
+        except KeyError:
+            func_edges = set()
+        scc_graph[func] = func_edges & taint_keys
 
     sccs = compute_sccs(scc_graph)
 
@@ -134,7 +140,11 @@ def propagate_callgraph_taints(
         for f in scc:
             if f in anchored:
                 continue
-            ext_callees = (edges.get(f, set()) & taint_keys) - scc
+            try:
+                f_edges = edges[f]
+            except KeyError:
+                f_edges = set()
+            ext_callees = (f_edges & taint_keys) - scc
             if ext_callees:
                 has_external_influence.add(f)
                 # For anchored callees, use return_taint (their static output tier).
@@ -142,10 +152,16 @@ def propagate_callgraph_taints(
                 # This is correct because non-anchored functions always have
                 # body_taint == return_taint (enforced by _walk_and_assign in
                 # function_level.py), so current[c] serves as both.
-                ext_ranks = [
-                    TRUST_RANK[return_taint_map.get(c, current[c]) if c in anchored else current[c]]
-                    for c in ext_callees
-                ]
+                ext_ranks: list[int] = []
+                for c in ext_callees:
+                    if c in anchored:
+                        try:
+                            c_return_taint = return_taint_map[c]
+                        except KeyError:
+                            c_return_taint = current[c]
+                        ext_ranks.append(TRUST_RANK[c_return_taint])
+                    else:
+                        ext_ranks.append(TRUST_RANK[current[c]])
                 ext_max = max(ext_ranks)
                 if f in floating_down:
                     l1_rank = TRUST_RANK[taint_map[f]]
@@ -155,7 +171,11 @@ def propagate_callgraph_taints(
                     l1_rank = TRUST_RANK[taint_map[f]]
                     ext_max = max(ext_max, l1_rank)
                 # Fix 2: unresolved calls pessimistic floor in Phase 1
-                if unresolved_counts.get(f, 0) > 0:
+                try:
+                    f_unresolved = unresolved_counts[f]
+                except KeyError:
+                    f_unresolved = 0
+                if f_unresolved > 0:
                     ext_max = max(ext_max, TRUST_RANK[taint_map[f]])
                 ext_taint = rank_to_state[ext_max]
                 if ext_taint != current[f]:
@@ -166,9 +186,14 @@ def propagate_callgraph_taints(
                     best_callee: str | None = None
                     best_rank = -1
                     for c in sorted(ext_callees):
-                        c_rank = TRUST_RANK[
-                            return_taint_map.get(c, current[c]) if c in anchored else current[c]
-                        ]
+                        if c in anchored:
+                            try:
+                                c_return_taint = return_taint_map[c]
+                            except KeyError:
+                                c_return_taint = current[c]
+                            c_rank = TRUST_RANK[c_return_taint]
+                        else:
+                            c_rank = TRUST_RANK[current[c]]
                         if c_rank > best_rank:
                             best_rank = c_rank
                             best_callee = c
@@ -196,16 +221,26 @@ def propagate_callgraph_taints(
             iterations += 1
 
             # Gather ALL callee taints (both inside and outside SCC)
-            callee_set = edges.get(func, set()) & taint_keys
+            try:
+                func_edges = edges[func]
+            except KeyError:
+                func_edges = set()
+            callee_set = func_edges & taint_keys
             if not callee_set:
                 # No resolved callees — stay at current taint
                 continue
 
             # Compute max_rank (least trusted) among callees
-            callee_ranks = [
-                TRUST_RANK[return_taint_map.get(c, current[c]) if c in anchored else current[c]]
-                for c in callee_set
-            ]
+            callee_ranks: list[int] = []
+            for c in callee_set:
+                if c in anchored:
+                    try:
+                        c_return_taint = return_taint_map[c]
+                    except KeyError:
+                        c_return_taint = current[c]
+                    callee_ranks.append(TRUST_RANK[c_return_taint])
+                else:
+                    callee_ranks.append(TRUST_RANK[current[c]])
             max_callee_rank = max(callee_ranks, default=TRUST_RANK[TaintState.AUDIT_TRAIL])
 
             # Floor clamp for module_default: result >= L1 rank
@@ -224,7 +259,11 @@ def propagate_callgraph_taints(
             # Fix 2: unresolved calls pessimistic floor — if this function
             # has unresolved calls, it cannot be more trusted than its L1
             # baseline (unresolved calls could go anywhere).
-            if unresolved_counts.get(func, 0) > 0:
+            try:
+                func_unresolved = unresolved_counts[func]
+            except KeyError:
+                func_unresolved = 0
+            if func_unresolved > 0:
                 result_rank = max(result_rank, TRUST_RANK[taint_map[func]])
 
             new_taint = rank_to_state[result_rank]
@@ -239,9 +278,14 @@ def propagate_callgraph_taints(
                 best_callee_wl: str | None = None
                 best_rank_wl = -1
                 for c in sorted(callee_set):  # sorted for tie-breaking
-                    c_rank = TRUST_RANK[
-                        return_taint_map.get(c, current[c]) if c in anchored else current[c]
-                    ]
+                    if c in anchored:
+                        try:
+                            c_return_taint = return_taint_map[c]
+                        except KeyError:
+                            c_return_taint = current[c]
+                        c_rank = TRUST_RANK[c_return_taint]
+                    else:
+                        c_rank = TRUST_RANK[current[c]]
                     if c_rank > best_rank_wl:
                         best_rank_wl = c_rank
                         best_callee_wl = c
@@ -249,7 +293,11 @@ def propagate_callgraph_taints(
                 via_callee_map[func] = best_callee_wl
 
                 # Add callers within this SCC to worklist
-                for caller in reverse_edges.get(func, set()):
+                try:
+                    func_callers = reverse_edges[func]
+                except KeyError:
+                    func_callers = set()
+                for caller in func_callers:
                     if caller in scc and caller not in anchored:
                         worklist.add(caller)
 
@@ -280,8 +328,14 @@ def propagate_callgraph_taints(
 
     # --- 6b. L3_LOW_RESOLUTION detection --------------------------------------
     for func in taint_map:
-        res = resolved_counts.get(func, 0)
-        unres = unresolved_counts.get(func, 0)
+        try:
+            res = resolved_counts[func]
+        except KeyError:
+            res = 0
+        try:
+            unres = unresolved_counts[func]
+        except KeyError:
+            unres = 0
         total_calls = res + unres
         if total_calls > 0:
             unresolved_ratio = unres / total_calls
@@ -297,33 +351,69 @@ def propagate_callgraph_taints(
     provenance: dict[str, TaintProvenance] = {}
     for func in taint_map:
         if func in anchored:
+            try:
+                func_resolved = resolved_counts[func]
+            except KeyError:
+                func_resolved = 0
+            try:
+                func_unresolved = unresolved_counts[func]
+            except KeyError:
+                func_unresolved = 0
             provenance[func] = TaintProvenance(
                 source="decorator",
                 via_callee=None,
-                resolved_call_count=resolved_counts.get(func, 0),
-                unresolved_call_count=unresolved_counts.get(func, 0),
+                resolved_call_count=func_resolved,
+                unresolved_call_count=func_unresolved,
             )
         elif func in refined:
+            try:
+                func_resolved = resolved_counts[func]
+            except KeyError:
+                func_resolved = 0
+            try:
+                func_unresolved = unresolved_counts[func]
+            except KeyError:
+                func_unresolved = 0
+            try:
+                func_via_callee = via_callee_map[func]
+            except KeyError:
+                func_via_callee = None
             provenance[func] = TaintProvenance(
                 source="callgraph",
-                via_callee=via_callee_map.get(func),
-                resolved_call_count=resolved_counts.get(func, 0),
-                unresolved_call_count=unresolved_counts.get(func, 0),
+                via_callee=func_via_callee,
+                resolved_call_count=func_resolved,
+                unresolved_call_count=func_unresolved,
             )
         elif func in floating_down:
+            try:
+                func_resolved = resolved_counts[func]
+            except KeyError:
+                func_resolved = 0
+            try:
+                func_unresolved = unresolved_counts[func]
+            except KeyError:
+                func_unresolved = 0
             provenance[func] = TaintProvenance(
                 source="module_default",
                 via_callee=None,
-                resolved_call_count=resolved_counts.get(func, 0),
-                unresolved_call_count=unresolved_counts.get(func, 0),
+                resolved_call_count=func_resolved,
+                unresolved_call_count=func_unresolved,
             )
         else:
             # fallback, unrefined
+            try:
+                func_resolved = resolved_counts[func]
+            except KeyError:
+                func_resolved = 0
+            try:
+                func_unresolved = unresolved_counts[func]
+            except KeyError:
+                func_unresolved = 0
             provenance[func] = TaintProvenance(
                 source="fallback",
                 via_callee=None,
-                resolved_call_count=resolved_counts.get(func, 0),
-                unresolved_call_count=unresolved_counts.get(func, 0),
+                resolved_call_count=func_resolved,
+                unresolved_call_count=func_unresolved,
             )
 
     return current, provenance, diagnostics
@@ -338,18 +428,29 @@ def _seed_provenance_only(
     """Build provenance records without any L3 refinement (fallback path)."""
     provenance: dict[str, TaintProvenance] = {}
     for func in taint_map:
-        src = taint_sources.get(func, "fallback")
+        try:
+            src = taint_sources[func]
+        except KeyError:
+            src = "fallback"
         if src == "decorator":
             prov_source: Literal["decorator", "module_default", "callgraph", "fallback"] = "decorator"
         elif src == "module_default":
             prov_source = "module_default"
         else:
             prov_source = "fallback"
+        try:
+            func_resolved = resolved_counts[func]
+        except KeyError:
+            func_resolved = 0
+        try:
+            func_unresolved = unresolved_counts[func]
+        except KeyError:
+            func_unresolved = 0
         provenance[func] = TaintProvenance(
             source=prov_source,
             via_callee=None,
-            resolved_call_count=resolved_counts.get(func, 0),
-            unresolved_call_count=unresolved_counts.get(func, 0),
+            resolved_call_count=func_resolved,
+            unresolved_call_count=func_unresolved,
         )
     return provenance
 
@@ -373,11 +474,19 @@ def compute_sccs(graph: dict[str, set[str]]) -> list[set[str]]:
     work_stack: list[tuple[str, Iterator[str], bool]] = []
 
     for start_node in sorted(graph):
-        if start_node in indices:
+        try:
+            indices[start_node]
+        except KeyError:
+            _idx = None  # start_node not yet indexed — proceed with DFS
+        else:
             continue
 
         # Push initial frame
-        work_stack.append((start_node, iter(sorted(graph.get(start_node, set()))), True))
+        try:
+            start_neighbors = graph[start_node]
+        except KeyError:
+            start_neighbors = set()
+        work_stack.append((start_node, iter(sorted(start_neighbors)), True))
 
         while work_stack:
             node, neighbors, is_first_visit = work_stack.pop()
@@ -393,17 +502,27 @@ def compute_sccs(graph: dict[str, set[str]]) -> list[set[str]]:
             # Try to advance through neighbors
             pushed_child = False
             for neighbor in neighbors:
-                if neighbor not in graph:
-                    # Neighbor not in graph, skip
+                try:
+                    neighbor_edges = graph[neighbor]
+                except KeyError:
+                    neighbor_edges = None  # neighbor not in graph — skip
                     continue
-                if neighbor not in indices:
+                try:
+                    indices[neighbor]
+                except KeyError:
                     # Unvisited neighbor: save current frame and push child
                     work_stack.append((node, neighbors, False))
-                    work_stack.append((neighbor, iter(sorted(graph.get(neighbor, set()))), True))
+                    work_stack.append((neighbor, iter(sorted(neighbor_edges)), True))
                     pushed_child = True
                     break
-                elif on_stack.get(neighbor, False):
-                    lowlinks[node] = min(lowlinks[node], indices[neighbor])
+                else:
+                    # Visited neighbor — update lowlink if on stack
+                    try:
+                        neighbor_on_stack = on_stack[neighbor]
+                    except KeyError:
+                        neighbor_on_stack = False
+                    if neighbor_on_stack:
+                        lowlinks[node] = min(lowlinks[node], indices[neighbor])
 
             if pushed_child:
                 continue

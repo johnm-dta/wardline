@@ -693,10 +693,12 @@ def _compute_taints(
 
         try:
             annotations = discover_annotations(tree, file_path)
-            taint_map, _return_taint_map, taint_sources, _conflicts = assign_function_taints(
+            project_root = Path(manifest_path).parent if manifest_path is not None else None
+            taint_map, _return_taint_map, taint_sources, _conflicts, _overclaims = assign_function_taints(
                 tree, file_path, annotations, manifest,
+                project_root=project_root,
             )
-        except Exception as exc:
+        except (AttributeError, KeyError, TypeError, ValueError, OSError) as exc:
             logger.warning("Taint assignment failed for %s: %s", file_path, exc)
             continue
 
@@ -710,7 +712,7 @@ def _compute_taints(
                     resolved, unresolved,
                 )
                 taint_map = refined
-            except Exception as exc:
+            except (AttributeError, KeyError, TypeError, ValueError) as exc:
                 logger.warning(
                     "L3 taint propagation failed for %s: %s — using L1 taints",
                     file_path, exc,

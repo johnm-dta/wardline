@@ -247,7 +247,7 @@ These areas require extra care:
   content; only parse it via AST.
 
 Report vulnerabilities via GitHub's
-[private vulnerability reporting](https://github.com/tachyon-beep/wardline/security/advisories/new),
+[private vulnerability reporting](https://github.com/johnm-dta/wardline/security/advisories/new),
 not public issues.
 
 ### Pull Requests

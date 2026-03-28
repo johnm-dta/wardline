@@ -12,6 +12,7 @@ from wardline.manifest.coherence import (
     check_expired_exceptions,
     check_first_scan_perimeter,
     check_orphaned_annotations,
+    check_restoration_evidence_consistency,
     check_stale_contract_bindings,
     check_tier_distribution,
     check_tier_downgrades,
@@ -19,6 +20,8 @@ from wardline.manifest.coherence import (
     check_tier_upgrade_without_evidence,
     check_undeclared_boundaries,
     check_unmatched_contracts,
+    check_validation_scope_presence,
+    check_restoration_evidence,
 )
 from wardline.manifest.models import (
     BoundaryEntry,
@@ -575,7 +578,7 @@ class TestUnmatchedContracts:
     """Tests for check_unmatched_contracts."""
 
     def test_matched_contract_no_issue(self) -> None:
-        """Boundary with bounded_context contracts and matching annotation is clean."""
+        """Boundary with validation_scope contracts and matching annotation is clean."""
         annotations = {
             ("src/api.py", "handle_request"): [_annot("external_boundary")],
         }
@@ -583,7 +586,7 @@ class TestUnmatchedContracts:
             BoundaryEntry(
                 function="handle_request",
                 transition="INGRESS",
-                bounded_context={
+                validation_scope={
                     "contracts": [
                         {"name": "UserInput", "data_tier": 3, "direction": "inbound"},
                     ]
@@ -600,7 +603,7 @@ class TestUnmatchedContracts:
             BoundaryEntry(
                 function="ghost_handler",
                 transition="INGRESS",
-                bounded_context={
+                validation_scope={
                     "contracts": [
                         {"name": "RawPayload", "data_tier": 4, "direction": "inbound"},
                     ]
@@ -614,8 +617,8 @@ class TestUnmatchedContracts:
         assert issues[0].function == "ghost_handler"
         assert "RawPayload" in issues[0].detail
 
-    def test_boundary_without_bounded_context_ignored(self) -> None:
-        """Boundaries without bounded_context are silently skipped."""
+    def test_boundary_without_validation_scope_ignored(self) -> None:
+        """Boundaries without validation_scope are silently skipped."""
         annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
         boundaries = (
             BoundaryEntry(function="handler", transition="INGRESS"),
@@ -630,7 +633,7 @@ class TestUnmatchedContracts:
             BoundaryEntry(
                 function="handler",
                 transition="INGRESS",
-                bounded_context={"contracts": []},
+                validation_scope={"contracts": []},
             ),
         )
         issues = check_unmatched_contracts(annotations, boundaries)
@@ -643,7 +646,7 @@ class TestUnmatchedContracts:
             BoundaryEntry(
                 function="handler",
                 transition="INGRESS",
-                bounded_context={
+                validation_scope={
                     "contracts": [
                         {"name": "ContractA", "data_tier": 2, "direction": "inbound"},
                         {"name": "ContractB", "data_tier": 3, "direction": "outbound"},
@@ -659,6 +662,25 @@ class TestUnmatchedContracts:
     def test_empty_inputs(self) -> None:
         """No annotations and no boundaries produces no issues."""
         issues = check_unmatched_contracts({}, ())
+        assert issues == []
+
+    def test_validation_scope_field_read_correctly(self) -> None:
+        """Regression: renamed attribute validation_scope is read correctly."""
+        annotations = {
+            ("src/api.py", "handle_request"): [_annot("external_boundary")],
+        }
+        boundaries = (
+            BoundaryEntry(
+                function="handle_request",
+                transition="semantic_validation",
+                validation_scope={
+                    "contracts": [
+                        {"name": "SomeContract", "data_tier": 2, "direction": "inbound"},
+                    ]
+                },
+            ),
+        )
+        issues = check_unmatched_contracts(annotations, boundaries)
         assert issues == []
 
 
@@ -848,3 +870,537 @@ class TestTierTopologyConsistency:
         assert len(issues) == 2
         kinds = {i.kind for i in issues}
         assert kinds == {"tier_topology_inconsistency"}
+
+
+# ── Validation scope presence tests ──────────────────────────────
+
+
+class TestValidationScopePresence:
+    """Tests for check_validation_scope_presence."""
+
+    def test_empty_boundaries(self) -> None:
+        """Empty boundaries tuple produces no issues."""
+        issues = check_validation_scope_presence(())
+        assert issues == []
+
+    def test_semantic_validation_without_scope(self) -> None:
+        """semantic_validation without validation_scope is flagged."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.validate",
+                transition="semantic_validation",
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "missing_validation_scope"
+        assert issues[0].function == "mymod.validate"
+        assert "semantic_validation" in issues[0].detail
+
+    def test_combined_validation_without_scope(self) -> None:
+        """combined_validation without validation_scope is flagged."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.combo",
+                transition="combined_validation",
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "missing_validation_scope"
+        assert "combined_validation" in issues[0].detail
+
+    def test_restoration_semantic_true_without_scope(self) -> None:
+        """restoration + provenance.semantic=True without scope is flagged."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                provenance={"structural": True, "semantic": True},
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "missing_validation_scope"
+        assert "restoration" in issues[0].detail
+
+    def test_restoration_semantic_false_without_scope(self) -> None:
+        """restoration + provenance.semantic=False without scope is clean."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                provenance={"structural": True, "semantic": False},
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert issues == []
+
+    def test_restoration_provenance_none_without_scope(self) -> None:
+        """restoration + provenance=None without scope is clean."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                provenance=None,
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert issues == []
+
+    def test_shape_validation_without_scope(self) -> None:
+        """shape_validation without validation_scope is clean."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.shape",
+                transition="shape_validation",
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert issues == []
+
+    def test_semantic_validation_with_scope(self) -> None:
+        """semantic_validation with validation_scope present is clean."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.validate",
+                transition="semantic_validation",
+                validation_scope={
+                    "contracts": [
+                        {"name": "foo", "data_tier": 2, "direction": "inbound"},
+                    ]
+                },
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert issues == []
+
+    def test_combined_validation_with_scope(self) -> None:
+        """combined_validation with validation_scope present is clean."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.combo",
+                transition="combined_validation",
+                validation_scope={
+                    "contracts": [
+                        {"name": "bar", "data_tier": 2, "direction": "outbound"},
+                    ]
+                },
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert issues == []
+
+    def test_mixed_boundaries(self) -> None:
+        """Only the boundary missing scope is flagged in a mixed list."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.validate",
+                transition="semantic_validation",
+                # no validation_scope — should be flagged
+            ),
+            BoundaryEntry(
+                function="mymod.shape",
+                transition="shape_validation",
+                # no validation_scope — but not required
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].function == "mymod.validate"
+
+    def test_validation_scope_empty_contracts(self) -> None:
+        """semantic_validation with empty contracts list is flagged."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.validate",
+                transition="semantic_validation",
+                validation_scope={"contracts": []},
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "missing_validation_scope"
+        assert issues[0].function == "mymod.validate"
+
+    def test_restoration_provenance_missing_semantic_key(self) -> None:
+        """restoration with provenance missing 'semantic' key is clean."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                provenance={"structural": True},
+            ),
+        )
+        issues = check_validation_scope_presence(boundaries)
+        assert issues == []
+
+
+class TestRestorationEvidence:
+    """Tests for check_restoration_evidence."""
+
+    def test_full_evidence_tier_1_passes(self) -> None:
+        """Full provenance supports tier 1 — no issues."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=1,
+                provenance={
+                    "structural": True,
+                    "semantic": True,
+                    "integrity": "hmac",
+                    "institutional": "org-db",
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_tier_1_with_only_structural_fails(self) -> None:
+        """Only structural evidence cannot support tier 1."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=1,
+                provenance={
+                    "structural": True,
+                    "semantic": False,
+                    "integrity": False,
+                    "institutional": False,
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "insufficient_restoration_evidence"
+        assert issues[0].function == "mymod.restore"
+
+    def test_tier_2_with_sufficient_evidence_passes(self) -> None:
+        """structural+semantic+institutional supports tier 2."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=2,
+                provenance={
+                    "structural": True,
+                    "semantic": True,
+                    "integrity": False,
+                    "institutional": "org-db",
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_tier_3_with_structural_institutional_passes(self) -> None:
+        """structural+institutional supports tier 3."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=3,
+                provenance={
+                    "structural": True,
+                    "semantic": False,
+                    "integrity": False,
+                    "institutional": "org-db",
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_restored_tier_none_skipped(self) -> None:
+        """restored_tier=None is skipped."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=None,
+                provenance={"structural": True},
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_provenance_none_skipped(self) -> None:
+        """provenance=None with restored_tier → ERROR (null provenance)."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=1,
+                provenance=None,
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "insufficient_restoration_evidence"
+        assert "no provenance" in issues[0].detail
+
+    def test_exact_ceiling_passes(self) -> None:
+        """restored_tier exactly equals evidence ceiling — no issue."""
+        # structural+institutional → ceiling tier 3; claim tier 3 → OK
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=3,
+                provenance={
+                    "structural": True,
+                    "semantic": False,
+                    "integrity": False,
+                    "institutional": "org-db",
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_one_above_ceiling_fails(self) -> None:
+        """restored_tier one above evidence ceiling — issue raised."""
+        # structural+institutional → ceiling tier 3; claim tier 2 → overclaim
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=2,
+                provenance={
+                    "structural": True,
+                    "semantic": False,
+                    "integrity": False,
+                    "institutional": "org-db",
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "insufficient_restoration_evidence"
+
+    def test_non_restoration_boundary_skipped(self) -> None:
+        """Non-restoration boundaries are skipped."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.validate",
+                transition="semantic_validation",
+                restored_tier=1,
+                provenance={"structural": True},
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert issues == []
+
+    def test_empty_boundaries(self) -> None:
+        """Empty boundaries tuple produces no issues."""
+        issues = check_restoration_evidence(())
+        assert issues == []
+
+    def test_no_institutional_provenance_rejects_any_tier_claim(self) -> None:
+        """structural+semantic but no institutional → ERROR (UNKNOWN family)."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=3,
+                provenance={
+                    "structural": True,
+                    "semantic": True,
+                    "integrity": False,
+                    "institutional": False,
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "insufficient_restoration_evidence"
+        assert "UNKNOWN_SEM_VALIDATED" in issues[0].detail
+
+    def test_unknown_raw_rejects_tier_claim(self) -> None:
+        """No evidence at all → ERROR (UNKNOWN_RAW)."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=4,
+                provenance={
+                    "structural": False,
+                    "semantic": False,
+                    "integrity": False,
+                    "institutional": False,
+                },
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "insufficient_restoration_evidence"
+        assert "UNKNOWN_RAW" in issues[0].detail
+
+    def test_null_provenance_with_restored_tier_fails(self) -> None:
+        """transition=restoration, restored_tier=2, provenance=None → ERROR."""
+        boundaries = (
+            BoundaryEntry(
+                function="mymod.restore",
+                transition="restoration",
+                restored_tier=2,
+                provenance=None,
+            ),
+        )
+        issues = check_restoration_evidence(boundaries)
+        assert len(issues) == 1
+        assert issues[0].kind == "insufficient_restoration_evidence"
+        assert "no provenance" in issues[0].detail
+
+
+# ── Restoration evidence consistency tests ────────────────────────
+
+
+class TestRestorationEvidenceConsistency:
+    """Cross-layer reconciliation between overlay and decorator evidence."""
+
+    def _make_ann(self, attrs: dict) -> WardlineAnnotation:
+        return WardlineAnnotation(
+            canonical_name="restoration_boundary",
+            group=17,
+            attrs=MappingProxyType(attrs),
+        )
+
+    def test_matching_evidence_no_issue(self) -> None:
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=2,
+            provenance={"structural": True, "semantic": True, "institutional": "org-db"},
+        )
+        annotations = {
+            ("test.py", "mymod.restore"): [self._make_ann({
+                "structural_evidence": True,
+                "semantic_evidence": True,
+                "institutional_provenance": "org-db",
+            })],
+        }
+        assert check_restoration_evidence_consistency((boundary,), annotations) == []
+
+    def test_decorator_claims_higher_than_overlay_warning(self) -> None:
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=2,
+            provenance={"structural": True},  # no semantic
+        )
+        annotations = {
+            ("test.py", "mymod.restore"): [self._make_ann({
+                "structural_evidence": True,
+                "semantic_evidence": True,  # decorator claims semantic
+            })],
+        }
+        issues = check_restoration_evidence_consistency((boundary,), annotations)
+        assert len(issues) == 1
+        assert issues[0].kind == "restoration_evidence_divergence"
+        assert "semantic_evidence" in issues[0].detail
+
+    def test_decorator_claims_lower_no_issue(self) -> None:
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=2,
+            provenance={"structural": True, "semantic": True, "institutional": "org-db"},
+        )
+        annotations = {
+            ("test.py", "mymod.restore"): [self._make_ann({
+                "structural_evidence": True,
+                # decorator doesn't claim semantic — conservative
+            })],
+        }
+        assert check_restoration_evidence_consistency((boundary,), annotations) == []
+
+    def test_no_annotation_for_boundary_skipped(self) -> None:
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=2,
+            provenance={"structural": True},
+        )
+        annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
+        assert check_restoration_evidence_consistency((boundary,), annotations) == []
+
+    def test_non_restoration_boundary_skipped(self) -> None:
+        boundary = BoundaryEntry(
+            function="mymod.validate",
+            transition="semantic_validation",
+        )
+        annotations: dict[tuple[str, str], list[WardlineAnnotation]] = {}
+        assert check_restoration_evidence_consistency((boundary,), annotations) == []
+
+    def test_integrity_mechanism_mismatch_warning(self) -> None:
+        """Decorator says hmac, overlay says checksum → value divergence."""
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=1,
+            provenance={
+                "structural": True,
+                "semantic": True,
+                "integrity": "checksum",
+                "institutional": "org-db",
+            },
+        )
+        annotations = {
+            ("test.py", "mymod.restore"): [self._make_ann({
+                "structural_evidence": True,
+                "semantic_evidence": True,
+                "integrity_evidence": "hmac",
+                "institutional_provenance": "org-db",
+            })],
+        }
+        issues = check_restoration_evidence_consistency((boundary,), annotations)
+        assert len(issues) == 1
+        assert "mechanism mismatch" in issues[0].detail
+
+    def test_institutional_string_mismatch_warning(self) -> None:
+        """Different institutional attestation strings → value divergence."""
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=2,
+            provenance={
+                "structural": True,
+                "semantic": True,
+                "institutional": "soc2",
+            },
+        )
+        annotations = {
+            ("test.py", "mymod.restore"): [self._make_ann({
+                "structural_evidence": True,
+                "semantic_evidence": True,
+                "institutional_provenance": "irap",
+            })],
+        }
+        issues = check_restoration_evidence_consistency((boundary,), annotations)
+        assert len(issues) == 1
+        assert "mechanism mismatch" in issues[0].detail
+
+    def test_matching_string_values_no_issue(self) -> None:
+        """Same integrity mechanism string → no issue."""
+        boundary = BoundaryEntry(
+            function="mymod.restore",
+            transition="restoration",
+            restored_tier=1,
+            provenance={
+                "structural": True,
+                "semantic": True,
+                "integrity": "hmac",
+                "institutional": "org-db",
+            },
+        )
+        annotations = {
+            ("test.py", "mymod.restore"): [self._make_ann({
+                "structural_evidence": True,
+                "semantic_evidence": True,
+                "integrity_evidence": "hmac",
+                "institutional_provenance": "org-db",
+            })],
+        }
+        assert check_restoration_evidence_consistency((boundary,), annotations) == []

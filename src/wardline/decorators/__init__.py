@@ -28,6 +28,7 @@ from wardline.decorators.operations import (
 )
 from wardline.decorators.plugin import system_plugin
 from wardline.decorators.provenance import int_data
+from wardline.decorators.restoration import restoration_boundary
 from wardline.decorators.safety import parse_at_init
 from wardline.decorators.schema import all_fields_mapped, output_schema, schema_default
 from wardline.decorators.secrets import handles_secrets
@@ -66,6 +67,7 @@ __all__ = [
     "preserve_cause",
     "privileged_operation",
     "requires_identity",
+    "restoration_boundary",
     "schema_default",
     "system_plugin",
     "test_only",

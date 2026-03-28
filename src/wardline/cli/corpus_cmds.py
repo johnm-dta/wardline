@@ -1,8 +1,8 @@
 """Corpus verification commands.
 
-Verifies specimen fragments against scanner rules, computes per-rule
-precision/recall where sample >= 5, and tracks known_false_negative
-specimens separately from true negatives.
+Verifies specimen fragments against scanner rules, computes per-cell
+(rule x taint_state) precision/recall where sample >= 5, and tracks
+known_false_negative specimens separately from true negatives.
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class _RuleStats:
-    """Per-rule verdict counters."""
+class _CellStats:
+    """Per-cell (rule x taint_state) verdict counters."""
 
     tp: int = 0
     fp: int = 0
@@ -198,7 +198,7 @@ def _run_rules_on_fragment(
         rule.set_context(ctx)
         try:
             rule.visit(tree)
-        except Exception as exc:
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
             logger.warning(
                 "Rule %s crashed on specimen: %s", rule.RULE_ID, exc,
             )
@@ -212,7 +212,7 @@ def _evaluate_specimen(
     data: dict[str, object],
     source: str,
     rules: tuple[RuleBase, ...],
-    stats: dict[str, _RuleStats],
+    stats: dict[tuple[str, str], _CellStats],
 ) -> None:
     """Evaluate a specimen's verdict against scanner results."""
     rule_id = str(data.get("rule", "") or data.get("rule_id", ""))
@@ -221,17 +221,19 @@ def _evaluate_specimen(
     if not rule_id or not verdict:
         return
 
-    if rule_id not in stats:
-        stats[rule_id] = _RuleStats()
-
     raw_taint = data.get("taint_state")
-    taint_state = str(raw_taint) if raw_taint is not None else None
+    taint_state = str(raw_taint) if raw_taint is not None else "UNKNOWN"
+
+    key = (rule_id, taint_state)
+    if key not in stats:
+        stats[key] = _CellStats()
+
     boundaries = _parse_specimen_boundaries(data)
     optional_fields = _parse_specimen_optional_fields(data)
     fired = _run_rules_on_fragment(
         source,
         rules,
-        taint_state=taint_state,
+        taint_state=taint_state if taint_state != "UNKNOWN" else None,
         boundaries=boundaries,
         optional_fields=optional_fields,
     )
@@ -239,55 +241,256 @@ def _evaluate_specimen(
 
     if verdict == "true_positive":
         if rule_fired:
-            stats[rule_id].tp += 1
+            stats[key].tp += 1
         else:
-            stats[rule_id].fn += 1
+            stats[key].fn += 1
     elif verdict == "true_negative":
         if rule_fired:
-            stats[rule_id].fp += 1
+            stats[key].fp += 1
         else:
-            stats[rule_id].tn += 1
+            stats[key].tn += 1
     elif verdict == "known_false_negative":
         if rule_fired:
             click.echo(
                 f"notice: {rule_id} fired on KFN specimen — consider promoting to true_positive",
                 err=True,
             )
-        stats[rule_id].kfn += 1
+        stats[key].kfn += 1
 
 
-def _print_stats(stats: dict[str, _RuleStats]) -> None:
-    """Print per-rule verdict stats with precision/recall where sample >= 5."""
+def _get_floors(
+    rule_id: str, taint_state: str,
+) -> tuple[float | None, float | None]:
+    """Return (precision_floor, recall_floor) from the severity matrix.
+
+    Floors:
+    - Precision: 80% (65% for MIXED_RAW)
+    - Recall: 90% for UNCONDITIONAL, 70% for STANDARD/RELAXED
+    - SUPPRESS cells: precision floor only, no recall floor
+    """
+    from wardline.core.matrix import SEVERITY_MATRIX
+    from wardline.core.severity import Exceptionability, RuleId, Severity
+    from wardline.core.taints import TaintState
+
+    try:
+        rid = RuleId(rule_id)
+        ts = TaintState(taint_state)
+    except ValueError:
+        return (None, None)
+
+    cell = SEVERITY_MATRIX.get((rid, ts))
+    if cell is None:
+        return (None, None)
+
+    # Precision floor
+    precision_floor = 0.65 if ts == TaintState.MIXED_RAW else 0.80
+
+    # SUPPRESS cells: precision floor only, no recall floor
+    if cell.severity == Severity.SUPPRESS:
+        return (precision_floor, None)
+
+    # Recall floor based on exceptionability
+    if cell.exceptionability == Exceptionability.UNCONDITIONAL:
+        recall_floor = 0.90
+    elif cell.exceptionability in (
+        Exceptionability.STANDARD,
+        Exceptionability.RELAXED,
+    ):
+        recall_floor = 0.70
+    else:
+        # TRANSPARENT — no recall floor
+        recall_floor = None
+
+    return (precision_floor, recall_floor)
+
+
+def _print_cell_stats(stats: dict[tuple[str, str], _CellStats]) -> None:
+    """Print per-cell verdict stats grouped by rule, with floor comparison."""
     if not stats:
         return
 
-    for rule_id in sorted(stats):
-        s = stats[rule_id]
-        parts: list[str] = []
-        if s.tp:
-            parts.append(f"{s.tp} TP")
-        if s.tn:
-            parts.append(f"{s.tn} TN")
-        if s.fn:
-            parts.append(f"{s.fn} FN")
-        if s.fp:
-            parts.append(f"{s.fp} FP")
-        if s.kfn:
-            parts.append(f"{s.kfn} KFN")
+    # Group by rule_id
+    rules: dict[str, list[str]] = {}
+    for rule_id, taint_state in sorted(stats):
+        rules.setdefault(rule_id, []).append(taint_state)
 
-        line = f"  {rule_id}: {', '.join(parts)}"
+    for rule_id in sorted(rules):
+        click.echo(f"  {rule_id}:")
+        for taint_state in sorted(rules[rule_id]):
+            key = (rule_id, taint_state)
+            s = stats[key]
+            parts: list[str] = []
+            if s.tp:
+                parts.append(f"{s.tp} TP")
+            if s.tn:
+                parts.append(f"{s.tn} TN")
+            if s.fn:
+                parts.append(f"{s.fn} FN")
+            if s.fp:
+                parts.append(f"{s.fp} FP")
+            if s.kfn:
+                parts.append(f"{s.kfn} KFN")
 
-        if s.sample_size >= 5:
-            prec_denom = s.tp + s.fp
-            precision = s.tp / prec_denom if prec_denom > 0 else 0.0
-            recall_denom = s.tp + s.fn  # KFN excluded
-            recall = s.tp / recall_denom if recall_denom > 0 else 0.0
-            line += (
-                f" | precision={precision:.1%}"
-                f" recall={recall:.1%}"
+            line = f"    {taint_state}: {', '.join(parts)}"
+
+            if s.sample_size >= 5:
+                prec_denom = s.tp + s.fp
+                precision = s.tp / prec_denom if prec_denom > 0 else 0.0
+                recall_denom = s.tp + s.fn  # KFN excluded
+                recall = s.tp / recall_denom if recall_denom > 0 else 0.0
+                line += f" | precision={precision:.1%} recall={recall:.1%}"
+
+                prec_floor, recall_floor = _get_floors(rule_id, taint_state)
+                floor_parts: list[str] = []
+                if prec_floor is not None:
+                    status = "ok" if precision >= prec_floor else "BELOW"
+                    floor_parts.append(
+                        f"prec>={prec_floor:.0%} {status}"
+                    )
+                if recall_floor is not None:
+                    status = "ok" if recall >= recall_floor else "BELOW"
+                    floor_parts.append(
+                        f"recall>={recall_floor:.0%} {status}"
+                    )
+                if floor_parts:
+                    line += f" [{', '.join(floor_parts)}]"
+
+            click.echo(line)
+
+
+def _build_json_report(
+    stats: dict[tuple[str, str], _CellStats],
+) -> dict[str, object]:
+    """Build per-cell assessment JSON with verdicts."""
+    from wardline.core.matrix import SEVERITY_MATRIX
+    from wardline.core.severity import RuleId, Severity
+    from wardline.core.taints import TaintState
+
+    cells: list[dict[str, object]] = []
+    passing = 0
+    failing = 0
+    no_data = 0
+    suppress_count = 0
+    below_precision = 0
+    below_recall = 0
+
+    # Iterate ALL severity matrix cells (72), not just cells with specimens.
+    # This ensures cells with zero specimens appear as NO_DATA rather than
+    # silently disappearing from the report.
+    all_cells = sorted(
+        (str(rid.value), str(ts.value))
+        for rid, ts in SEVERITY_MATRIX
+    )
+    for rule_id, taint_state in all_cells:
+        s = stats.get((rule_id, taint_state), _CellStats())
+        prec_floor, recall_floor = _get_floors(rule_id, taint_state)
+
+        matrix_cell = SEVERITY_MATRIX[(RuleId(rule_id), TaintState(taint_state))]
+        is_suppress = matrix_cell.severity == Severity.SUPPRESS
+        exceptionability = str(matrix_cell.exceptionability.value)
+
+        if is_suppress:
+            suppress_count += 1
+
+        # Compute metrics
+        prec_denom = s.tp + s.fp
+        precision = round(s.tp / prec_denom, 4) if prec_denom > 0 else None
+        recall_denom = s.tp + s.fn
+        recall = round(s.tp / recall_denom, 4) if recall_denom > 0 else None
+
+        # Determine cell verdict
+        if s.sample_size == 0:
+            verdict = "NO_DATA"
+            no_data += 1
+        elif is_suppress:
+            verdict = "PASS" if s.fp == 0 else "FAIL"
+            if verdict == "PASS":
+                passing += 1
+            else:
+                failing += 1
+        else:
+            below_p = (
+                precision is not None
+                and prec_floor is not None
+                and precision < prec_floor
             )
+            below_r = (
+                recall is not None
+                and recall_floor is not None
+                and recall < recall_floor
+            )
+            if below_p:
+                below_precision += 1
+            if below_r:
+                below_recall += 1
+            verdict = "FAIL" if below_p or below_r else "PASS"
+            if verdict == "PASS":
+                passing += 1
+            else:
+                failing += 1
 
-        click.echo(line)
+        cells.append({
+            "rule": rule_id,
+            "taint_state": taint_state,
+            "exceptionability": exceptionability,
+            "suppress": is_suppress,
+            "tp": s.tp,
+            "tn": s.tn,
+            "fp": s.fp,
+            "fn": s.fn,
+            "kfn": s.kfn,
+            "precision": precision,
+            "recall": recall,
+            "precision_floor": prec_floor,
+            "recall_floor": recall_floor,
+            "cell_verdict": verdict,
+        })
+
+    overall = "PASS" if failing == 0 and no_data == 0 else "FAIL"
+
+    return {
+        "format_version": "1.0",
+        "overall_verdict": overall,
+        "cells": cells,
+        "summary": {
+            "total_cells": len(cells),
+            "measured_cells": passing + failing,
+            "suppress_cells": suppress_count,
+            "passing_cells": passing,
+            "failing_cells": failing,
+            "no_data_cells": no_data,
+            "cells_below_precision_floor": below_precision,
+            "cells_below_recall_floor": below_recall,
+        },
+    }
+
+
+def _compute_corpus_hash(corpus_path: Path) -> str:
+    """Hash-of-hashes over the full corpus artefact set.
+
+    Covers specimen YAML files, corpus_manifest.json, and schema files.
+    Uses the same §10.1 construction as inputHash.
+    """
+    all_files = sorted(
+        list(corpus_path.glob("**/*.yaml"))
+        + list(corpus_path.glob("**/*.yml"))
+        + list(corpus_path.glob("**/*.json"))
+    )
+
+    records: list[str] = []
+    for fp in all_files:
+        resolved = fp.resolve()
+        try:
+            rel = resolved.relative_to(corpus_path.resolve())
+        except ValueError:
+            rel = resolved
+        normalized = rel.as_posix()
+        digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+        records.append(f"{normalized}\x00{digest}")
+
+    records.sort()
+    combined = "".join(r + "\n" for r in records)
+    return "sha256:" + hashlib.sha256(combined.encode("utf-8")).hexdigest()
 
 
 @click.group()
@@ -308,7 +511,13 @@ def corpus() -> None:
     default=1,
     help="Analysis level (1-3). Specimens requiring a higher level are skipped.",
 )
-def verify(corpus_dir: str, analysis_level: int) -> None:
+@click.option(
+    "--json", "output_json",
+    is_flag=True,
+    default=False,
+    help="Output per-cell assessment JSON instead of text.",
+)
+def verify(corpus_dir: str, analysis_level: int, output_json: bool) -> None:
     """Verify corpus specimens against scanner rules."""
     corpus_path = Path(corpus_dir)
     # Keep the two glob results concatenated before sorting so `.yaml` and
@@ -324,7 +533,7 @@ def verify(corpus_dir: str, analysis_level: int) -> None:
 
     WardlineSafeLoader = make_wardline_loader()
     rules = make_rules()
-    stats: dict[str, _RuleStats] = {}
+    stats: dict[tuple[str, str], _CellStats] = {}
     errors = 0
     total = 0
     skipped = 0
@@ -419,9 +628,232 @@ def verify(corpus_dir: str, analysis_level: int) -> None:
             errors += 1
             continue
 
-    skip_msg = f" ({skipped} skipped, level > {analysis_level})" if skipped else ""
-    click.echo(f"Lite bootstrap: {total} specimens{skip_msg}")
-    _print_stats(stats)
+    if output_json:
+        import json as json_mod
+
+        report = _build_json_report(stats)
+        # No timestamp — deterministic output per §10 property 5.
+        # corpus publish adds generated_at when producing the conformance file.
+        click.echo(json_mod.dumps(report, indent=2, sort_keys=True))
+    else:
+        skip_msg = f" ({skipped} skipped, level > {analysis_level})" if skipped else ""
+        click.echo(f"Lite bootstrap: {total} specimens{skip_msg}")
+        _print_cell_stats(stats)
 
     if errors:
         raise SystemExit(1)
+
+
+@corpus.command()
+@click.option(
+    "--corpus-dir",
+    type=click.Path(exists=True, file_okay=False),
+    default="corpus/",
+    help="Corpus specimen directory.",
+)
+@click.option(
+    "--sarif",
+    type=click.Path(exists=True, dir_okay=False),
+    required=True,
+    help="Self-hosting SARIF output file from a previous scan.",
+)
+@click.option(
+    "--output", "-o",
+    type=click.Path(dir_okay=False),
+    default="wardline.conformance.json",
+    help="Output path for conformance status file.",
+)
+@click.option(
+    "--analysis-level",
+    type=click.IntRange(1, 3),
+    default=1,
+    help="Analysis level (1-3).",
+)
+def publish(
+    corpus_dir: str,
+    sarif: str,
+    output: str,
+    analysis_level: int,
+) -> None:
+    """Generate wardline.conformance.json from corpus verify + self-hosting SARIF."""
+    import json as json_mod
+    from datetime import UTC, datetime
+
+    # --- Run corpus verify internally ---
+    corpus_path = Path(corpus_dir)
+    specimens = sorted(
+        list(corpus_path.glob("**/*.yaml"))
+        + list(corpus_path.glob("**/*.yml"))
+    )
+
+    WardlineSafeLoader = make_wardline_loader()
+    rules = make_rules()
+    stats: dict[tuple[str, str], _CellStats] = {}
+    errors = 0
+    category_rules: dict[str, set[str]] = {}
+    category_counts: dict[str, int] = {}
+
+    for specimen_path in specimens:
+        try:
+            with open(specimen_path, encoding="utf-8") as f:
+                data = yaml.load(f, Loader=WardlineSafeLoader)  # noqa: S506
+        except (OSError, yaml.YAMLError):
+            errors += 1
+            continue
+        if not isinstance(data, dict):
+            errors += 1
+            continue
+
+        required_level = int(data.get("analysis_level_required", 1))
+        if required_level > analysis_level:
+            continue
+
+        source = data.get("fragment", "") or data.get("source", "")
+        if not source:
+            errors += 1
+            continue
+
+        actual_hash = hashlib.sha256(str(source).encode("utf-8")).hexdigest()
+        if actual_hash != data.get("sha256", ""):
+            errors += 1
+            continue
+
+        try:
+            ast.parse(str(source))
+        except SyntaxError:
+            errors += 1
+            continue
+
+        category = str(data.get("category", ""))
+        if category:
+            rule_id = str(data.get("rule", ""))
+            category_rules.setdefault(category, set()).add(rule_id)
+            category_counts[category] = category_counts.get(category, 0) + 1
+
+        try:
+            _evaluate_specimen(data, str(source), rules, stats)
+        except ValueError:
+            errors += 1
+            continue
+
+    if errors > 0:
+        click.echo(
+            f"error: {errors} corpus specimen(s) failed verification — "
+            f"cannot generate conformance status from partial evidence.",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    corpus_report = _build_json_report(stats)
+
+    # --- Read self-hosting SARIF ---
+    sarif_data = json_mod.loads(Path(sarif).read_text(encoding="utf-8"))
+    run = sarif_data["runs"][0]
+    run_props = run.get("properties", {})
+    implemented_rules = set(run_props.get("wardline.implementedRules", []))
+
+    # Count unexcepted ERROR findings for implemented rules.
+    #
+    # The gate uses a three-tier signal model:
+    # - SUPPRESS (SARIF "note"): Matrix says this pattern is expected at this
+    #   taint state.  Excluded from gate; tracked as diagnostic counter.
+    # - WARNING (SARIF "warning"): Pattern is worth reviewing but does not
+    #   block.  Excluded from gate; tracked as separate counter.
+    # - ERROR (SARIF "error"): Pattern violates the tier's integrity contract.
+    #   Blocks the gate unless governed by an exception.
+    #
+    # This creates an economic incentive: promoting data to a higher tier
+    # (via validation boundaries) removes findings.  Leaving raw data in
+    # hot code paths is expensive.
+    unexcepted_errors = 0
+    warning_findings = 0
+    suppressed_cell_findings = 0
+    for result in run.get("results", []):
+        rule_id = result.get("ruleId", "")
+        if rule_id not in implemented_rules:
+            continue
+        level = result.get("level", "error")
+        if level == "note":
+            suppressed_cell_findings += 1
+            continue
+        if level == "warning":
+            warning_findings += 1
+            continue
+        props = result.get("properties", {})
+        if "wardline.exceptionId" in props:
+            continue
+        unexcepted_errors += 1
+
+    self_hosting_verdict = "PASS" if unexcepted_errors == 0 else "FAIL"
+
+    # --- Compute corpus hash ---
+    corpus_hash = _compute_corpus_hash(corpus_path)
+
+    # --- Build gaps list ---
+    gaps: list[str] = []
+    if corpus_report["overall_verdict"] == "FAIL":
+        failing = corpus_report["summary"]["failing_cells"]
+        gaps.append(f"{failing} corpus cell(s) below floor")
+    if self_hosting_verdict == "FAIL":
+        gaps.append(f"{unexcepted_errors} unexcepted self-hosting ERROR finding(s)")
+    # Adversarial corpus floor: per-rule AFP/AFN + aggregate suppression/taint-flow
+    # Per-rule check applies to PY-WL-* analysis rules from the SARIF implementedRules.
+    adversarial_shortfalls: list[str] = []
+    analysis_rules = {r for r in implemented_rules if r.startswith("PY-WL-")}
+    for per_rule_cat in ("adversarial_false_positive", "adversarial_false_negative"):
+        covered_rules = category_rules.get(per_rule_cat, set())
+        missing = sorted(analysis_rules - covered_rules)
+        if missing:
+            adversarial_shortfalls.append(
+                f"{per_rule_cat}: missing for {', '.join(missing)}"
+            )
+    _AGGREGATE_FLOORS: dict[str, int] = {
+        "suppression_interaction": 3,
+        "taint_flow": 8,
+    }
+    for category, floor in _AGGREGATE_FLOORS.items():
+        actual = category_counts.get(category, 0)
+        if actual < floor:
+            adversarial_shortfalls.append(
+                f"{category}: {actual}/{floor}"
+            )
+    if adversarial_shortfalls:
+        gaps.append(
+            f"adversarial corpus below full floor ({', '.join(adversarial_shortfalls)})"
+        )
+
+    # --- Assemble conformance status ---
+    tool_version = run.get("tool", {}).get("driver", {}).get("version", "unknown")
+
+    conformance = {
+        "format_version": "1.0",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "inputs": {
+            "tool_version": tool_version,
+            "commit_ref": run_props.get("wardline.commitRef", "unknown"),
+            "manifest_hash": run_props.get("wardline.manifestHash", "unknown"),
+            "corpus_hash": corpus_hash,
+            "self_hosting_input_hash": run_props.get("wardline.inputHash", "unknown"),
+        },
+        "corpus_verdict": corpus_report["overall_verdict"],
+        "self_hosting_verdict": self_hosting_verdict,
+        "gaps": gaps,
+        "corpus_cells_failing": [
+            c for c in corpus_report["cells"]
+            if c["cell_verdict"] == "FAIL"
+        ],
+        "self_hosting_unexcepted_errors": unexcepted_errors,
+        "self_hosting_warning_findings": warning_findings,
+        "self_hosting_suppressed_cell_findings": suppressed_cell_findings,
+    }
+
+    Path(output).write_text(
+        json_mod.dumps(conformance, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    click.echo(
+        f"Conformance status written to {output} "
+        f"(corpus={corpus_report['overall_verdict']}, "
+        f"self-hosting={self_hosting_verdict}, "
+        f"{len(gaps)} gap(s))"
+    )

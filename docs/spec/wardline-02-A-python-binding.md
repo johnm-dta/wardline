@@ -268,7 +268,23 @@ The 17 annotation groups are defined as language-agnostic semantic requirements 
 | 28 | `@compensatable` + `@deterministic` | Suspicious | Compensation introduces state changes that may affect determinism |
 | 29 | `@time_dependent` + `@idempotent` | Suspicious | Time-dependent operations may not be idempotent across invocations |
 
-**Severity matrix.** The Python binding inherits the parent specification's 8×8 severity matrix (Part I §7.3) without modification. Where the binding splits a framework rule into binding-specific sub-rules (e.g., WL-001 → PY-WL-001 and PY-WL-002), the sub-rules inherit the framework rule's severity matrix entries. The Java binding (Part II-B §B.4.4) documents two cells where Java's type system structurally prevents certain violations, warranting SUPPRESS; Python's weaker type system does not support equivalent structural guarantees, so no cells are modified.
+**Severity matrix.** The Python binding inherits the parent specification's 8×8 severity matrix (Part I §7.3). Where the binding splits a framework rule into binding-specific sub-rules (e.g., WL-001 → PY-WL-001 and PY-WL-002), the sub-rules inherit the framework rule's severity matrix entries with the following binding-level deviation:
+
+**PY-WL-002 (attribute access with fallback default).** PY-WL-002 derives from WL-001 but covers `getattr(obj, name, default)` and `obj.attr or default`. The `obj.attr or default` form has a falsy-substitution risk absent from dict-key access: it silently replaces *present but falsy* attribute values (0, `""`, `False`, `None`) with the default, not just missing attributes. For this reason, PY-WL-002 uses WARNING/RELAXED (not SUPPRESS/TRANSPARENT) at EXTERNAL_RAW, UNKNOWN_RAW, UNKNOWN_SHAPE_VALIDATED, and MIXED_RAW — the pattern is expected at T4 boundaries but the falsy-substitution risk warrants visibility. This deviation *narrows* relative to the framework's WL-001 SUPPRESS at those cells (it uses WARNING where the framework uses SUPPRESS), which is permitted by §7.3.
+
+The Python binding matrix for PY-WL-001 through PY-WL-009 (72 cells) is:
+
+| Rule | Pattern | Audit Trail | Pipeline | Shape Val. | Ext. Raw | Unk. Raw | Unk. Shape V. | Unk. Sem. V. | Mixed Raw |
+|------|---------|---|---|---|---|---|---|---|---|
+| **PY-WL-001** | Dict key access with fallback default | E/U | E/St | W/R | Su/T | Su/T | W/R | E/St | Su/T |
+| **PY-WL-002** | Attribute access with fallback default | E/U | E/St | W/R | W/R | W/R | W/R | E/St | W/St |
+| **PY-WL-003** | Existence-checking as structural gate | E/U | E/U | E/St | Su/T | Su/T | E/St | E/St | Su/T |
+| **PY-WL-004** | Catching all exceptions broadly | E/U | E/St | W/St | W/R | E/St | W/St | W/St | E/St |
+| **PY-WL-005** | Catching exceptions silently | E/U | E/St | W/St | W/R | E/St | W/St | W/St | E/St |
+| **PY-WL-006** | Audit-critical writes in broad handlers | E/U | E/U | E/St | E/St | E/St | E/St | E/St | E/St |
+| **PY-WL-007** | Runtime type-checking internal data | E/St | W/R | W/R | Su/T | Su/T | W/R | W/R | W/St |
+| **PY-WL-008** | Validation with no rejection path | E/U | E/U | E/U | E/U | E/U | E/U | E/U | E/U |
+| **PY-WL-009** | Semantic validation without shape validation | E/U | E/U | E/U | E/U | E/U | E/U | E/U | E/U |
 
 ---
 

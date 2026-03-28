@@ -2,6 +2,7 @@
 specimen_id: "PY-WL-001-TP-schema-default-ungoverned"
 description: "schema_default() without overlay governance still fires PY-WL-001"
 rule: "PY-WL-001"
+category: "suppression_interaction"
 fragment: |
   from wardline import schema_default
 

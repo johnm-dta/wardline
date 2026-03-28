@@ -14,7 +14,7 @@ guidelines and information for contributors.
 
 ```bash
 # Clone the repository
-git clone https://github.com/tachyon-beep/wardline.git
+git clone https://github.com/johnm-dta/wardline.git
 cd wardline
 
 # Install dependencies (including dev extras)
@@ -73,7 +73,7 @@ If you're adding a new scanner rule:
 
 ## Reporting Bugs
 
-Please use [GitHub Issues](https://github.com/tachyon-beep/wardline/issues) and
+Please use [GitHub Issues](https://github.com/johnm-dta/wardline/issues) and
 include:
 
 - Python version and OS

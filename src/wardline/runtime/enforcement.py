@@ -74,11 +74,20 @@ def disable() -> None:
 
 def _reset_enforcement_state() -> None:
     """Reset enforcement state to defaults. INTERNAL — for test fixtures only."""
-    if "pytest" not in sys.modules and not os.environ.get("WARDLINE_TESTING"):
-        raise RuntimeError("_reset_enforcement_state is for test use only")
+    try:
+        _ = sys.modules["pytest"]
+    except KeyError:
+        try:
+            _ = os.environ["WARDLINE_TESTING"]
+        except KeyError:
+            raise RuntimeError("_reset_enforcement_state is for test use only")
     global _enforcement_enabled, _first_check_done  # noqa: PLW0603
-    _enforcement_enabled = os.environ.get("WARDLINE_ENFORCE", "") == "1"
+    try:
+        _enforcement_enabled = os.environ["WARDLINE_ENFORCE"] == "1"
+    except KeyError:
+        _enforcement_enabled = False
     _first_check_done = False
+    _callback_failures.clear()
 
 
 # ── Optional violation callback ──────────────────────────────
@@ -176,11 +185,16 @@ def stamp_tier(
     if not isinstance(tier, int) or not (1 <= tier <= 4):
         raise ValueError(f"tier must be int 1-4, got {tier!r}")
 
-    if not overwrite and hasattr(obj, "_wardline_tier"):
-        raise ValueError(
-            f"Object already has _wardline_tier={obj._wardline_tier}; "
-            f"pass overwrite=True to re-stamp"
-        )
+    if not overwrite:
+        try:
+            existing_tier = obj._wardline_tier
+        except AttributeError:
+            existing_tier = None  # object not yet stamped — continue
+        else:
+            raise ValueError(
+                f"Object already has _wardline_tier={existing_tier}; "
+                f"pass overwrite=True to re-stamp"
+            )
 
     normalized_groups = tuple(sorted(groups))
 
@@ -233,8 +247,9 @@ def check_tier_boundary(
     if not _enforcement_enabled:
         return
 
-    tier = getattr(obj, "_wardline_tier", None)
-    if tier is None:
+    try:
+        tier = obj._wardline_tier
+    except AttributeError:
         ctx = f" (context: {context})" if context else ""
         msg = f"{type(obj).__name__} has no _wardline_tier attribute{ctx}"
         logger.warning("Tier boundary violation: %s", msg)
@@ -290,18 +305,68 @@ def check_tier_boundary(
         )
 
 
+# Callback failure log — observable state for monitoring.
+# Each entry is (exception_type, message). Cleared by _reset_enforcement_state().
+_callback_failures: list[tuple[str, str]] = []
+
+
 def _invoke_on_violation(
     obj: object,
     expected_tier: int,
     actual_tier: int | None,
 ) -> None:
-    """Call the on_violation callback if set."""
+    """Call the on_violation callback if set.
+
+    PY-WL-004 design note (broad exception handler in T1 code):
+    ─────────────────────────────────────────────────────────────
+    This function invokes a user-supplied callback — essentially a
+    T4→T1 boundary call.  The previous implementation used
+    ``except Exception: logger.warning()``, which PY-WL-004 correctly
+    flagged: a warning log notes the failure but doesn't handle it.
+    The exception is still swallowed — execution continues as if the
+    callback ran.  A broken callback is itself an integrity signal:
+    if the violation handler can't run, the system's response to
+    boundary violations is degraded.
+
+    The fix separates two failure modes:
+
+    - **TypeError** (wrong callback signature): re-raised immediately.
+      This is a registration-time bug — the caller passed a handler
+      that doesn't match the ``(obj, expected_tier, actual_tier)``
+      contract.  Configuration errors should fail loudly.
+
+    - **All other exceptions**: logged at ERROR (not WARNING), recorded
+      in ``_callback_failures`` for programmatic observability, and then
+      execution continues so the caller can still raise its
+      ``TierViolationError``.  The enforcement violation must not be
+      masked by a callback bug — both signals need to surface.
+
+    The handler is still broad for the second case because user code can
+    throw anything.  But the action is substantive (error log + observable
+    state mutation), not a silent swallow.  This is the correct T1 posture
+    for an external-code boundary: fail loudly for structural errors
+    (TypeError), record and continue for runtime errors so the primary
+    enforcement signal is preserved.
+
+    Raises:
+        TypeError: If the callback has the wrong signature.
+    """
     if _on_violation is not None:
         try:
             _on_violation(obj, expected_tier, actual_tier)
+        except TypeError:
+            # Wrong callback signature is a configuration error, not a
+            # runtime data issue.  Re-raise: the caller registered a
+            # handler that doesn't match the documented contract.
+            raise
         except Exception as exc:
-            logging.getLogger("wardline").warning(
-                "on_violation callback raised %s — enforcement continues",
+            # Record the failure for programmatic inspection.
+            _callback_failures.append((type(exc).__name__, str(exc)))
+            logger.error(
+                "on_violation callback failed (%s: %s) — "
+                "enforcement violation will still be raised, but "
+                "callback response is lost",
+                type(exc).__name__,
                 exc,
             )
 
@@ -357,6 +422,18 @@ def check_validated_record(obj: Any) -> None:
 # ── WardlineBase enforcement extension ────────────────────────
 
 
+def _add_tier_method(
+    tier_methods: dict[int, set[str]], tier: int, name: str,
+) -> None:
+    """Add *name* to the method set for *tier*, creating the set if needed."""
+    try:
+        methods = tier_methods[tier]
+    except KeyError:
+        methods = set()
+        tier_methods[tier] = methods
+    methods.add(name)
+
+
 def check_subclass_tier_consistency(cls: type) -> list[str]:
     """Check tier consistency across decorated methods in a class.
 
@@ -376,24 +453,38 @@ def check_subclass_tier_consistency(cls: type) -> list[str]:
         if not callable(value):
             continue
 
-        groups = getattr(value, "_wardline_groups", None)
-        if groups is None:
+        try:
+            groups = value._wardline_groups
+        except AttributeError:
+            groups = None  # not a wardline-decorated callable — skip
             continue
 
         # Derive tier from _wardline_tier_source
-        tier_source = getattr(value, "_wardline_tier_source", None)
+        try:
+            tier_source = value._wardline_tier_source
+        except AttributeError:
+            tier_source = None
         if tier_source is not None:
-            tier_val = TAINT_TO_TIER.get(tier_source)
-            if tier_val is not None:
-                tier_methods.setdefault(int(tier_val), set()).add(name)
+            try:
+                tier_val = TAINT_TO_TIER[tier_source]
+            except KeyError:
+                tier_val = None  # tier_source not in TAINT_TO_TIER — unrecognised taint
+            else:
+                _add_tier_method(tier_methods, int(tier_val), name)
 
         # Derive tier from _wardline_transition (use "to" state = index 1)
-        transition = getattr(value, "_wardline_transition", None)
+        try:
+            transition = value._wardline_transition
+        except AttributeError:
+            transition = None
         if transition is not None and len(transition) >= 2:
             to_state = transition[1]
-            tier_val = TAINT_TO_TIER.get(to_state)
-            if tier_val is not None:
-                tier_methods.setdefault(int(tier_val), set()).add(name)
+            try:
+                tier_val = TAINT_TO_TIER[to_state]
+            except KeyError:
+                tier_val = None  # to_state not in TAINT_TO_TIER — unrecognised taint
+            else:
+                _add_tier_method(tier_methods, int(tier_val), name)
 
     if len(tier_methods) > 1:
         tiers_str = ", ".join(

@@ -62,6 +62,7 @@ _RULE_SHORT_DESCRIPTIONS: dict[RuleId, str] = {
     RuleId.GOVERNANCE_EXCEPTION_SEVERITY_DRIFT: "Exception severity_at_grant differs from current finding severity",
     RuleId.GOVERNANCE_TAINT_DEGRADED: "Taint assignment degraded — file scanned with empty fallback taint map",
     RuleId.GOVERNANCE_TAINT_CONFLICT: "Conflicting taint decorators on function — first decorator wins, others ignored",
+    RuleId.GOVERNANCE_RESTORATION_OVERCLAIM: "Restoration decorator claims tier unsupported by declared evidence (governance)",
     RuleId.GOVERNANCE_MODULE_TIERS_BLANKET: "Module-level taint default covers >80% of functions with no decorator evidence",
     RuleId.GOVERNANCE_MODULE_TIERS_UNDECORATED: "High-trust module_tiers entry with zero wardline decorator usage in file",
     RuleId.GOVERNANCE_CUSTOM_KNOWN_VALIDATOR: "Custom known_validators entry (governance)",
@@ -90,6 +91,7 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
         RuleId.GOVERNANCE_EXCEPTION_SEVERITY_DRIFT,
         RuleId.GOVERNANCE_TAINT_DEGRADED,
         RuleId.GOVERNANCE_TAINT_CONFLICT,
+        RuleId.GOVERNANCE_RESTORATION_OVERCLAIM,
         RuleId.GOVERNANCE_MODULE_TIERS_BLANKET,
         RuleId.GOVERNANCE_MODULE_TIERS_UNDECORATED,
         RuleId.GOVERNANCE_CUSTOM_KNOWN_VALIDATOR,
@@ -223,6 +225,12 @@ class SarifReport:
     manifest_hash: str | None = None
     scan_timestamp: str | None = None
     commit_ref: str | None = None
+    # Gap 3: Run-level identity properties (§10.1)
+    input_hash: str = ""
+    input_files: int = 0
+    overlay_hashes: tuple[str, ...] = ()
+    coverage_ratio: float | None = None
+    conformance_gaps: tuple[str, ...] = ()
 
     def _implemented_rules(self) -> list[str]:
         """Return sorted list of canonical rule ID values (excludes pseudo-IDs).
@@ -273,19 +281,38 @@ class SarifReport:
                 **({"wardline.commitRef": self.commit_ref}
                    if not self.verification_mode and self.commit_ref
                    else {}),
-                "wardline.conformanceGaps": [],
+                "wardline.conformanceGaps": list(self.conformance_gaps),
                 "wardline.controlLaw": self.control_law,
+                **({"wardline.coverageRatio": round(self.coverage_ratio, 4)}
+                   if self.coverage_ratio is not None else {}),
                 "wardline.governanceProfile": self.governance_profile,
                 "wardline.implementedRules": self._implemented_rules(),
+                "wardline.inputFiles": self.input_files,
+                "wardline.inputHash": self.input_hash,
                 **({"wardline.manifestHash": self.manifest_hash}
                    if self.manifest_hash is not None
                    else {}),
-                "wardline.propertyBagVersion": "0.2",
+                "wardline.overlayHashes": list(self.overlay_hashes),
+                "wardline.propertyBagVersion": "0.4",
                 **({"wardline.scanTimestamp": self.scan_timestamp}
                    if not self.verification_mode and self.scan_timestamp
                    else {}),
-                "wardline.suppressedFindingCount": sum(
+                "wardline.errorFindingCount": sum(
+                    1 for f in self.findings if f.severity == Severity.ERROR
+                ),
+                "wardline.exceptedFindingCount": sum(
                     1 for f in self.findings if f.exception_id is not None
+                ),
+                "wardline.gateBlockingCount": sum(
+                    1
+                    for f in self.findings
+                    if f.severity == Severity.ERROR and f.exception_id is None
+                ),
+                "wardline.suppressedCellFindingCount": sum(
+                    1 for f in self.findings if f.severity == Severity.SUPPRESS
+                ),
+                "wardline.warningFindingCount": sum(
+                    1 for f in self.findings if f.severity == Severity.WARNING
                 ),
                 "wardline.unknownRawFunctionCount": self.unknown_raw_count,
                 "wardline.unresolvedDecoratorCount": self.unresolved_decorator_count,

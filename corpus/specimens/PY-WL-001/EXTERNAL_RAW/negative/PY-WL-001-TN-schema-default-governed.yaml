@@ -2,6 +2,7 @@
 specimen_id: "PY-WL-001-TN-schema-default-governed"
 description: "schema_default() governed by declared optional field and boundary is suppressed"
 rule: "PY-WL-001"
+category: "suppression_interaction"
 fragment: |
   from wardline import schema_default
 

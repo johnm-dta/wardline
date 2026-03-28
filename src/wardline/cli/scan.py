@@ -10,10 +10,12 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 import click
 
+from wardline.cli._gate import count_gate_blocking, severity_breakdown
+from wardline.cli._helpers import cli_error
 from wardline.core.severity import (
     Exceptionability,
     RuleId,
@@ -21,7 +23,6 @@ from wardline.core.severity import (
 )
 from wardline.scanner.context import Finding, make_governance_finding
 from wardline.scanner.rules import make_rules
-from wardline.cli._helpers import cli_error
 from wardline.scanner.sarif import _PSEUDO_RULE_IDS, SarifReport
 
 if TYPE_CHECKING:
@@ -48,24 +49,189 @@ EXIT_TOOL_ERROR = 3
 
 
 def _compute_manifest_hash(manifest_path: Path) -> str | None:
-    """SHA-256 of manifest + sorted overlay contents. Binds findings to policy version."""
+    """SHA-256 of root manifest raw bytes only (§10.1).
+
+    The spec defines wardline.manifestHash as the hash of the root manifest
+    file content — not a combined hash with overlays. Overlay hashes are
+    reported separately via wardline.overlayHashes.
+    """
     import hashlib
 
     try:
-        parts: list[str] = [manifest_path.read_text(encoding="utf-8")]
-        overlay_dir = manifest_path.parent / "overlays"
-        if overlay_dir.is_dir():
-            overlay_files = sorted(
-                [*overlay_dir.rglob("*.yaml"), *overlay_dir.rglob("*.yml")]
-            )
-            for overlay_file in overlay_files:
-                if overlay_file.is_symlink():
-                    continue
-                parts.append(overlay_file.read_text(encoding="utf-8"))
-        combined = "\n---\n".join(parts)
-        return "sha256:" + hashlib.sha256(combined.encode("utf-8")).hexdigest()
+        raw = manifest_path.read_bytes()
+        return "sha256:" + hashlib.sha256(raw).hexdigest()
     except OSError:
         return None
+
+
+def _compute_input_hash(
+    file_paths: Sequence[Path], project_root: Path
+) -> tuple[str, int]:
+    """Hash-of-hashes over analysed files (§10.1 algorithm).
+
+    Args:
+        file_paths: Files the engine analysed (from ScanResult.scanned_file_paths).
+        project_root: The project root (manifest_path.parent), NOT the scan
+            target path. The spec requires paths relative to project root so
+            that scanning a subdirectory produces the same inputHash as scanning
+            the full project (for the same file set).
+
+    Returns:
+        (hash_string, deduplicated_file_count). The hash is always valid
+        (including for empty file sets). OSError on any file is re-raised —
+        silently skipping would make the hash describe a different set than
+        the scan consumed.
+    """
+    import hashlib
+
+    resolved_root = project_root.resolve()
+
+    # Deduplicate after symlink resolution (§10.1 step 2)
+    seen: dict[Path, None] = {}
+    for fp in file_paths:
+        resolved = fp.resolve()
+        if resolved not in seen:
+            seen[resolved] = None
+
+    records: list[str] = []
+    for resolved in seen:
+        # Step 3: normalize to forward-slash path relative to project root
+        try:
+            rel = resolved.relative_to(resolved_root)
+        except ValueError:
+            rel = resolved
+        normalized = rel.as_posix()
+        # Step 4: SHA-256 of raw bytes (OSError re-raises — hard failure)
+        digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+        # Step 5: form record
+        records.append(f"{normalized}\x00{digest}")
+
+    # Step 6: sort, concatenate with \n terminators, hash
+    records.sort()
+    combined = "".join(r + "\n" for r in records)
+    return (
+        "sha256:" + hashlib.sha256(combined.encode("utf-8")).hexdigest(),
+        len(records),
+    )
+
+
+def _compute_overlay_hashes(
+    consumed_overlay_paths: Sequence[Path],
+    project_root: Path,
+) -> tuple[str, ...]:
+    """SHA-256 of each consumed overlay, sorted by normalized path (§10.1).
+
+    Symlinked overlay files are excluded (consistent with overlay discovery).
+    """
+    import hashlib
+
+    entries: list[tuple[str, str]] = []
+    resolved_root = project_root.resolve()
+    for overlay_path in consumed_overlay_paths:
+        if overlay_path.is_symlink():
+            continue
+        resolved = overlay_path.resolve()
+        try:
+            rel = resolved.relative_to(resolved_root)
+        except ValueError:
+            rel = resolved
+        normalized = rel.as_posix()
+        digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+        entries.append((normalized, f"sha256:{digest}"))
+
+    entries.sort(key=lambda e: e[0])
+    return tuple(h for _, h in entries)
+
+
+def _read_coverage_ratio(manifest_path: Path) -> float | None:
+    """Read annotation coverage ratio from fingerprint baseline.
+
+    Returns None when no baseline exists (property omitted from SARIF).
+    Returns 0.0 when baseline exists but shows zero coverage.
+    """
+    import json
+
+    baseline = manifest_path.parent / "wardline.fingerprint.json"
+    if not baseline.exists():
+        return None
+    try:
+        data = json.loads(baseline.read_text(encoding="utf-8"))
+        ratio = data.get("coverage", {}).get("ratio")
+        return float(ratio) if ratio is not None else None
+    except (json.JSONDecodeError, OSError, ValueError):
+        return None
+
+
+def _read_conformance_gaps(
+    manifest_path: Path, scan_path: Path | None = None
+) -> tuple[str, ...]:
+    """Read conformance gaps from wardline.conformance.json.
+
+    Returns gap strings from the generated conformance status file.
+    If the file is absent or stale, returns a gap describing that.
+
+    Args:
+        manifest_path: Path to wardline.yaml.
+        scan_path: Resolved scan target path. When provided and it overlaps
+            the self-hosting source path, self_hosting_input_hash is also
+            validated for staleness.
+    """
+    import json
+
+    conf_path = manifest_path.parent / "wardline.conformance.json"
+    if not conf_path.exists():
+        return ("conformance status not generated — run 'wardline corpus publish'",)
+
+    try:
+        data = json.loads(conf_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return ("conformance status file unreadable",)
+
+    # Staleness check: compare input identities against current state
+    import wardline as _pkg
+    inputs = data.get("inputs", {})
+
+    stale_reasons: list[str] = []
+    if inputs.get("tool_version") != _pkg.__version__:
+        stale_reasons.append("tool_version")
+    manifest_hash = _compute_manifest_hash(manifest_path)
+    if manifest_hash is not None and inputs.get("manifest_hash") != manifest_hash:
+        stale_reasons.append("manifest_hash")
+    # commit_ref: validated against HEAD, not the scan target's inputHash
+    current_ref = _git_head_ref()
+    if current_ref is not None and inputs.get("commit_ref", "unknown") != current_ref:
+        stale_reasons.append("commit_ref")
+    # corpus_hash: validated against the current corpus on disk
+    corpus_dir = manifest_path.parent / "corpus"
+    if corpus_dir.is_dir() and "corpus_hash" in inputs:
+        from wardline.cli.corpus_cmds import _compute_corpus_hash
+        current_corpus_hash = _compute_corpus_hash(corpus_dir)
+        if inputs["corpus_hash"] != current_corpus_hash:
+            stale_reasons.append("corpus_hash")
+    # self_hosting_input_hash: validated by hashing the self-hosting source
+    # files on disk and comparing against the conformance file's recorded
+    # hash. This catches source file changes even when commit_ref is
+    # unavailable (e.g., not in a git repo, or dirty working tree).
+    if "self_hosting_input_hash" in inputs:
+        self_hosting_dir = manifest_path.parent / "src" / "wardline"
+        if self_hosting_dir.is_dir():
+            py_files = sorted(self_hosting_dir.rglob("*.py"))
+            if py_files:
+                current_sh_hash, _ = _compute_input_hash(
+                    py_files, manifest_path.parent
+                )
+                if inputs["self_hosting_input_hash"] != current_sh_hash:
+                    stale_reasons.append("self_hosting_input_hash")
+    # The self_hosting_input_hash is primarily useful for corpus publish's
+    # own evidence chain, not for scan-time re-validation.
+
+    if stale_reasons:
+        return (
+            f"conformance status stale — {', '.join(stale_reasons)} changed",
+            *tuple(data.get("gaps", [])),
+        )
+
+    return tuple(data.get("gaps", []))
 
 
 def _utc_timestamp() -> str:
@@ -263,7 +429,8 @@ def scan(
     strict_governance: bool,
 ) -> None:
     """Scan Python files for boundary violations."""
-    _setup_logging(verbose=verbose, debug=debug)
+    cli_handler = _setup_logging(verbose=verbose, debug=debug)
+    click.get_current_context().call_on_close(lambda: _teardown_logging(cli_handler))
 
     # --- Load manifest ---
     _manifest_result = _load_manifest(manifest)
@@ -357,12 +524,13 @@ def scan(
     boundaries: tuple[_BoundaryEntry, ...] = ()
     optional_fields: tuple[object, ...] = ()
     resolved_rule_overrides: tuple[dict[str, object], ...] | None = None
+    consumed_overlay_paths: tuple[Path, ...] = ()
 
     if resolved:
         loaded = _load_resolved(resolved, manifest_path)
         if loaded is None:
             sys.exit(EXIT_CONFIG_ERROR)
-        boundaries, resolved_rule_overrides, optional_fields = loaded
+        boundaries, resolved_rule_overrides, optional_fields, consumed_overlay_paths = loaded
         if resolved_rule_overrides is not None:
             import dataclasses as _dc
 
@@ -378,8 +546,14 @@ def scan(
             resolve_optional_fields,
         )
 
+        from wardline.manifest.loader import ManifestPolicyError as _PolicyError
+
         # manifest_path is threaded from _load_manifest — no re-discovery needed
-        boundaries = resolve_boundaries(manifest_path.parent, manifest_model)
+        try:
+            boundaries, consumed_overlay_paths = resolve_boundaries(manifest_path.parent, manifest_model)
+        except _PolicyError as exc:
+            cli_error(str(exc))
+            sys.exit(EXIT_CONFIG_ERROR)
         optional_fields = resolve_optional_fields(
             manifest_path.parent,
             manifest_model,
@@ -399,6 +573,7 @@ def scan(
         analysis_level=analysis_level,
         known_validators=effective_known_validators,
         max_expansion_rounds=cfg.max_expansion_rounds if cfg is not None else 1,
+        project_root=manifest_path.parent,
     )
 
     logger.info("Scanning %d target path(s)...", len(target_paths))
@@ -520,10 +695,10 @@ def scan(
         has_tool_error = any(
             f.rule_id == RuleId.TOOL_ERROR for f in result.findings
         )
-        scan_finding_count = len(result.findings)
+        preview_blocking = count_gate_blocking(result.findings)
         if has_tool_error:
             sys.exit(EXIT_TOOL_ERROR)
-        elif exceeded_pct or scan_finding_count > 0:
+        elif exceeded_pct or preview_blocking > 0:
             sys.exit(EXIT_FINDINGS)
         else:
             sys.exit(EXIT_CLEAN)
@@ -533,6 +708,32 @@ def scan(
     manifest_hash = _compute_manifest_hash(manifest_path)
     if manifest_hash is None:
         logger.warning("Manifest hash unavailable — SARIF report has no policy binding")
+
+    # --- Compute run identity properties (§10.1) ---
+    overlay_hashes = _compute_overlay_hashes(
+        consumed_overlay_paths, manifest_path.parent
+    )
+    coverage_ratio = _read_coverage_ratio(manifest_path)
+    conformance_gaps = _read_conformance_gaps(manifest_path, scan_path=scan_path)
+
+    # inputHash — hard failure if a scanned file becomes unreadable
+    project_root = manifest_path.parent
+    try:
+        input_hash, input_files = _compute_input_hash(
+            result.scanned_file_paths, project_root
+        )
+    except OSError as exc:
+        logger.error("inputHash computation failed: %s", exc)
+        all_findings.append(
+            _make_governance_finding(
+                RuleId.TOOL_ERROR,
+                f"inputHash computation failed — scanned file unreadable: {exc}",
+                Severity.ERROR,
+            )
+        )
+        input_hash = ""
+        input_files = 0
+
     import wardline as _wardline_pkg
 
     sarif_report = SarifReport(
@@ -552,6 +753,11 @@ def scan(
         manifest_hash=manifest_hash,
         scan_timestamp=_utc_timestamp(),
         commit_ref=_git_head_ref(),
+        input_hash=input_hash,
+        input_files=input_files,
+        overlay_hashes=overlay_hashes,
+        coverage_ratio=coverage_ratio,
+        conformance_gaps=conformance_gaps,
     )
 
     sarif_text = sarif_report.to_json_string() + "\n"
@@ -566,10 +772,13 @@ def scan(
         click.echo(sarif_text, nl=False)
 
     # --- Summary to stderr ---
-    scan_finding_count = len(result.findings)
+    bd = severity_breakdown(result.findings)
     click.echo(
         f"{result.files_scanned} file(s) scanned, "
-        f"{scan_finding_count} finding(s).",
+        f"{len(result.findings)} finding(s) "
+        f"({bd.error_count} error, {bd.warning_count} warning, "
+        f"{bd.suppress_count} suppressed"
+        f"{f', {bd.excepted_count} excepted' if bd.excepted_count else ''}).",
         err=True,
     )
 
@@ -577,12 +786,17 @@ def scan(
     # Exit code priority (highest wins):
     #   EXIT_TOOL_ERROR (3) — a rule or scanner component raised an
     #       unhandled exception; signals infrastructure failure.
-    #   EXIT_FINDINGS   (1) — at least one scan finding exists, or the
-    #       max_unknown_raw_percent ceiling was exceeded, or
-    #       --strict-governance is set and GOVERNANCE findings exist.
-    #   EXIT_CLEAN      (0) — no findings, no errors.
+    #   EXIT_FINDINGS   (1) — at least one unexcepted ERROR finding
+    #       exists, or the max_unknown_raw_percent ceiling was exceeded,
+    #       or --strict-governance is set and GOVERNANCE findings exist.
+    #   EXIT_CLEAN      (0) — no gate-blocking findings.
+    #
+    # The three-tier signal model (§7.3–§7.5):
+    #   SUPPRESS findings are excluded (pattern is expected at this tier).
+    #   WARNING findings are excluded (suspicious, non-blocking).
+    #   Only ERROR findings block the gate.
     has_tool_error = any(
-        f.rule_id == RuleId.TOOL_ERROR for f in result.findings
+        f.rule_id == RuleId.TOOL_ERROR for f in all_findings
     )
     has_governance_findings = effective_strict_governance and any(
         str(f.rule_id).startswith("GOVERNANCE-") for f in all_findings
@@ -590,7 +804,7 @@ def scan(
 
     if has_tool_error:
         sys.exit(EXIT_TOOL_ERROR)
-    elif exceeded_pct or scan_finding_count > 0 or has_governance_findings:
+    elif exceeded_pct or bd.gate_blocking > 0 or has_governance_findings:
         sys.exit(EXIT_FINDINGS)
     else:
         sys.exit(EXIT_CLEAN)
@@ -599,12 +813,15 @@ def scan(
 _CLI_HANDLER_NAME = "wardline_cli"
 
 
-def _setup_logging(*, verbose: bool, debug: bool) -> None:
+def _setup_logging(*, verbose: bool, debug: bool) -> logging.Handler:
     """Configure logging level based on CLI flags.
 
     Uses a named handler so we only remove our own handler on
     re-entry, preserving any handlers installed by test harnesses
     (e.g. pytest's ``caplog`` fixture).
+
+    Returns the installed handler so callers can pass it to
+    ``_teardown_logging`` when the command completes.
     """
     if debug:
         level = logging.DEBUG
@@ -624,6 +841,12 @@ def _setup_logging(*, verbose: bool, debug: bool) -> None:
     handler.setFormatter(logging.Formatter("%(levelname)s: %(name)s: %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(level)
+    return handler
+
+
+def _teardown_logging(handler: logging.Handler) -> None:
+    """Remove the CLI handler installed by ``_setup_logging``."""
+    logger.removeHandler(handler)
 
 
 def _load_manifest(
@@ -694,7 +917,7 @@ def _load_config(config_arg: str | None) -> ScannerConfig | None | _ConfigError:
     except ScannerConfigError as exc:
         cli_error(f"config error: {exc}")
         return _CONFIG_ERROR
-    except Exception as exc:
+    except OSError as exc:
         cli_error(f"config load error: {exc}")
         return _CONFIG_ERROR
 
@@ -706,10 +929,13 @@ def _load_resolved(
     tuple[_BoundaryEntry, ...],
     tuple[dict[str, object], ...] | None,
     tuple[object, ...],
+    tuple[Path, ...],
 ] | None:
-    """Load boundaries and rule overrides from a wardline.resolved.json file.
+    """Load boundaries, rule overrides, optional fields, and overlay paths.
 
     Returns ``None`` on error (after printing a structured error message).
+    The fourth element is the tuple of consumed overlay file paths,
+    reconstructed from the resolved JSON's ``overlays_discovered`` array.
     """
     import hashlib
     import json
@@ -721,7 +947,7 @@ def _load_resolved(
 
         # F6: format_version validation
         version = data.get("format_version")
-        if version != "0.1":
+        if version != "0.2":
             cli_error(f"unsupported resolved manifest version: {version}")
             return None
 
@@ -745,7 +971,7 @@ def _load_resolved(
                 to_tier=b.get("to_tier"),
                 restored_tier=b.get("restored_tier"),
                 provenance=b.get("provenance"),
-                bounded_context=b.get("bounded_context"),
+                validation_scope=b.get("validation_scope"),
                 overlay_scope=str(
                     (project_root / b.get("overlay_scope", "")).resolve()
                 ),
@@ -772,7 +998,13 @@ def _load_resolved(
             for entry in data.get("optional_fields", [])
         )
 
-        return boundaries, rule_overrides, optional_fields
+        # Reconstruct overlay file paths from overlays_discovered
+        overlay_paths = tuple(
+            project_root / entry["path"]
+            for entry in data.get("overlays_discovered", [])
+        )
+
+        return boundaries, rule_overrides, optional_fields, overlay_paths
     except (json.JSONDecodeError, KeyError, TypeError, OSError) as exc:
         cli_error(f"resolved manifest invalid: {exc}")
         return None

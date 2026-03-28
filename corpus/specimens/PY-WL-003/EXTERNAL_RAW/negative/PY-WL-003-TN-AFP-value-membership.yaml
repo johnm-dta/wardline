@@ -1,0 +1,20 @@
+---
+specimen_id: "PY-WL-003-TN-AFP-value-membership"
+description: "Adversarial false positive: value-membership check against UPPER_CASE constant suppressed as constant set"
+rule: "PY-WL-003"
+category: "adversarial_false_positive"
+fragment: |
+  VALID_STATUSES = frozenset({"active", "pending", "closed"})
+  
+  def validate_status(record):
+      """Looks like existence check but is value-membership against constant set."""
+      if record.status not in VALID_STATUSES:
+          raise ValueError(f"invalid status: {record.status}")
+      return record
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+sha256: "590559fa90449ca2b8852399771196b0792de575ce622eea9a67afe7180aaaf4"
+verdict: "true_negative"

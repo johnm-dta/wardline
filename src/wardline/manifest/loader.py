@@ -21,6 +21,7 @@ from wardline.manifest.models import (
     DelegationGrant,
     ManifestMetadata,
     OptionalFieldEntry,
+    TemporalSeparation,
     ModuleTierEntry,
     RulesConfig,
     TierEntry,
@@ -47,6 +48,15 @@ class WardlineYAMLError(yaml.YAMLError):
 
 class ManifestLoadError(Exception):
     """Raised when manifest loading fails (file size, schema, version)."""
+
+
+class ManifestPolicyError(ManifestLoadError):
+    """Raised for policy violations that must not be silently skipped.
+
+    Subclass of ManifestLoadError so callers catching the base class
+    still see it, but resolve.py can let it propagate while catching
+    ordinary ManifestLoadError for I/O-level parse failures.
+    """
 
 
 def make_wardline_loader(
@@ -220,11 +230,42 @@ def _build_manifest(data: dict[str, Any]) -> WardlineManifest:
     )
 
     raw_meta = data.get("metadata", {})
+
+    # Build TemporalSeparation with conditional validation
+    ts_data = raw_meta.get("temporal_separation")
+    temporal_separation = None
+    if ts_data is not None:
+        alt = ts_data["alternative"]
+        if alt == "same-actor-with-retrospective":
+            if "retrospective_window_days" not in ts_data:
+                raise ManifestLoadError(
+                    "temporal_separation: retrospective_window_days required "
+                    "when alternative is same-actor-with-retrospective"
+                )
+            if not ts_data.get("rationale"):
+                raise ManifestLoadError(
+                    "temporal_separation: rationale required "
+                    "when alternative is same-actor-with-retrospective"
+                )
+            temporal_separation = TemporalSeparation(
+                alternative=alt,
+                retrospective_window_days=ts_data["retrospective_window_days"],
+                rationale=ts_data["rationale"],
+            )
+        elif alt == "enforced":
+            if "retrospective_window_days" in ts_data or "rationale" in ts_data:
+                raise ManifestLoadError(
+                    "temporal_separation: retrospective_window_days and rationale "
+                    "must not be present when alternative is enforced"
+                )
+            temporal_separation = TemporalSeparation(alternative="enforced")
+
     metadata = ManifestMetadata(
         organisation=raw_meta.get("organisation", ""),
         ratified_by=raw_meta.get("ratified_by"),
         ratification_date=raw_meta.get("ratification_date"),
         review_interval_days=raw_meta.get("review_interval_days"),
+        temporal_separation=temporal_separation,
     )
 
     return WardlineManifest(
@@ -258,15 +299,28 @@ def load_overlay(
 
 def _build_overlay(data: dict[str, Any]) -> WardlineOverlay:
     """Construct a WardlineOverlay from validated data."""
+    # Reject skip-promotions: to_tier=1 is valid only from from_tier=2 (§13.1.2).
+    for b in data.get("boundaries", []):
+        to_tier = b.get("to_tier")
+        if to_tier == 1 and b.get("transition") != "restoration":
+            from_tier = b.get("from_tier")
+            if from_tier != 2:
+                raise ManifestPolicyError(
+                    f"Boundary '{b.get('function', '<unknown>')}' declares "
+                    f"from_tier={from_tier}, to_tier=1 — skip-promotions to "
+                    f"Tier 1 are prohibited. Use composed steps: "
+                    f"validation to T2, then T2→T1 construction (§13.1.2)."
+                )
+
     boundaries = tuple(
         BoundaryEntry(
             function=b["function"],
             transition=b["transition"],
             from_tier=b.get("from_tier"),
-            to_tier=b.get("to_tier"),
+            to_tier=None if b["transition"] == "restoration" else b.get("to_tier"),
             restored_tier=b.get("restored_tier"),
             provenance=b.get("provenance"),
-            bounded_context=b.get("bounded_context"),
+            validation_scope=b.get("validation_scope"),
         )
         for b in data.get("boundaries", [])
     )

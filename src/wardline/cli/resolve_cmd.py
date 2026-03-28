@@ -27,7 +27,7 @@ logger = logging.getLogger("wardline")
 @click.option("-o", "--output", default=None, help="Output file (default: stdout)")
 def resolve(manifest: str | None, path: str, output: str | None) -> None:
     """Resolve overlays and produce wardline.resolved.json."""
-    from wardline.manifest.discovery import discover_manifest, discover_overlays
+    from wardline.manifest.discovery import discover_manifest
     from wardline.manifest.loader import ManifestLoadError, load_manifest, load_overlay
     from wardline.manifest.merge import merge
     from wardline.manifest.resolve import resolve_boundaries, resolve_optional_fields
@@ -59,11 +59,10 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
     manifest_hash = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
 
     # --- Resolve boundaries (with overlay_path + overlay_scope) ---
-    boundaries = resolve_boundaries(root, manifest_model)
+    boundaries, overlay_file_paths = resolve_boundaries(root, manifest_model)
     optional_fields = resolve_optional_fields(root, manifest_model)
 
-    # --- Discover overlays and build per-overlay summary + merged overrides ---
-    overlay_file_paths = discover_overlays(root, manifest_model)
+    # --- Build per-overlay summary + merged overrides ---
 
     import dataclasses
 
@@ -129,7 +128,7 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
 
     # --- Build resolved JSON ---
     resolved_json: dict[str, object] = {
-        "format_version": "0.1",
+        "format_version": "0.2",
         "resolved_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "root": ".",
         "manifest_source": str(manifest_path.relative_to(root))
@@ -153,7 +152,7 @@ def resolve(manifest: str | None, path: str, output: str | None) -> None:
                 "to_tier": b.to_tier,
                 "restored_tier": b.restored_tier,
                 "provenance": b.provenance,
-                "bounded_context": b.bounded_context,
+                "validation_scope": b.validation_scope,
                 "overlay_scope": (
                     str(Path(b.overlay_scope).relative_to(root))
                     if b.overlay_scope else ""

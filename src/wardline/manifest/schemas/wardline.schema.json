@@ -36,6 +36,28 @@
         "review_interval_days": {
           "type": "integer",
           "minimum": 1
+        },
+        "temporal_separation": {
+          "type": "object",
+          "description": "Temporal separation posture declaration (§14.3.2).",
+          "properties": {
+            "alternative": {
+              "type": "string",
+              "enum": ["enforced", "same-actor-with-retrospective"],
+              "description": "The declared posture: enforced or a named alternative."
+            },
+            "retrospective_window_days": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum days before retrospective review must occur."
+            },
+            "rationale": {
+              "type": "string",
+              "description": "Free-text justification for the alternative."
+            }
+          },
+          "required": ["alternative"],
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

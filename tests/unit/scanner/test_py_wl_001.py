@@ -58,7 +58,7 @@ class TestGetWithDefault:
 
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_001
-        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].severity == Severity.SUPPRESS
 
     def test_get_with_none_default_fires(self) -> None:
         rule = _run_rule('d.get("key", None)\n')

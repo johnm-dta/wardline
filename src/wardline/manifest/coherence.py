@@ -5,12 +5,14 @@ Detects multiple classes of inconsistency:
   matching boundary declaration in any overlay.
 - **Undeclared boundaries**: overlay boundary entries whose function name does
   not appear as a decorated function in code.
-- **Unmatched contracts**: bounded_context contract declarations that don't
+- **Unmatched contracts**: validation_scope contract declarations that don't
   match any code-level annotation.
 - **Stale contract bindings**: contract_bindings entries pointing to
   non-existent functions.
 - **Tier-topology consistency**: tier assignments consistent with declared
   data-flow topology.
+- **Missing validation_scope**: Tier 2 boundaries that require a
+  validation_scope declaration but lack one.
 - **Governance anomalies**: tier distribution, tier downgrades, upgrade without
   evidence, agent-originated policy changes, expired exceptions, and first-scan
   perimeter detection.
@@ -23,6 +25,8 @@ import json
 import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from wardline.core.taints import TaintState
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -212,22 +216,25 @@ def check_tier_downgrades(
 
     issues: list[CoherenceIssue] = []
     for mt in module_tiers:
-        if mt.path in baseline_modules:
+        try:
             old_taint = baseline_modules[mt.path]
-            old_tier = baseline_tiers.get(old_taint)
-            new_tier = current_tier_map.get(mt.default_taint)
-            if old_tier is not None and new_tier is not None and new_tier > old_tier:
-                issues.append(
-                    CoherenceIssue(
-                        kind="tier_downgrade",
-                        function="",
-                        file_path=mt.path,
-                        detail=(
-                            f"Tier downgrade: module '{mt.path}' changed from "
-                            f"tier {old_tier} to tier {new_tier}."
-                        ),
-                    )
+        except KeyError:
+            old_taint = None  # module absent from baseline — newly introduced, skip
+            continue
+        old_tier = baseline_tiers.get(old_taint)
+        new_tier = current_tier_map.get(mt.default_taint)
+        if old_tier is not None and new_tier is not None and new_tier > old_tier:
+            issues.append(
+                CoherenceIssue(
+                    kind="tier_downgrade",
+                    function="",
+                    file_path=mt.path,
+                    detail=(
+                        f"Tier downgrade: module '{mt.path}' changed from "
+                        f"tier {old_tier} to tier {new_tier}."
+                    ),
                 )
+            )
     return issues
 
 
@@ -281,36 +288,39 @@ def check_tier_upgrade_without_evidence(
 
     issues: list[CoherenceIssue] = []
     for mt in module_tiers:
-        if mt.path in baseline_modules:
+        try:
             old_taint = baseline_modules[mt.path]
-            old_tier = baseline_tiers.get(old_taint)
-            new_tier = current_tier_map.get(mt.default_taint)
-            if old_tier is not None and new_tier is not None and new_tier < old_tier:
-                # Check if any boundary's overlay scope covers this module path.
-                # Module paths are relative (e.g. "src/wardline/scanner"),
-                # overlay scopes are absolute. A scope covers a module if
-                # the scope path ends with the module path.
-                module_prefix = mt.path.rstrip("/")
-                has_evidence = any(
-                    scope.endswith("/" + module_prefix)
-                    or scope.endswith("/" + module_prefix + "/")
-                    or scope == module_prefix
-                    for scope in boundary_scopes
-                )
-                if not has_evidence:
-                    issues.append(
-                        CoherenceIssue(
-                            kind="tier_upgrade_without_evidence",
-                            function="",
-                            file_path=mt.path,
-                            detail=(
-                                f"Tier upgrade without evidence: module "
-                                f"'{mt.path}' changed from tier {old_tier} to "
-                                f"tier {new_tier} but no overlay boundary "
-                                f"covers this module."
-                            ),
-                        )
+        except KeyError:
+            old_taint = None  # module absent from baseline — newly introduced, skip
+            continue
+        old_tier = baseline_tiers.get(old_taint)
+        new_tier = current_tier_map.get(mt.default_taint)
+        if old_tier is not None and new_tier is not None and new_tier < old_tier:
+            # Check if any boundary's overlay scope covers this module path.
+            # Module paths are relative (e.g. "src/wardline/scanner"),
+            # overlay scopes are absolute. A scope covers a module if
+            # the scope path ends with the module path.
+            module_prefix = mt.path.rstrip("/")
+            has_evidence = any(
+                scope.endswith("/" + module_prefix)
+                or scope.endswith("/" + module_prefix + "/")
+                or scope == module_prefix
+                for scope in boundary_scopes
+            )
+            if not has_evidence:
+                issues.append(
+                    CoherenceIssue(
+                        kind="tier_upgrade_without_evidence",
+                        function="",
+                        file_path=mt.path,
+                        detail=(
+                            f"Tier upgrade without evidence: module "
+                            f"'{mt.path}' changed from tier {old_tier} to "
+                            f"tier {new_tier} but no overlay boundary "
+                            f"covers this module."
+                        ),
                     )
+                )
     return issues
 
 
@@ -453,9 +463,9 @@ def check_unmatched_contracts(
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
     boundaries: tuple[BoundaryEntry, ...],
 ) -> list[CoherenceIssue]:
-    """Find contract declarations in bounded_contexts with no matching annotation.
+    """Find contract declarations in validation_scopes with no matching annotation.
 
-    For each boundary that declares a ``bounded_context`` with ``contracts``,
+    For each boundary that declares a ``validation_scope`` with ``contracts``,
     verify the boundary's function has a matching annotation in code.  A
     contract declaration without a corresponding code-level annotation
     indicates a specification/implementation mismatch.
@@ -473,17 +483,22 @@ def check_unmatched_contracts(
     issues: list[CoherenceIssue] = []
 
     for boundary in boundaries:
-        if boundary.bounded_context is None:
+        if boundary.validation_scope is None:
             continue
 
-        contracts = boundary.bounded_context.get("contracts")
+        contracts = boundary.validation_scope.get("contracts")
         if not contracts:
             continue
 
         if boundary.function not in annotated_functions:
-            contract_names = ", ".join(
-                c["name"] for c in contracts if isinstance(c, dict) and "name" in c
-            )
+            _names: list[str] = []
+            for _c in contracts:
+                if isinstance(_c, dict):
+                    try:
+                        _names.append(_c["name"])
+                    except KeyError:
+                        _names_key = None  # contract dict has no 'name' field — skip
+            contract_names = ", ".join(_names)
             issues.append(
                 CoherenceIssue(
                     kind="unmatched_contract",
@@ -491,7 +506,7 @@ def check_unmatched_contracts(
                     file_path=boundary.overlay_path,
                     detail=(
                         f"Boundary '{boundary.function}' declares contracts "
-                        f"({contract_names}) in bounded_context but has no "
+                        f"({contract_names}) in validation_scope but has no "
                         f"matching wardline-decorated function in code."
                     ),
                 )
@@ -640,4 +655,216 @@ def check_tier_topology_consistency(
                         )
                     break  # First match is sufficient
 
+    return issues
+
+
+def check_validation_scope_presence(
+    boundaries: tuple[BoundaryEntry, ...],
+) -> list[CoherenceIssue]:
+    """Check that Tier 2 boundaries declare their ``validation_scope``.
+
+    A boundary needs ``validation_scope`` when its ``transition`` is
+    ``"semantic_validation"`` or ``"combined_validation"``, or when it is
+    a ``"restoration"`` with semantic provenance.
+
+    Args:
+        boundaries: All boundary entries from loaded overlays.
+
+    Returns:
+        One ``CoherenceIssue`` per missing declaration (kind
+        ``"missing_validation_scope"``).
+    """
+    issues: list[CoherenceIssue] = []
+    for boundary in boundaries:
+        needs_scope = boundary.transition in (
+            "semantic_validation",
+            "combined_validation",
+        ) or (
+            boundary.transition == "restoration"
+            and boundary.provenance is not None
+            and boundary.provenance.get("semantic") is True
+        )
+        if needs_scope and (
+            boundary.validation_scope is None
+            or not boundary.validation_scope.get("contracts")
+        ):
+            issues.append(
+                CoherenceIssue(
+                    kind="missing_validation_scope",
+                    function=boundary.function,
+                    file_path=boundary.overlay_path,
+                    detail=(
+                        f"Boundary '{boundary.function}' claims Tier 2 semantics "
+                        f"(transition={boundary.transition}) but has no "
+                        f"validation_scope declaration (\u00a713.1.2)."
+                    ),
+                )
+            )
+    return issues
+
+
+_UNKNOWN_FAMILY = frozenset({
+    TaintState.UNKNOWN_SEM_VALIDATED,
+    TaintState.UNKNOWN_SHAPE_VALIDATED,
+    TaintState.UNKNOWN_RAW,
+})
+
+
+def check_restoration_evidence(
+    boundaries: tuple[BoundaryEntry, ...],
+) -> list[CoherenceIssue]:
+    """Check that restoration boundaries don't overclaim their tier.
+
+    For each boundary with ``transition == "restoration"`` and a
+    non-None ``restored_tier``, compares the claimed tier against the
+    maximum tier the declared evidence supports per §5.3.
+    """
+    from wardline.core.evidence import max_restorable_tier
+    from wardline.core.tiers import TAINT_TO_TIER
+
+    issues: list[CoherenceIssue] = []
+    for boundary in boundaries:
+        if boundary.transition != "restoration":
+            continue
+        if boundary.restored_tier is None:
+            continue
+        if boundary.provenance is None:
+            issues.append(
+                CoherenceIssue(
+                    kind="insufficient_restoration_evidence",
+                    function=boundary.function,
+                    file_path=boundary.overlay_path,
+                    detail=(
+                        f"Boundary '{boundary.function}' declares "
+                        f"transition='restoration' with restored_tier="
+                        f"{boundary.restored_tier} but has no provenance "
+                        f"declaration. Restoration boundaries require "
+                        f"provenance evidence (§5.3)."
+                    ),
+                )
+            )
+            continue
+
+        structural = bool(boundary.provenance.get("structural"))
+        semantic = bool(boundary.provenance.get("semantic"))
+        integrity = bool(boundary.provenance.get("integrity"))
+        institutional = bool(boundary.provenance.get("institutional"))
+
+        ceiling_taint = max_restorable_tier(structural, semantic, integrity, institutional)
+
+        # If evidence only supports an UNKNOWN-family state, no numeric tier claim
+        # is valid — UNKNOWN states are outside the T1-T4 tier ladder (§5.3).
+        if ceiling_taint in _UNKNOWN_FAMILY:
+            issues.append(
+                CoherenceIssue(
+                    kind="insufficient_restoration_evidence",
+                    function=boundary.function,
+                    file_path=boundary.overlay_path,
+                    detail=(
+                        f"Boundary '{boundary.function}' claims "
+                        f"restored_tier={boundary.restored_tier} but evidence "
+                        f"supports only {ceiling_taint.value} (no institutional "
+                        f"provenance — numeric tier restoration requires "
+                        f"institutional provenance, §5.3)."
+                    ),
+                )
+            )
+            continue
+
+        ceiling_tier = TAINT_TO_TIER[ceiling_taint].value
+
+        if boundary.restored_tier < ceiling_tier:
+            # restored_tier uses lower=better (T1=1), so claimed < ceiling means overclaim
+            issues.append(
+                CoherenceIssue(
+                    kind="insufficient_restoration_evidence",
+                    function=boundary.function,
+                    file_path=boundary.overlay_path,
+                    detail=(
+                        f"Boundary '{boundary.function}' claims "
+                        f"restored_tier={boundary.restored_tier} but evidence "
+                        f"supports at most tier {ceiling_tier} "
+                        f"({ceiling_taint.value}). §5.3 evidence matrix."
+                    ),
+                )
+            )
+    return issues
+
+
+def check_restoration_evidence_consistency(
+    boundaries: tuple[BoundaryEntry, ...],
+    annotations: dict[tuple[str, str], list[WardlineAnnotation]],
+) -> list[CoherenceIssue]:
+    """Check that decorator evidence doesn't exceed overlay provenance.
+
+    The overlay is the governance source of truth. If the decorator
+    claims higher evidence than the overlay declares, emit a WARNING.
+    """
+    issues: list[CoherenceIssue] = []
+    for boundary in boundaries:
+        if boundary.transition != "restoration":
+            continue
+        if boundary.provenance is None:
+            continue
+
+        # Find matching annotation by function name
+        matching_ann = None
+        for (fp, qn), anns in annotations.items():
+            for ann in anns:
+                if ann.canonical_name == "restoration_boundary" and qn == boundary.function:
+                    matching_ann = ann
+                    break
+            if matching_ann is not None:
+                break
+
+        if matching_ann is None:
+            continue  # No decorator found for this boundary — handled by check_undeclared_boundaries
+
+        # Compare each evidence category: decorator vs overlay
+        evidence_keys = [
+            ("structural_evidence", "structural"),
+            ("semantic_evidence", "semantic"),
+            ("integrity_evidence", "integrity"),
+            ("institutional_provenance", "institutional"),
+        ]
+        for dec_key, overlay_key in evidence_keys:
+            dec_raw = matching_ann.attrs.get(dec_key)
+            overlay_raw = boundary.provenance.get(overlay_key)
+            dec_value = bool(dec_raw)
+            overlay_value = bool(overlay_raw)
+
+            if dec_value and not overlay_value:
+                # Presence divergence: decorator claims evidence overlay doesn't
+                issues.append(
+                    CoherenceIssue(
+                        kind="restoration_evidence_divergence",
+                        function=boundary.function,
+                        file_path=boundary.overlay_path,
+                        detail=(
+                            f"Boundary '{boundary.function}' decorator claims "
+                            f"{dec_key}={dec_raw!r} but overlay provenance "
+                            f"has {overlay_key}={overlay_raw!r}. The overlay "
+                            f"is the governance source of truth."
+                        ),
+                    )
+                )
+            elif (
+                dec_value and overlay_value
+                and isinstance(dec_raw, str) and isinstance(overlay_raw, str)
+                and dec_raw != overlay_raw
+            ):
+                # Value divergence: both truthy but different mechanism/attestation
+                issues.append(
+                    CoherenceIssue(
+                        kind="restoration_evidence_divergence",
+                        function=boundary.function,
+                        file_path=boundary.overlay_path,
+                        detail=(
+                            f"Boundary '{boundary.function}' decorator has "
+                            f"{dec_key}={dec_raw!r} but overlay provenance "
+                            f"has {overlay_key}={overlay_raw!r}. Evidence "
+                            f"mechanism mismatch."
+                        ),
+                    )
+                )
     return issues

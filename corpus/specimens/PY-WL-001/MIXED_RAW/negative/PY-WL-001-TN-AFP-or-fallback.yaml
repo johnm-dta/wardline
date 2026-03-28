@@ -1,0 +1,17 @@
+---
+specimen_id: "PY-WL-001-TN-AFP-or-fallback"
+description: "Adversarial false positive: or-fallback mimics dict.get default but uses Python or operator"
+rule: "PY-WL-001"
+category: "adversarial_false_positive"
+fragment: |
+  def process(data):
+      """Looks like fabricated default but uses or-fallback, not .get(key, default)."""
+      value = data.get("key") or "fallback_value"
+      return value
+taint_state: "MIXED_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+sha256: "605cb26ee78f6fe5404b3c44cb998f47e07fd193d6a0322ad15eeebdc854a669"
+verdict: "true_negative"

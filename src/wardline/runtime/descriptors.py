@@ -62,7 +62,9 @@ class AuthoritativeField:
         if obj is None:
             # Class-level access returns the descriptor itself
             return self
-        if not hasattr(self, "storage_name"):
+        try:
+            _ = self.storage_name
+        except AttributeError:
             raise AuthoritativeAccessError(
                 "AuthoritativeField has no name — was it dynamically assigned "
                 "without passing name= to __init__?"

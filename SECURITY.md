@@ -13,7 +13,7 @@ responsibly.
 
 **Do not open a public issue.** Instead, email security concerns to
 the maintainers via GitHub's
-[private vulnerability reporting](https://github.com/tachyon-beep/wardline/security/advisories/new).
+[private vulnerability reporting](https://github.com/johnm-dta/wardline/security/advisories/new).
 
 You can expect:
 

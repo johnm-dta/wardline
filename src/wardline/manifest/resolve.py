@@ -11,7 +11,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from wardline.manifest.discovery import GovernanceError, discover_overlays
-from wardline.manifest.loader import ManifestLoadError, load_overlay
+from wardline.manifest.loader import ManifestLoadError, ManifestPolicyError, load_overlay
 from wardline.manifest.merge import merge
 from wardline.manifest.scope import relative_path_within_scope
 
@@ -31,8 +31,12 @@ logger = logging.getLogger(__name__)
 def resolve_boundaries(
     root: Path,
     manifest: WardlineManifest,
-) -> tuple[BoundaryEntry, ...]:
-    """Discover overlays, merge each with *manifest*, return all boundaries.
+) -> tuple[tuple[BoundaryEntry, ...], tuple[Path, ...]]:
+    """Discover overlays, merge each with *manifest*, return boundaries and overlay paths.
+
+    Returns a two-tuple of ``(boundaries, overlay_paths)`` where *boundaries*
+    contains all ``BoundaryEntry`` objects with ``overlay_scope`` populated and
+    *overlay_paths* is the list of overlay files that were discovered.
 
     Error handling:
     - ``GovernanceError`` / ``ManifestWidenError``: propagate (policy violation).
@@ -44,6 +48,8 @@ def resolve_boundaries(
     for overlay_path in overlay_paths:
         try:
             overlay = load_overlay(overlay_path)
+        except ManifestPolicyError:
+            raise  # Policy violations (e.g. skip-promotion) must propagate
         except (ManifestLoadError, OSError) as exc:
             logger.warning("Failed to load overlay %s: %s", overlay_path, exc)
             continue
@@ -80,7 +86,7 @@ def resolve_boundaries(
             scoped = replace(boundary, overlay_scope=scope, overlay_path=rel_overlay)
             all_boundaries.append(scoped)
 
-    return tuple(all_boundaries)
+    return tuple(all_boundaries), tuple(overlay_paths)
 
 
 def resolve_optional_fields(
@@ -95,6 +101,8 @@ def resolve_optional_fields(
     for overlay_path in overlay_paths:
         try:
             overlay = load_overlay(overlay_path)
+        except ManifestPolicyError:
+            raise  # Policy violations (e.g. skip-promotion) must propagate
         except (ManifestLoadError, OSError) as exc:
             logger.warning("Failed to load overlay %s: %s", overlay_path, exc)
             continue
@@ -158,6 +166,8 @@ def resolve_contract_bindings(
     for overlay_path in overlay_paths:
         try:
             overlay = load_overlay(overlay_path)
+        except ManifestPolicyError:
+            raise  # Policy violations (e.g. skip-promotion) must propagate
         except (ManifestLoadError, OSError) as exc:
             logger.warning("Failed to load overlay %s: %s", overlay_path, exc)
             continue

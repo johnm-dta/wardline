@@ -7,6 +7,20 @@ $id: "https://wardline.dev/schemas/0.1/wardline.schema.json"
 
 metadata:
   organisation: "wardline"
+  ratified_by:
+    name: "John"
+    role: "Project Lead"
+  ratification_date: "2026-03-27"
+  review_interval_days: 180
+  temporal_separation:
+    alternative: "same-actor-with-retrospective"
+    retrospective_window_days: 10
+    rationale: >
+      Single-developer project. Same-actor approval permitted for
+      enforcement artefact changes with mandatory retrospective review
+      within 10 business days. Policy artefact changes (tier definitions,
+      boundary declarations, restoration provenance) require different-actor
+      review per §9.3.1.
 
 # ── Tier definitions ──────────────────────────────────────────
 tiers:
@@ -121,37 +135,41 @@ module_tiers:
   - path: "src/wardline/scanner/rules"
     default_taint: "SHAPE_VALIDATED"
     # Rationale: AST visitor rules that walk parsed syntax trees to detect
-    # patterns (dict key fallback, attribute fallback, existence gates,
-    # broad/silent exception handlers). Input is parsed AST nodes — shape-
-    # validated by the Python parser but not semantically verified by
-    # wardline until findings are produced.
-    # Includes: __init__.py, base.py, py_wl_001.py, py_wl_002.py,
-    #           py_wl_003.py, py_wl_004.py, py_wl_005.py
+    # patterns. Input is parsed AST nodes — shape-validated by the Python
+    # parser but not semantically verified by wardline until findings are
+    # produced.
+
+  - path: "src/wardline/scanner"
+    default_taint: "SHAPE_VALIDATED"
+    # Rationale: Catch-all for scanner modules not listed above
+    # (import_resolver.py, fingerprint.py, exceptions.py, _qualnames.py,
+    # _scope.py, rejection_path.py). All operate on parsed AST or
+    # validated Finding objects — partially trusted analysis infrastructure.
+
+  - path: "src/wardline/manifest"
+    default_taint: "PIPELINE"
+    # Rationale: Catch-all for manifest modules not listed above
+    # (scope.py, exceptions.py, resolve.py, regime.py). These operate
+    # on already-loaded and schema-validated manifest data — post-
+    # validation pipeline structures. loader.py and discovery.py are
+    # explicitly listed at EXTERNAL_RAW (they handle raw filesystem input).
 
   # ─── Tier 4: External boundaries (untrusted input) ─────────
 
   - path: "src/wardline/manifest/loader.py"
     default_taint: "EXTERNAL_RAW"
-    # Rationale: Parses YAML files from disk using SafeLoader. This is a
-    # primary external boundary — the first code to touch user-supplied
-    # manifest YAML. Untrusted input enters here before schema validation.
-    # Data flow: disk file -> yaml.safe_load() -> schema validation ->
-    # ManifestModel (Tier 2). The loader itself sits at the raw boundary.
+    # Rationale: Parses YAML files from disk using SafeLoader. Primary
+    # external boundary — first code to touch user-supplied manifest YAML.
 
   - path: "src/wardline/manifest/discovery.py"
     default_taint: "EXTERNAL_RAW"
     # Rationale: Walks filesystem paths (glob, os.walk) to locate manifest
-    # and overlay YAML files. Handles external filesystem input — user-
-    # controlled directory structures, symlinks, and file paths. The
-    # discovered paths are passed to loader.py for parsing.
+    # and overlay YAML files. Handles external filesystem input.
 
   - path: "src/wardline/cli"
     default_taint: "EXTERNAL_RAW"
-    # Rationale: Click CLI entry points that accept user command-line
-    # arguments, environment variables, and file paths. The outermost
-    # boundary of the application. All external user input enters here.
-    # Includes: __init__.py, main.py, scan.py, corpus_cmds.py,
-    #           manifest_cmds.py, explain_cmd.py
+    # Rationale: Click CLI entry points — outermost boundary. All external
+    # user input enters here.
 
 # ── Distribution sketch ───────────────────────────────────────
 #

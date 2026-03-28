@@ -1,0 +1,18 @@
+{
+  "corpus_cells_failing": [],
+  "corpus_verdict": "PASS",
+  "format_version": "1.0",
+  "gaps": [
+    "457 unexcepted self-hosting finding(s)"
+  ],
+  "generated_at": "2026-03-27T15:56:59.768825+00:00",
+  "inputs": {
+    "commit_ref": "41fae76d26355a8f5843426b726256ddc0719a4d-dirty",
+    "corpus_hash": "sha256:d9356a7cc2236e891d7f9250a0831589ef2ffdfef838a419455d21058f6576b2",
+    "manifest_hash": "sha256:2d2dc83506b5c1331bb5c6a488f8550080ba68065db8907d06aa475c68bb0a17",
+    "self_hosting_input_hash": "sha256:122db7191e0abe85a6815a40e7707948c83f26f894a34785ab6feefc7412a97f",
+    "tool_version": "0.1.0"
+  },
+  "self_hosting_unexcepted_findings": 457,
+  "self_hosting_verdict": "FAIL"
+}

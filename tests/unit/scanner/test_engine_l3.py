@@ -197,7 +197,7 @@ def caller():
 
         with patch(
             "wardline.scanner.engine.assign_function_taints",
-            return_value=(l1_taint_map, l1_taint_map, l1_sources, []),
+            return_value=(l1_taint_map, l1_taint_map, l1_sources, [], []),
         ):
             result = engine.scan()
 

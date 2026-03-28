@@ -522,3 +522,230 @@ class TestNonMappingYaml:
         f.write_text("- item1\n- item2\n")
         with pytest.raises(ManifestLoadError, match="must be a YAML mapping"):
             load_overlay(f)
+
+
+# ── Skip-Promotion Rejection (§13.1.2) ──────────────────────────
+
+
+class TestSkipPromotionRejection:
+    """to_tier=1 is valid only from from_tier=2; all other origins are rejected."""
+
+    def test_from_tier_4_to_tier_1_rejected(self, tmp_path: Path) -> None:
+        f = tmp_path / "wardline.overlay.yaml"
+        f.write_text("""\
+overlay_for: "adapters/"
+boundaries:
+  - function: "mymod.ingest"
+    transition: "construction"
+    from_tier: 4
+    to_tier: 1
+""")
+        with pytest.raises(ManifestLoadError, match="skip-promotions to Tier 1 are prohibited"):
+            load_overlay(f)
+
+    def test_from_tier_3_to_tier_1_rejected(self, tmp_path: Path) -> None:
+        f = tmp_path / "wardline.overlay.yaml"
+        f.write_text("""\
+overlay_for: "adapters/"
+boundaries:
+  - function: "mymod.validate"
+    transition: "construction"
+    from_tier: 3
+    to_tier: 1
+""")
+        with pytest.raises(ManifestLoadError, match="skip-promotions to Tier 1 are prohibited"):
+            load_overlay(f)
+
+    def test_missing_from_tier_to_tier_1_rejected(self, tmp_path: Path) -> None:
+        """Omitting from_tier with to_tier=1 on a non-restoration boundary is a skip-promotion."""
+        f = tmp_path / "wardline.overlay.yaml"
+        f.write_text("""\
+overlay_for: "adapters/"
+boundaries:
+  - function: "mymod.magic"
+    transition: "construction"
+    to_tier: 1
+""")
+        with pytest.raises(ManifestLoadError, match="skip-promotions to Tier 1 are prohibited"):
+            load_overlay(f)
+
+    def test_from_tier_2_to_tier_1_accepted(self, tmp_path: Path) -> None:
+        """Construction boundary T2→T1 is the valid path."""
+        f = tmp_path / "wardline.overlay.yaml"
+        f.write_text("""\
+overlay_for: "adapters/"
+boundaries:
+  - function: "mymod.construct"
+    transition: "construction"
+    from_tier: 2
+    to_tier: 1
+""")
+        overlay = load_overlay(f)
+        assert overlay.boundaries[0].from_tier == 2
+        assert overlay.boundaries[0].to_tier == 1
+
+    def test_from_tier_4_to_tier_2_accepted(self, tmp_path: Path) -> None:
+        """Combined validation T4→T2 is allowed — not a skip-promotion to T1."""
+        f = tmp_path / "wardline.overlay.yaml"
+        f.write_text("""\
+overlay_for: "adapters/"
+boundaries:
+  - function: "mymod.combined"
+    transition: "combined_validation"
+    from_tier: 4
+    to_tier: 2
+""")
+        overlay = load_overlay(f)
+        assert overlay.boundaries[0].from_tier == 4
+        assert overlay.boundaries[0].to_tier == 2
+
+    def test_restoration_boundary_not_rejected(self, tmp_path: Path) -> None:
+        """Restoration boundaries use restored_tier, not to_tier — no skip-promotion check."""
+        f = tmp_path / "wardline.overlay.yaml"
+        f.write_text("""\
+overlay_for: "adapters/"
+boundaries:
+  - function: "mymod.restore"
+    transition: "restoration"
+    restored_tier: 1
+""")
+        overlay = load_overlay(f)
+        assert overlay.boundaries[0].transition == "restoration"
+        assert overlay.boundaries[0].restored_tier == 1
+
+    def test_restoration_with_to_tier_stripped(self, tmp_path: Path) -> None:
+        """Restoration boundary with to_tier in YAML has it stripped at load time."""
+        f = tmp_path / "wardline.overlay.yaml"
+        f.write_text("""\
+overlay_for: "adapters/"
+boundaries:
+  - function: "mymod.restore"
+    transition: "restoration"
+    restored_tier: 1
+    to_tier: 1
+""")
+        overlay = load_overlay(f)
+        assert overlay.boundaries[0].transition == "restoration"
+        assert overlay.boundaries[0].restored_tier == 1
+        assert overlay.boundaries[0].to_tier is None
+
+
+class TestTemporalSeparationLoading:
+    def test_load_manifest_with_temporal_separation(self, tmp_path: Path) -> None:
+        """Manifest with temporal_separation loads correctly."""
+        from wardline.manifest.loader import load_manifest
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "  temporal_separation:\n"
+            '    alternative: "same-actor-with-retrospective"\n'
+            "    retrospective_window_days: 10\n"
+            "    rationale: small team\n"
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        result = load_manifest(manifest)
+        assert result.metadata.temporal_separation is not None
+        assert result.metadata.temporal_separation.alternative == "same-actor-with-retrospective"
+        assert result.metadata.temporal_separation.retrospective_window_days == 10
+        assert result.metadata.temporal_separation.rationale == "small team"
+
+    def test_load_manifest_with_enforced_temporal_separation(self, tmp_path: Path) -> None:
+        """Manifest with enforced temporal_separation loads correctly."""
+        from wardline.manifest.loader import load_manifest
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "  temporal_separation:\n"
+            '    alternative: "enforced"\n'
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        result = load_manifest(manifest)
+        assert result.metadata.temporal_separation is not None
+        assert result.metadata.temporal_separation.alternative == "enforced"
+
+    def test_load_manifest_without_temporal_separation(self, tmp_path: Path) -> None:
+        """Absent temporal_separation loads as None (undeclared)."""
+        from wardline.manifest.loader import load_manifest
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        result = load_manifest(manifest)
+        assert result.metadata.temporal_separation is None
+
+    def test_schema_rejects_unknown_alternative(self, tmp_path: Path) -> None:
+        """Invalid temporal_separation.alternative fails schema validation."""
+        from wardline.manifest.loader import ManifestLoadError, load_manifest
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "  temporal_separation:\n"
+            '    alternative: "bogus"\n'
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        with pytest.raises(ManifestLoadError):
+            load_manifest(manifest)
+
+    def test_same_actor_requires_window_and_rationale(self, tmp_path: Path) -> None:
+        """same-actor-with-retrospective without window/rationale fails."""
+        from wardline.manifest.loader import ManifestLoadError, load_manifest
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "  temporal_separation:\n"
+            '    alternative: "same-actor-with-retrospective"\n'
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        with pytest.raises(ManifestLoadError, match="retrospective_window_days"):
+            load_manifest(manifest)
+
+    def test_enforced_rejects_extra_fields(self, tmp_path: Path) -> None:
+        """enforced with retrospective fields is rejected."""
+        from wardline.manifest.loader import ManifestLoadError, load_manifest
+
+        manifest = tmp_path / "wardline.yaml"
+        manifest.write_text(
+            '$id: "https://wardline.dev/schemas/0.1/wardline.schema.json"\n'
+            "metadata:\n"
+            "  organisation: test\n"
+            "  temporal_separation:\n"
+            '    alternative: "enforced"\n'
+            "    retrospective_window_days: 10\n"
+            "tiers:\n"
+            '  - id: "T1"\n'
+            "    tier: 1\n"
+            "module_tiers: []\n"
+        )
+        with pytest.raises(ManifestLoadError, match="must not be present"):
+            load_manifest(manifest)

@@ -100,7 +100,7 @@ def explain(
 
         # Discover annotations and assign taints
         annotations = discover_annotations(tree, file_path_str)
-        taint_map, _return_taint_map, _taint_sources, _conflicts = assign_function_taints(
+        taint_map, _return_taint_map, _taint_sources, _conflicts, _overclaims = assign_function_taints(
             tree, file_path_str, annotations, manifest_model
         )
 
@@ -128,7 +128,10 @@ def explain(
         decorator_taint = taint_from_annotations(
             file_path_str, qualname, annotations
         )
-        module_default = resolve_module_default(file_path_str, manifest_model)
+        module_default = resolve_module_default(
+            file_path_str, manifest_model,
+            project_root=manifest_path.parent if manifest_path is not None else None,
+        )
 
         if decorator_taint is not None:
             # Find which decorator(s) matched
@@ -289,7 +292,7 @@ def _build_exception_section(
     if manifest_path is not None and manifest_path.exists():
         try:
             all_exceptions = load_exceptions(manifest_path.parent)
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
             click.echo(f"warning: could not load exception register: {exc}", err=True)
 
     # Build relative location key for matching
@@ -377,7 +380,7 @@ def _build_overlay_section(
         return None
 
     try:
-        boundaries = resolve_boundaries(root, manifest_model)  # type: ignore[arg-type]
+        boundaries, _ = resolve_boundaries(root, manifest_model)  # type: ignore[arg-type]
         optional_fields = resolve_optional_fields(root, manifest_model)  # type: ignore[arg-type]
     except Exception:
         if not output_json:
@@ -554,7 +557,7 @@ def _build_fingerprint_section(
                         break
                 else:
                     baseline_status = "no baseline stored"
-            except Exception:
+            except (OSError, ValueError, KeyError, _json.JSONDecodeError):
                 baseline_status = "no baseline stored"
 
     if not output_json:

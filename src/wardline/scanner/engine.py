@@ -70,6 +70,7 @@ class ScanResult:
     files_skipped: int = 0
     files_with_degraded_taint: int = 0
     errors: list[str] = field(default_factory=list)
+    scanned_file_paths: list[Path] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -150,6 +151,7 @@ class ScanEngine:
         analysis_level: int = 1,
         known_validators: frozenset[str] | None = None,
         max_expansion_rounds: int = 1,
+        project_root: Path | None = None,
     ) -> None:
         self._target_paths = target_paths
         self._exclude_paths = tuple(p.resolve() for p in exclude_paths)
@@ -160,6 +162,7 @@ class ScanEngine:
         self._analysis_level = analysis_level
         self._known_validators = known_validators if known_validators is not None else BUILTIN_KNOWN_VALIDATORS
         self._max_expansion_rounds = max_expansion_rounds
+        self._project_root = project_root
         self._project_index: ProjectIndex | None = None
 
     def scan(self) -> ScanResult:
@@ -249,6 +252,7 @@ class ScanEngine:
             return
 
         result.files_scanned += 1
+        result.scanned_file_paths.append(file_path)
 
         for diagnostic in _detect_dynamic_imports(tree):
             result.findings.append(
@@ -272,8 +276,9 @@ class ScanEngine:
         # Pass 1: Discovery + taint assignment (fault-tolerant)
         try:
             annotations = discover_annotations(tree, file_path)
-            body_taint_map, return_taint_map, taint_sources, taint_conflicts = assign_function_taints(
-                tree, file_path, annotations, self._manifest
+            body_taint_map, return_taint_map, taint_sources, taint_conflicts, restoration_overclaims = assign_function_taints(
+                tree, file_path, annotations, self._manifest,
+                project_root=self._project_root,
             )
         except Exception as exc:
             logger.error("Discovery/taint failed for %s: %s", file_path, exc)
@@ -304,6 +309,7 @@ class ScanEngine:
             annotations = {}
             body_taint_map, return_taint_map, taint_sources = {}, {}, {}
             taint_conflicts = []
+            restoration_overclaims = []
 
         # Emit GOVERNANCE findings for conflicting taint decorators
         for conflict in taint_conflicts:
@@ -326,6 +332,31 @@ class ScanEngine:
                     analysis_level=self._analysis_level,
                     source_snippet=None,
                     qualname=conflict.qualname,
+                )
+            )
+
+        # Emit GOVERNANCE findings for restoration overclaims
+        for overclaim in restoration_overclaims:
+            result.findings.append(
+                Finding(
+                    rule_id=RuleId.GOVERNANCE_RESTORATION_OVERCLAIM,
+                    file_path=overclaim.file_path,
+                    line=1,
+                    col=0,
+                    end_line=None,
+                    end_col=None,
+                    message=(
+                        f"@restoration_boundary on {overclaim.qualname} claims "
+                        f"restored_tier={overclaim.claimed_tier} but evidence "
+                        f"supports at most tier {overclaim.evidence_ceiling} "
+                        f"({overclaim.evidence_taint.value}). §5.3 evidence matrix."
+                    ),
+                    severity=Severity.WARNING,
+                    exceptionability=Exceptionability.STANDARD,
+                    taint_state=overclaim.evidence_taint,
+                    analysis_level=self._analysis_level,
+                    source_snippet=None,
+                    qualname=overclaim.qualname,
                 )
             )
 

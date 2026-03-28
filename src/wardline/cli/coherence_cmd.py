@@ -1,6 +1,6 @@
 """wardline manifest coherence — cross-reference annotations against manifest.
 
-Runs all 11 coherence checks, formats output (text or JSON), and
+Runs all 14 coherence checks, formats output (text or JSON), and
 optionally gates on ERROR-level issues.
 """
 
@@ -30,6 +30,9 @@ CATEGORY_MAP = {
     "agent_originated_exception": "enforcement",
     "expired_exception": "enforcement",
     "first_scan_perimeter": "enforcement",
+    "missing_validation_scope": "enforcement",
+    "insufficient_restoration_evidence": "enforcement",
+    "restoration_evidence_divergence": "enforcement",
 }
 
 
@@ -85,10 +88,14 @@ def coherence(
         check_tier_upgrade_without_evidence,
         check_undeclared_boundaries,
         check_unmatched_contracts,
+        check_validation_scope_presence,
+        check_restoration_evidence,
+        check_restoration_evidence_consistency,
     )
     from wardline.manifest.exceptions import load_exceptions
     from wardline.manifest.loader import (
         ManifestLoadError,
+        ManifestPolicyError,
         WardlineYAMLError,
         load_manifest,
     )
@@ -118,13 +125,17 @@ def coherence(
     from wardline.manifest.discovery import GovernanceError
 
     try:
-        boundaries = resolve_boundaries(manifest_dir, manifest_model)
+        boundaries, _ = resolve_boundaries(manifest_dir, manifest_model)
+    except ManifestPolicyError:
+        raise
     except (GovernanceError, ManifestLoadError, OSError) as exc:
         click.echo(f"warning: boundary resolution failed: {exc}", err=True)
         boundaries = ()
 
     try:
         contract_bindings = resolve_contract_bindings(manifest_dir, manifest_model)
+    except ManifestPolicyError:
+        raise
     except (GovernanceError, ManifestLoadError, OSError) as exc:
         click.echo(f"warning: contract binding resolution failed: {exc}", err=True)
         contract_bindings = ()
@@ -134,7 +145,7 @@ def coherence(
     except ManifestLoadError:
         exceptions = ()
 
-    # --- Run all 11 checks ---
+    # --- Run all 14 checks ---
     all_issues: list[CoherenceIssue] = []
 
     all_issues.extend(
@@ -180,6 +191,15 @@ def coherence(
         check_tier_topology_consistency(
             boundaries, manifest_model.tiers, manifest_model.module_tiers
         )
+    )
+    all_issues.extend(
+        check_validation_scope_presence(boundaries)
+    )
+    all_issues.extend(
+        check_restoration_evidence(boundaries)
+    )
+    all_issues.extend(
+        check_restoration_evidence_consistency(boundaries, annotations)
     )
 
     # --- Format output ---

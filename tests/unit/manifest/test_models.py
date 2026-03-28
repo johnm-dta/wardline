@@ -22,6 +22,7 @@ from wardline.manifest.models import (
     RulesConfig,
     ScannerConfig,
     ScannerConfigError,
+    TemporalSeparation,
     TierEntry,
     WardlineManifest,
     WardlineOverlay,
@@ -396,3 +397,39 @@ class TestRulesConfigDeepFreeze:
         proxy = MappingProxyType({"id": "R1"})
         rc = RulesConfig(overrides=(proxy,))
         assert rc.overrides[0] is proxy
+
+
+# ── TemporalSeparation ────────────────────────────────────────────
+
+
+class TestTemporalSeparation:
+    def test_defaults(self) -> None:
+        ts = TemporalSeparation()
+        assert ts.alternative == "same-actor-with-retrospective"
+        assert ts.retrospective_window_days == 10
+        assert ts.rationale == ""
+
+    def test_enforced(self) -> None:
+        ts = TemporalSeparation(alternative="enforced")
+        assert ts.alternative == "enforced"
+
+    def test_frozen(self) -> None:
+        ts = TemporalSeparation()
+        with pytest.raises(FrozenInstanceError):
+            ts.alternative = "enforced"  # type: ignore[misc]
+
+    def test_manifest_metadata_temporal_separation_none_means_undeclared(self) -> None:
+        meta = ManifestMetadata(organisation="test")
+        assert meta.temporal_separation is None
+
+    def test_manifest_metadata_temporal_separation_round_trip(self) -> None:
+        ts = TemporalSeparation(
+            alternative="same-actor-with-retrospective",
+            retrospective_window_days=15,
+            rationale="small team",
+        )
+        meta = ManifestMetadata(organisation="test", temporal_separation=ts)
+        assert meta.temporal_separation is not None
+        assert meta.temporal_separation.alternative == "same-actor-with-retrospective"
+        assert meta.temporal_separation.retrospective_window_days == 15
+        assert meta.temporal_separation.rationale == "small team"

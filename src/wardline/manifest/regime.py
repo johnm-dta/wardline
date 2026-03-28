@@ -62,6 +62,8 @@ class ManifestMetrics:
     ratification_age_days: int | None = None
     review_interval_days: int | None = None
     ratification_overdue: bool = False
+    ratified_by_present: bool = False
+    temporal_separation_posture: str | None = None
 
 
 @dataclass(frozen=True)
@@ -204,6 +206,16 @@ def collect_manifest_metrics(manifest_path: Path) -> ManifestMetrics:
         except (ValueError, TypeError):
             pass
 
+    ratified_by_present = meta.ratified_by is not None
+
+    temporal_separation_posture: str | None = None
+    if meta.temporal_separation is not None:
+        alt = meta.temporal_separation.alternative
+        if alt == "enforced":
+            temporal_separation_posture = "enforced"
+        else:
+            temporal_separation_posture = f"alternative:{alt}"
+
     return ManifestMetrics(
         governance_profile=manifest.governance_profile,
         schema_version="0.1",
@@ -212,6 +224,8 @@ def collect_manifest_metrics(manifest_path: Path) -> ManifestMetrics:
         ratification_age_days=ratification_age_days,
         review_interval_days=meta.review_interval_days,
         ratification_overdue=ratification_overdue,
+        ratified_by_present=ratified_by_present,
+        temporal_separation_posture=temporal_separation_posture,
     )
 
 

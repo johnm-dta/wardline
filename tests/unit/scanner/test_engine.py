@@ -527,3 +527,47 @@ class TestEngineBoundaryInjection:
         engine.scan()
         assert rule.captured_context is not None
         assert rule.captured_context.boundaries == ()
+
+
+class TestScanResultFileTracking:
+    def test_scanned_file_paths_populated(self, tmp_path: Path) -> None:
+        """Engine records the paths of files it successfully scanned."""
+        py_file = tmp_path / "example.py"
+        py_file.write_text("x = 1\n", encoding="utf-8")
+
+        from wardline.scanner.engine import ScanEngine, ScanResult
+        from wardline.manifest.models import WardlineManifest
+
+        engine = ScanEngine(
+            target_paths=(tmp_path,),
+            exclude_paths=(),
+            rules=(),
+            manifest=WardlineManifest(),
+            boundaries=(),
+            optional_fields=(),
+            analysis_level=1,
+        )
+        result = engine.scan()
+        assert len(result.scanned_file_paths) == 1
+        assert result.scanned_file_paths[0] == py_file.resolve()
+
+    def test_scanned_file_paths_excludes_skipped(self, tmp_path: Path) -> None:
+        """Files that fail to parse are not in scanned_file_paths."""
+        bad_file = tmp_path / "bad.py"
+        bad_file.write_text("def broken(\n", encoding="utf-8")
+
+        from wardline.scanner.engine import ScanEngine, ScanResult
+        from wardline.manifest.models import WardlineManifest
+
+        engine = ScanEngine(
+            target_paths=(tmp_path,),
+            exclude_paths=(),
+            rules=(),
+            manifest=WardlineManifest(),
+            boundaries=(),
+            optional_fields=(),
+            analysis_level=1,
+        )
+        result = engine.scan()
+        assert result.scanned_file_paths == []
+        assert result.files_skipped == 1

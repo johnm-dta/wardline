@@ -1,0 +1,232 @@
+requirements:
+  - id: WL-FIT-CONF-001
+    title: Ten conformance criteria are addressable
+    statement: >
+      The implementation MUST address all ten conformance criteria defined in
+      §14.2: (1) annotation expressiveness across 17 groups,
+      (2) pattern rule detection WL-001–WL-006, (3) structural verification
+      WL-007 and WL-008, (4) taint-flow tracking, (5) measured precision and
+      recall per cell, (6) golden corpus, (7) self-hosting gate,
+      (8) deterministic SARIF v2.1.0, (9) governance infrastructure,
+      (10) manifest system with schema validation. Criteria may be
+      collectively satisfied by an enforcement regime of multiple tools.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.2 Conformance criteria"
+    verification:
+      method: documentation_and_integration_review
+      target_paths:
+        - docs/spec/wardline-02-A-python-binding.md
+        - src/wardline/scanner
+        - src/wardline/manifest
+        - src/wardline/cli
+    fitness_dimensions: [conformance]
+    notes: >
+      This is the top-level conformance check. Individual criteria are
+      covered by more specific requirements in this baseline. This
+      requirement verifies that the mapping from criteria to implementation
+      is documented and complete.
+
+  - id: WL-FIT-CONF-002
+    title: Enforcement profile is declared
+    statement: >
+      Each tool in the enforcement regime MUST declare which enforcement
+      profile(s) it satisfies: Wardline-Core, Wardline-Type,
+      Wardline-Governance, or Wardline-Full. A Wardline-Core tool's
+      documentation MUST declare which rules it implements.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.1 Enforcement profiles"
+    verification:
+      method: documentation_and_sarif_review
+      target_paths:
+        - docs/spec/wardline-02-A-python-binding.md
+        - src/wardline/scanner/sarif.py
+    fitness_dimensions: [conformance, interoperability]
+    notes: >
+      The Python scanner is a Wardline-Core tool. Verify that its declared
+      rule subset, conditional criteria (WL-007, WL-008, taint), and
+      delegated validation responsibilities are documented.
+
+  - id: WL-FIT-CONF-003
+    title: Governance profile is declared and assessable
+    statement: >
+      A deployment MUST declare which governance profile it operates under
+      (Lite or Assurance) in the root wardline manifest. The governance
+      profile is reported in SARIF output as wardline.governanceProfile.
+      A Lite deployment is assessed against the Lite governance checklist;
+      an Assurance deployment against the full §9 governance surface.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.2 Governance profiles"
+    verification:
+      method: manifest_and_sarif_review
+      target_paths:
+        - wardline.yaml
+        - src/wardline/manifest/schemas/wardline.schema.json
+        - src/wardline/scanner/sarif.py
+    fitness_dimensions: [governance, conformance]
+    notes: >
+      This overlaps with MAN-008 but focuses on the assessability dimension —
+      the seven-point Lite governance checklist and the Assurance requirements
+      table must be verifiable against the self-hosting repo.
+
+  - id: WL-FIT-CONF-004
+    title: Enforcement regime is documented
+    statement: >
+      An enforcement regime MUST be documented: which tools, which profiles,
+      which rules each tool covers, and which criteria remain unmet. The
+      regime composition is documented in the language binding reference.
+      The regime's corpus is the union of all constituent tools' corpora.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.4 Enforcement regimes"
+    verification:
+      method: documentation_review
+      target_paths:
+        - docs/spec/wardline-02-A-python-binding.md
+    fitness_dimensions: [conformance, assessability]
+    notes: >
+      The Python binding should include a regime composition matrix (§A.6)
+      mapping tools to criteria and rules.
+
+  - id: WL-FIT-CONF-005
+    title: Supplementary group enforcement scope is documented
+    statement: >
+      The regime documentation SHOULD document which supplementary groups
+      (5–15) have enforcement rules and which are expressiveness-only. The
+      overlay supplementary section provides the structured location for this
+      documentation.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.5 Supplementary group enforcement scope"
+    verification:
+      method: documentation_review
+      target_paths:
+        - docs/spec/wardline-02-A-python-binding.md
+        - src/wardline/manifest/schemas/overlay.schema.json
+    fitness_dimensions: [conformance, honesty]
+    notes: >
+      A regime can be Wardline-Full conformant while providing rich
+      enforcement for some supplementary groups and minimal for others.
+      The distinction must be honestly documented.
+
+  - id: WL-FIT-CONF-006
+    title: Assessment procedure is supportable
+    statement: >
+      The implementation MUST support the six-step assessment procedure
+      defined in §14.6: (1) regime documentation review, (2) manifest
+      validation, (2.5) manifest coherence verification, (3) golden corpus
+      verification, (4) enforcement execution with SARIF property bag
+      verification, (5) governance artefact review, and (6) self-hosting
+      verification.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.6 Assessment procedure"
+    verification:
+      method: integration_tests_and_cli_review
+      target_paths:
+        - src/wardline/cli
+        - tests/integration
+        - corpus/specimens
+    fitness_dimensions: [conformance, assessability]
+    notes: >
+      Verify that the CLI commands needed for each assessment step exist and
+      produce the expected output. The pass/fail criteria table in §14.6
+      defines the standard.
+
+  - id: WL-FIT-CONF-007
+    title: Graduation path from Lite to Assurance
+    statement: >
+      The implementation SHOULD support the five-item graduation checklist
+      for transitioning from Lite to Assurance governance profile:
+      (1) golden corpus expansion to 126+ specimens, (2) fingerprint baseline
+      established with canonical hashing, (3) temporal separation operational,
+      (4) expedited ratio threshold declared, and (5) retrospective review of
+      Lite-era exceptions.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.3 Governance profile graduation"
+    verification:
+      method: manifest_and_cli_review
+      target_paths:
+        - wardline.yaml
+        - src/wardline/manifest/models.py
+        - corpus/specimens
+    fitness_dimensions: [governance, conformance]
+    notes: >
+      The graduation is recorded as a manifest change — governance_profile
+      field changes from lite to assurance. Verify that the tooling supports
+      each checklist item.
+
+  - id: WL-FIT-CONF-008
+    title: Precision and recall floors per cell
+    statement: >
+      Precision MUST be measured per cell (rule × taint state) with a
+      recommended floor of 80% generally (65% for MIXED_RAW cells, 90% for
+      UNCONDITIONAL cells under ISM). Recall MUST be measured with a floor of
+      70% for STANDARD/RELAXED cells and 90% for UNCONDITIONAL cells.
+      Measurement and publication obligations are non-negotiable regardless
+      of threshold.
+    normative_sources:
+      - file: docs/spec/wardline-01-10-verification-properties.md
+        section: "10. Verification properties"
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.6 Assessment procedure"
+    verification:
+      method: corpus_and_cli_tests
+      target_paths:
+        - src/wardline/cli/corpus_cmds.py
+        - tests/unit/scanner/test_corpus_runner.py
+        - tests/integration/test_corpus_verify.py
+    fitness_dimensions: [conformance, assessability]
+    notes: >
+      This refines SCAN-005 with the specific floor values from the spec.
+      The assessment procedure step 3 tests these floors explicitly.
+
+  - id: WL-FIT-CONF-009
+    title: Enforcement regime composition rules
+    statement: >
+      An enforcement regime MUST satisfy: coverage completeness (every
+      criterion covered by at least one tool), rule coverage completeness
+      (union of all tools covers all eight rules), corpus union (regime
+      corpus satisfies minimum specimen counts across the full rule set),
+      SARIF aggregation (multi-run SARIF log), and per-tool self-hosting
+      where applicable.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.4 Enforcement regimes"
+    verification:
+      method: documentation_review
+      target_paths:
+        - docs/spec/wardline-02-A-python-binding.md
+    fitness_dimensions: [conformance, assessability]
+    notes: >
+      The Python binding should include a regime composition matrix (§A.6)
+      showing how tools map to criteria, rules, and profiles. Gaps in rule
+      coverage MUST be documented.
+
+  - id: WL-FIT-CONF-010
+    title: Lite governance checklist is verifiable
+    statement: >
+      A Lite deployment MUST satisfy the seven-point Lite governance
+      checklist: (1) schema-valid manifest with current ratification,
+      (2) CODEOWNERS protection for governance artefacts, (3) exception
+      register with reviewer identity/rationale/expiry, (4) temporal
+      separation implemented or documented alternative, (5) annotation
+      changes reviewed in assessment window, (6) bootstrap corpus
+      specimens correctly classified, (7) expedited exceptions documented
+      with retrospective review.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.2 Governance profiles"
+    verification:
+      method: repository_and_manifest_review
+      target_paths:
+        - wardline.yaml
+        - .github/CODEOWNERS
+        - corpus/specimens
+    fitness_dimensions: [governance, conformance]
+    notes: >
+      This refines CONF-003 by enumerating the specific Lite governance
+      checklist items that an assessor verifies.

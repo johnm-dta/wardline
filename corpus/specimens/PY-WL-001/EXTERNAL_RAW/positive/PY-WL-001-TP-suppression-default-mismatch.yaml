@@ -1,0 +1,25 @@
+---
+specimen_id: "PY-WL-001-TP-suppression-default-mismatch"
+description: "Suppression interaction: optional_field declares approved_default='' but code uses 'UNKNOWN'"
+rule: "PY-WL-001"
+category: "suppression_interaction"
+fragment: |
+  from wardline import schema_default
+
+  def process(data):
+      return schema_default(data.get("key", "UNKNOWN"))
+taint_state: "EXTERNAL_RAW"
+boundaries:
+  - function: "process"
+    transition: "shape_validation"
+optional_fields:
+  - field: "key"
+    approved_default: ""
+    rationale: "optional by contract"
+expected_rules:
+- PY-WL-001
+expected_severity: ERROR
+expected_exceptionability: UNCONDITIONAL
+expected_match: true
+sha256: "6938e3ff084660e6633f75a9f0705a5e27a434f8a3fd7fb904667c071bda6776"
+verdict: "true_positive"

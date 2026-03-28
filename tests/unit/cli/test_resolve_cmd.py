@@ -100,7 +100,7 @@ def test_resolve_empty_project(runner: CliRunner, tmp_path: Path) -> None:
     ])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert data["format_version"] == "0.1"
+    assert data["format_version"] == "0.2"
     assert data["boundaries"] == []
     assert data["overlays_discovered"] == []
     assert data["manifest_hash"].startswith("sha256:")
@@ -138,7 +138,7 @@ def test_resolve_output_flag(runner: CliRunner, tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert out_file.exists()
     data = json.loads(out_file.read_text(encoding="utf-8"))
-    assert data["format_version"] == "0.1"
+    assert data["format_version"] == "0.2"
 
 
 def test_merged_overrides_have_source(runner: CliRunner, tmp_path: Path) -> None:

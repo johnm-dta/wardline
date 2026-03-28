@@ -1,0 +1,18 @@
+---
+specimen_id: "PY-WL-002-TP-AFN-aliased-getattr"
+description: "Adversarial false negative: 3-arg getattr disguised via variable aliasing of function"
+rule: "PY-WL-002"
+category: "adversarial_false_negative"
+fragment: |
+  def resolve_attribute(obj, name):
+      """3-arg getattr looks safe because name is variable, but default is present."""
+      value = getattr(obj, name, None)
+      return value
+taint_state: "EXTERNAL_RAW"
+expected_rules:
+- PY-WL-002
+expected_severity: ERROR
+expected_exceptionability: STANDARD
+expected_match: true
+sha256: "1f79588372314700d86a40db0257adc0e3b779bc2e0ab64417217889669aedf9"
+verdict: "true_positive"

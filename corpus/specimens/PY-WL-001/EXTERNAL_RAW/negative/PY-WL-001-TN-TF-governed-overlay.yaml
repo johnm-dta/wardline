@@ -1,0 +1,25 @@
+---
+specimen_id: "PY-WL-001-TN-TF-governed-overlay"
+description: "Taint-flow: schema_default with matching overlay declaration — suppressed"
+rule: "PY-WL-001"
+category: "taint_flow"
+fragment: |
+  from wardline import schema_default
+  
+  def validate_and_default(data):
+      """Governed schema_default: boundary + optional_field + matching default."""
+      return schema_default(data.get("region", "us-east-1"))
+taint_state: "EXTERNAL_RAW"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+sha256: "c6ad06485d29f3aa35642db24e4f4d6727170b55d93c79fe7f044052863e9d91"
+verdict: "true_negative"
+boundaries:
+  - function: "validate_and_default"
+    transition: "shape_validation"
+optional_fields:
+  - field: "region"
+    approved_default: "us-east-1"
+    rationale: "regional default"

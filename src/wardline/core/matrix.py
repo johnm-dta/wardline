@@ -1,4 +1,31 @@
-"""Severity matrix — 72 cells mapping (rule, taint) to (severity, exceptionability)."""
+"""Severity matrix — 72 cells mapping (rule, taint) to (severity, exceptionability).
+
+The matrix encodes a single principle: **rules protect the integrity of
+high-tier code paths, not the hygiene of low-tier code.**
+
+Tier 4 (EXTERNAL_RAW) is the developer-freedom zone.  Python idioms like
+``dict.get()``, ``getattr()``, ``hasattr()``, and ``key in dict`` are
+expected and correct there.  The language permits these patterns for valid
+reasons — the tier system carves out the code paths where they are not
+permitted.
+
+Severity scales with the *consequence* of the pattern at that tier:
+
+- **T1 (INTEGRAL/AUDIT_TRAIL):** ERROR or UNCONDITIONAL — fabricated
+  defaults or unchecked structure in authoritative code undermines the
+  guarantees that tier exists to provide.
+- **T2 (ASSURED/PIPELINE):** ERROR/STANDARD — validated data should not
+  need fallback defaults; if it does, that's suspicious but exceptionable.
+- **T3 (GUARDED/SHAPE_VALIDATED):** WARNING — partially validated data
+  may legitimately use defensive access; flag for review, don't block.
+- **T4 (EXTERNAL_RAW):** SUPPRESS or WARNING — this IS boundary code;
+  the enforcement happens when data crosses upward, not at the access site.
+
+A ``.get("timeout", 30)`` in CLI parsing is fine.  That same value reaching
+a T1 decision path without passing through a validation boundary is the
+violation — and the boundary transition rules (PY-WL-008, PY-WL-009) catch
+that at the crossing point.
+"""
 
 from __future__ import annotations
 
@@ -41,18 +68,48 @@ _TAINT_ORDER = [
 ]
 
 # fmt: off
+#
+# Design intent — §7.5 calibration principle:
+#
+#   These boundaries exist because the language permits these patterns for
+#   valid reasons.  The tier system carves out code paths where those patterns
+#   are not permitted.
+#
+#   Rules protect the integrity of high-tier code paths, not the hygiene of
+#   low-tier code.  T4 (EXTERNAL_RAW) is the developer-freedom zone — any
+#   Python idiom is fine there.  Enforcement activates when data crosses a
+#   boundary upward.  A .get("timeout", 30) in CLI parsing is fine; that
+#   value reaching a T1 decision path without validation is the violation.
+#
+#   Severity scales with the CONSEQUENCE of the pattern at that tier, not
+#   with the mere presence of the pattern.  SUPPRESS at T4 means "this
+#   pattern is expected here"; ERROR at T1 means "this pattern undermines
+#   the guarantees this tier exists to provide."
+#
 # Row data: (rule, [(severity, exceptionability) for each taint state])
 _MATRIX_DATA: list[tuple[RuleId, list[tuple[Severity, Exceptionability]]]] = [
-    # PY-WL-001 inherits WL-001 matrix (dict key access with fallback default)
-    (RuleId.PY_WL_001, [(_E,_U), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St)]),
-    # PY-WL-002 inherits WL-001 matrix (attribute access with fallback default)
-    (RuleId.PY_WL_002, [(_E,_U), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St)]),
-    # PY-WL-003 = WL-002 (existence-checking as structural gate)
-    (RuleId.PY_WL_003, [(_E,_U), (_E,_U), (_E,_U), (_E,_St), (_E,_St), (_E,_U), (_E,_U), (_E,_St)]),
+    # PY-WL-001 (dict key access with fallback default)
+    # T1/T2: ERROR — fabricated defaults in authoritative/validated code undermine integrity
+    # T3: WARNING — partially validated; flag for review but don't block
+    # T4: SUPPRESS — boundary code legitimately uses .get() for optional config/input
+    (RuleId.PY_WL_001, [(_E,_U), (_E,_St), (_W,_R), (_Su,_T), (_Su,_T), (_W,_R), (_E,_St), (_Su,_T)]),
+    # PY-WL-002 (attribute access with fallback default)
+    # Same gradient as PY-WL-001; T4 stays WARNING (not SUPPRESS) because
+    # obj.attr-or-default has a falsy-substitution risk even at boundaries
+    (RuleId.PY_WL_002, [(_E,_U), (_E,_St), (_W,_R), (_W,_R),  (_W,_R),  (_W,_R), (_E,_St), (_W,_St)]),
+    # PY-WL-003 (existence-checking as structural gate)
+    # T1/T2: ERROR — validated data should have known structure
+    # T3: ERROR/STANDARD — existence checks in partially-validated code are suspicious
+    #      (was UNCONDITIONAL; changed to STANDARD so exceptions are possible)
+    # T4: SUPPRESS — existence-checking IS the validation mechanism at boundaries
+    (RuleId.PY_WL_003, [(_E,_U), (_E,_U), (_E,_St), (_Su,_T), (_Su,_T), (_E,_St), (_E,_St), (_Su,_T)]),
     # PY-WL-004 = WL-003 (catching all exceptions broadly)
     (RuleId.PY_WL_004, [(_E,_U), (_E,_St), (_W,_St), (_W,_R), (_E,_St), (_W,_St), (_W,_St), (_E,_St)]),
     # PY-WL-005 = WL-004 (catching exceptions silently)
-    (RuleId.PY_WL_005, [(_E,_U), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St)]),
+    # T1/T2: ERROR — silent catch in trusted code destroys diagnostic evidence
+    # T3: WARNING — partially validated; flag for review
+    # T4: WARNING/RELAXED — boundary code may legitimately suppress parse errors
+    (RuleId.PY_WL_005, [(_E,_U), (_E,_St), (_W,_St), (_W,_R), (_E,_St), (_W,_St), (_W,_St), (_E,_St)]),
     # PY-WL-006 = WL-005 (audit-critical writes in broad handlers)
     (RuleId.PY_WL_006, [(_E,_U), (_E,_U), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St)]),
     # PY-WL-007 = WL-006 (runtime type-checking internal data)

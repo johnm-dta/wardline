@@ -1,0 +1,20 @@
+---
+specimen_id: "PY-WL-004-TN-AFP-immediate-reraise"
+description: "Adversarial false positive: broad except with immediate re-raise is structurally exempt"
+rule: "PY-WL-004"
+category: "adversarial_false_positive"
+fragment: |
+  def transform(data):
+      """Broad handler that immediately re-raises — scanner exempts this pattern."""
+      try:
+          result = parse_and_validate(data)
+      except Exception:
+          raise
+      return result
+taint_state: "PIPELINE"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+sha256: "cdfaee43be0708d63ffa64f8aef94e48d152ee493632b6f2d3e673926b5b2d41"
+verdict: "true_negative"

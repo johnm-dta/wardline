@@ -140,9 +140,10 @@ def apply_exceptions(
             processed.append(finding)
             continue
 
-        # Relativize file_path so location keys match CLI-added exceptions
+        # Relativize file_path so location keys match CLI-added exceptions.
+        # Resolve project_root to handle both relative and absolute file_paths.
         try:
-            rel_path = str(Path(finding.file_path).relative_to(project_root))
+            rel_path = str(Path(finding.file_path).relative_to(project_root.resolve()))
         except ValueError:
             rel_path = finding.file_path
 
@@ -201,6 +202,7 @@ def apply_exceptions(
                 try:
                     expiry = datetime.date.fromisoformat(exc.expires)
                 except ValueError:
+                    logger.warning("Exception %s has unparseable expiry %r — skipped", exc.id, exc.expires)
                     continue
                 if expiry < now:
                     continue  # Expired

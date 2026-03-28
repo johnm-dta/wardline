@@ -1,0 +1,22 @@
+---
+specimen_id: "PY-WL-004-TP-TF-join-semantics"
+description: "Taint-flow: mixed-tier data in broad exception handler"
+rule: "PY-WL-004"
+category: "taint_flow"
+fragment: |
+  def process_mixed(trusted_data, raw_input):
+      """MIXED_RAW context: broad handler on mixed-tier data."""
+      combined = {**trusted_data, "external": raw_input}
+      try:
+          result = transform(combined)
+      except Exception:
+          result = fallback(combined)
+      return result
+taint_state: "MIXED_RAW"
+expected_rules:
+- PY-WL-004
+expected_severity: ERROR
+expected_exceptionability: STANDARD
+expected_match: true
+sha256: "e8bb7c870d7e99c256386f9d282460f5bb84a31bce34cd5609ad9e1d3c9a76d5"
+verdict: "true_positive"

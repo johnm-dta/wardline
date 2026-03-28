@@ -26,5 +26,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Corpus test suite with specimen files for validation.
 - Runtime descriptor system for boundary enforcement at execution time.
 
-[Unreleased]: https://github.com/tachyon-beep/wardline/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/tachyon-beep/wardline/releases/tag/v0.1.0
+[Unreleased]: https://github.com/johnm-dta/wardline/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/johnm-dta/wardline/releases/tag/v0.1.0

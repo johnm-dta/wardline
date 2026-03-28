@@ -4,15 +4,16 @@ This is the first repo fitness assessment against the baseline in this folder.
 
 ## Rollup
 
-- Pass: 18
-- Partial: 8
-- Fail: 5
+- Pass: 17 (of 35 assessed)
+- Partial: 10
+- Fail: 8
+- Not assessed: 71 (39 previously in YAML + 32 added in baseline expansion)
 
 Overall judgment: the project has a solid core implementation and test surface, but it is not yet fit to claim clean alignment with the current normative spec. The main issues are concentrated in three areas:
 
-1. Python binding incompleteness: `@restoration_boundary(...)` is still missing, and generic boundary decorators are not parameterized per the binding contract.
-2. Manifest/spec drift: the implementation still uses `bounded_context` where the current spec uses `validation_scope`, and several governance/reporting surfaces remain behind the normative wording.
-3. Conformance surface gaps: the scanner and corpus are strong in core areas, but corpus breadth, self-hosting strictness, and some SARIF/run-level properties lag the spec.
+1. Binding-to-spec contract gaps: AST discovery and `schema_default()` handling are solid, but the normative restoration-composition contract and required run-level SARIF properties are not yet met.
+2. Manifest and governance drift: `validation_scope` remains incomplete, the self-hosting manifest lacks ratification metadata, and Lite-governance controls are only partially evidenced.
+3. Conformance evidence gaps: the scanner is strong on rule logic and two-hop taint behavior, but per-cell metrics, full SARIF property bags, corpus breadth, and substantive self-hosting still lag the spec.
 
 ## Verification Run
 
@@ -46,48 +47,65 @@ Result: `252 passed in 0.38s`
 | `WL-FIT-CORE-004` | pass | `src/wardline/core/tiers.py`, `tests/unit/core/test_taint_to_tier.py` | Tier-to-taint mapping is explicit and complete. |
 | `WL-FIT-CORE-005` | pass | `src/wardline/core/matrix.py`, `tests/unit/core/test_matrix.py`, `tests/unit/scanner/test_matrix_cells.py` | Implemented rule/state severity behavior is covered by dedicated tests. |
 | `WL-FIT-CORE-006` | fail | `src/wardline/manifest/schemas/overlay.schema.json`, `src/wardline/manifest/loader.py` | Skip-promotions to Tier 1 are not rejected by schema or loader logic. |
-| `WL-FIT-CORE-007` | fail | `src/wardline/decorators/__init__.py`, `src/wardline/core/registry.py`, `docs/audits/2026-03-25-rule-conformance/phase-2/f1/evidence-restoration.md` | Restoration claims are not fully implementable because the core decorator contract is missing. |
+| `WL-FIT-CORE-007` | fail | `src/wardline/decorators/__init__.py`, `src/wardline/core/registry.py`, `docs/audits/2026-03-25-rule-conformance/phase-2/f1/evidence-restoration.md` | The Part I restoration contract is not fully realisable in the Python binding because `@restoration_boundary(...)` support is still missing. |
 | `WL-FIT-MAN-001` | pass | `src/wardline/manifest/loader.py`, `src/wardline/manifest/schemas/wardline.schema.json`, `tests/unit/manifest/test_schemas.py` | Root manifest schema validation is enforced before model construction. |
 | `WL-FIT-MAN-002` | pass | `src/wardline/manifest/resolve.py`, `src/wardline/manifest/scope.py`, `tests/unit/manifest/test_loader.py`, `tests/unit/manifest/test_resolve.py` | Overlay path/scope spoofing is rejected. |
 | `WL-FIT-MAN-003` | pass | `src/wardline/manifest/merge.py`, `tests/unit/manifest/test_merge.py`, `tests/unit/manifest/test_resolve.py` | Narrow-only enforcement exists for severity and scoped tier widening. |
 | `WL-FIT-MAN-004` | fail | `src/wardline/manifest/models.py`, `src/wardline/manifest/loader.py`, `src/wardline/manifest/schemas/overlay.schema.json`, `docs/audits/2026-03-25-rule-conformance/phase-2/f1/bounded-context.md` | Implementation still uses `bounded_context`; current spec baseline requires `validation_scope`. Presence-check enforcement is also absent. |
 | `WL-FIT-MAN-005` | partial | `src/wardline/manifest/models.py`, `src/wardline/manifest/loader.py`, `src/wardline/manifest/resolve.py` | Contract bindings are separate and name-based, but contract declarations remain raw dicts and cross-validation is weak. |
 | `WL-FIT-MAN-006` | pass | `src/wardline/scanner/rules/py_wl_001.py`, `tests/unit/scanner/test_py_wl_001.py`, `src/wardline/manifest/resolve.py` | `schema_default()` is tied to overlay optional-field governance and tested. |
-| `WL-FIT-MAN-007` | partial | `src/wardline/manifest/models.py`, `src/wardline/manifest/regime.py`, `tests/unit/manifest/test_regime.py` | Ratification age is computed and surfaced in regime metrics, but the evidence is stronger in governance CLI than in scan-time findings. |
+| `WL-FIT-MAN-007` | partial | `src/wardline/manifest/models.py`, `src/wardline/manifest/regime.py`, `tests/unit/manifest/test_regime.py`, `wardline.yaml` | Ratification age is computed by the tooling, but the self-hosting root manifest lacks ratification metadata, so the control cannot currently pass on the repo’s own manifest. |
 | `WL-FIT-MAN-008` | pass | `src/wardline/manifest/schemas/wardline.schema.json`, `src/wardline/manifest/models.py`, `src/wardline/manifest/loader.py`, `src/wardline/manifest/regime.py`, `src/wardline/scanner/sarif.py` | Governance profile is now modeled in the manifest, consumed by regime reporting, and emitted in SARIF as `wardline.governanceProfile`. |
+| `WL-FIT-MAN-009` | partial | `.github/CODEOWNERS`, `wardline.yaml`, `.github/workflows/ci.yml` | Path protection exists for the root manifest, overlays, and corpus, but exception-register and fingerprint-governance paths are not comprehensively covered. |
+| `WL-FIT-MAN-010` | partial | `src/wardline/cli/fingerprint_cmd.py`, `src/wardline/scanner/fingerprint.py`, `tests/unit/cli/test_fingerprint_cmd.py` | Fingerprint tooling exists and is tested, but the active self-hosting governance posture is closer to “tools available” than “declared profile fully evidenced.” |
+| `WL-FIT-MAN-011` | fail | `wardline.yaml`, `docs/audits/2026-03-25-rule-conformance/phase-2/f3/compliance-surface.md` | No temporal-separation posture or Lite-profile alternative is declared in the self-hosting manifest, so this governance requirement is not assessable. |
 | `WL-FIT-SCAN-001` | pass | `src/wardline/scanner/rules/__init__.py`, `src/wardline/scanner/sarif.py`, `tests/unit/scanner/test_sarif.py` | Implemented rules are declared and pseudo-rules are excluded from `implementedRules`. |
 | `WL-FIT-SCAN-002` | pass | `tests/unit/scanner/test_py_wl_001.py` through `test_py_wl_009.py`, `tests/unit/scanner/test_scn_021.py` | Implemented rule behavior has substantial unit coverage. |
 | `WL-FIT-SCAN-003` | pass | `tests/unit/scanner/test_engine_l3.py`, `tests/unit/scanner/test_delegated_rejection.py`, `tests/unit/scanner/test_rejection_path_convergence.py` | Direct, two-hop, delegated, and convergence paths are explicitly tested. |
-| `WL-FIT-SCAN-004` | partial | `src/wardline/scanner/sarif.py`, `tests/unit/scanner/test_sarif.py`, ready issues `keisei-d1dfd63456` and related audit notes | SARIF is deterministic and now includes core Wardline properties including governance profile, but run-level property coverage is still incomplete relative to the current spec/audit expectations. |
-| `WL-FIT-SCAN-005` | pass | `src/wardline/scanner/engine.py`, `tests/unit/scanner/test_engine.py`, `tests/unit/scanner/test_engine_l3.py` | Tool failures are surfaced and fall back behavior is tested. |
-| `WL-FIT-SCAN-006` | partial | `corpus/specimens`, `tests/unit/corpus/test_corpus_skeleton.py`, `tests/unit/scanner/test_corpus_runner.py` | Corpus machinery exists and is runnable, but skeleton coverage is still narrower than the full claimed rule surface. |
-| `WL-FIT-SCAN-007` | partial | `docs/audits/2026-03-25-rule-conformance/phase-2/f3/compliance-surface.md`, `tests/unit/test_wp04_hardening.py`, CLI scan/regime surfaces | Self-hosting is measurable, but the current gate is closer to stability checking than strict “passes its own rules” conformance. |
-| `WL-FIT-SCAN-008` | partial | `docs/spec/wardline-02-A-python-binding.md`, `src/wardline/scanner/sarif.py`, `docs/audits/2026-03-25-rule-conformance/phase-2/f3/compliance-surface.md` | Regime composition is documented, but machine-readable conformance honesty lags because SARIF reports no conformance gaps despite known tracked gaps. |
-| `WL-FIT-PY-001` | partial | `src/wardline/decorators/__init__.py`, `src/wardline/core/registry.py`, `tests/unit/scanner/test_registry_sync.py` | Export surface is strong for Groups 1–15, but core binding vocabulary is incomplete for the current spec baseline. |
-| `WL-FIT-PY-002` | fail | `src/wardline/decorators/__init__.py`, `src/wardline/core/registry.py`, `docs/audits/2026-03-25-rule-conformance/phase-2/f1/evidence-restoration.md`, ready issue `keisei-125ea62dcd` | `@restoration_boundary(...)` is missing from the decorator library and registry. |
-| `WL-FIT-PY-003` | fail | `src/wardline/decorators/boundaries.py`, `tests/unit/decorators/test_boundaries.py`, ready issue `keisei-ad7fa05ab1` | `trust_boundary` and `tier_transition` exist only as boolean markers, not parameterized transitions. |
-| `WL-FIT-PY-004` | partial | `src/wardline/decorators/_base.py`, `src/wardline/runtime/base.py`, `tests/unit/decorators/test_decorators.py`, ready issue `keisei-cb8fe87f0b` | `get_wardline_attrs()` traverses `__wrapped__`, but `WardlineBase` still relies on top-level attrs instead of full chain traversal. |
-| `WL-FIT-PY-005` | pass | `src/wardline/scanner/rules/scn_021.py`, `tests/unit/scanner/test_scn_021.py` | Contradictory/suspicious decorator combinations are implemented and tested. |
-| `WL-FIT-PY-006` | pass | `src/wardline/scanner/rules/py_wl_009.py`, `tests/unit/scanner/test_py_wl_009.py` | Validation ordering enforcement is implemented and well tested. |
-| `WL-FIT-PY-007` | pass | `src/wardline/runtime`, `tests/unit/runtime` | Runtime support exists and is tested as complementary enforcement. |
-| `WL-FIT-PY-008` | pass | `src/wardline/scanner/sarif.py`, `src/wardline/scanner/rules/__init__.py`, `src/wardline/core/severity.py` | Python-specific rule splits and diagnostics are distinguishable from core rule IDs. |
+| `WL-FIT-SCAN-004` | fail | `src/wardline/scanner/sarif.py`, `tests/unit/scanner/test_sarif.py`, `src/wardline/cli/scan.py` | The scanner emits several required properties, but the full required Part I and A.3 property bag is incomplete, especially at run level (`inputHash`, `inputFiles`, `overlayHashes`, `coverageRatio`, and related fields). |
+| `WL-FIT-SCAN-005` | partial | `src/wardline/cli/corpus_cmds.py`, `tests/unit/scanner/test_corpus_runner.py`, `tests/integration/test_corpus_verify.py` | Corpus verification computes and prints metrics, but current reporting is per rule with sample thresholds, not the spec’s required per-cell measured-and-published surface. |
+| `WL-FIT-SCAN-006` | partial | `corpus/specimens`, `tests/unit/corpus/test_corpus_skeleton.py`, `tests/unit/scanner/test_corpus_runner.py` | Corpus machinery exists and is runnable, but specimen breadth is still narrower than the full claimed rule surface and adversarial floor. |
+| `WL-FIT-SCAN-007` | partial | `tests/integration/test_self_hosting.py`, `tests/integration/test_self_hosting_scan.py`, `docs/audits/2026-03-25-rule-conformance/phase-2/f3/compliance-surface.md` | Self-hosting is exercised, but the current gate is closer to stability checking than a strict “passes its own rules” conformance claim. |
+| `WL-FIT-SCAN-008` | partial | `src/wardline/scanner/sarif.py`, `docs/audits/2026-03-25-rule-conformance/phase-2/f3/compliance-surface.md` | The scanner documents and emits implemented rules, but the machine-readable conformance surface still reports no conformance gaps despite tracked gaps. |
+| `WL-FIT-PY-001` | pass | `src/wardline/scanner/discovery.py`, `tests/unit/test_wp04_hardening.py` | Decorator discovery is AST-based and explicitly designed around parsed source rather than runtime reflection. |
+| `WL-FIT-PY-002` | pass | `src/wardline/decorators/schema.py`, `src/wardline/scanner/rules/py_wl_001.py`, `tests/unit/scanner/test_py_wl_001.py` | `schema_default()` is recognised and tied to overlay-backed governance. |
+| `WL-FIT-PY-003` | pass | `src/wardline/scanner/sarif.py`, `tests/unit/scanner/test_sarif.py` | The Python interface contract’s mandatory result-level SARIF fields are emitted. |
+| `WL-FIT-PY-004` | fail | `src/wardline/decorators/__init__.py`, `src/wardline/core/registry.py`, `docs/audits/2026-03-25-rule-conformance/phase-2/f1/evidence-restoration.md` | The normative `@int_data` + `@restoration_boundary` composition contract is not satisfied because `@restoration_boundary(...)` is still missing. |
+| `WL-FIT-PY-005` | pass | `tests/unit/scanner/test_delegated_rejection.py`, `tests/unit/scanner/test_rejection_path_convergence.py` | Conservative fallback behavior for unresolved delegation is covered by dedicated rejection-path tests. |
+| `WL-FIT-PY-006` | partial | `src/wardline/scanner/rules/__init__.py`, `src/wardline/cli/corpus_cmds.py`, `corpus/specimens` | Rule declaration is explicit, but corpus maintenance breadth still lags the claimed conformance surface. |
+| `WL-FIT-PY-007` | pass | `src/wardline/cli/scan.py`, `tests/integration/test_determinism.py` | `--verification-mode` exists and deterministic output is tested. |
+| `WL-FIT-PY-008` | fail | `src/wardline/scanner/sarif.py`, `src/wardline/cli/scan.py`, `tests/unit/scanner/test_sarif.py` | The Python interface contract’s required run-level properties are incomplete; notably `wardline.inputHash` and `wardline.inputFiles` are absent. |
+| `WL-FIT-PY-009` | pass | `src/wardline/cli/scan.py`, `src/wardline/manifest/loader.py`, `tests/integration/test_scan_cmd.py` | The scanner loads and validates the manifest against JSON Schema before producing findings. |
+
+## Requirements Not Yet Assessed
+
+The following requirements were either in the YAML files but not assessed in this initial pass, or were added during the baseline expansion to 106 requirements on 2026-03-26. They require assessment in a subsequent fitness pass.
+
+**Previously in YAML, not assessed (39 requirements):**
+CORE-008 through CORE-012, MAN-012 through MAN-013, SCAN-009 through SCAN-014, ENF-001 through ENF-007, GOV-001 through GOV-011, CONF-001 through CONF-008.
+
+**Added in baseline expansion (32 requirements):**
+CORE-013 through CORE-017, MAN-014 through MAN-019, SCAN-015 through SCAN-020, PY-010 through PY-012, ENF-008 through ENF-012, GOV-012 through GOV-016, CONF-009 through CONF-010.
 
 ## Highest-Value Gaps
 
-1. Implement Group 17 properly.
-   This means adding `@restoration_boundary(...)`, registering it in the canonical registry, exporting it from the decorator package, and wiring it through scanner/runtime consumers.
+1. Finish the restoration contract.
+   Add `@restoration_boundary(...)`, register it, and wire scanner behavior so the normative `@int_data` composition rule from A.3 becomes true.
 
-2. Reconcile manifest terminology with the current spec.
-   The codebase still uses `bounded_context`; the current baseline is `validation_scope`. This needs a fix across model, loader, schema, CLI serialization, and any rule/coherence consumers.
+2. Reconcile manifest terminology and validation behavior.
+   Replace `bounded_context` with `validation_scope`, add presence checks for Tier 2 semantics, and reject skip-promotions to Tier 1.
 
-3. Add proper parameterized generic boundaries.
-   `trust_boundary(from_tier=..., to_tier=...)` and `tier_transition(...)` need to carry real transition metadata instead of boolean presence markers.
+3. Complete the required SARIF run-level property bag.
+   Add at least `wardline.inputHash`, `wardline.inputFiles`, `wardline.overlayHashes`, `wardline.coverageRatio`, and other missing required run properties.
 
-4. Tighten conformance reporting.
-   The repo already knows about several active spec mismatches; the machine-readable conformance surface should stop claiming an empty gap set while those remain open.
+4. Raise conformance evidence from “tooling exists” to “spec requirement satisfied”.
+   This mainly means per-cell corpus metrics, adversarial corpus breadth, and a stricter self-hosting gate.
+
+5. Make Lite governance assessable on the self-hosting repo.
+   Add manifest ratification metadata, declare the temporal-separation posture or allowed Lite alternative, and tighten CODEOWNERS coverage for governance artefacts.
 
 ## Suggested Next Moves
 
-1. Fix the binding blockers first: `WL-FIT-PY-002`, `WL-FIT-PY-003`, `WL-FIT-PY-004`.
-2. Fix the manifest drift next: `WL-FIT-MAN-004`, `WL-FIT-CORE-006`.
-3. Then refresh SARIF/conformance honesty: `WL-FIT-SCAN-004`, `WL-FIT-SCAN-008`, `WL-FIT-SCAN-007`.
+1. Fix the hard normative blockers first: `WL-FIT-PY-004`, `WL-FIT-CORE-006`, `WL-FIT-MAN-004`, `WL-FIT-SCAN-004`, `WL-FIT-PY-008`.
+2. Make the self-hosting governance posture assessable: `WL-FIT-MAN-007`, `WL-FIT-MAN-009`, `WL-FIT-MAN-011`.
+3. Then close the evidence-quality gaps: `WL-FIT-SCAN-005`, `WL-FIT-SCAN-006`, `WL-FIT-SCAN-007`, `WL-FIT-SCAN-008`, `WL-FIT-PY-006`.

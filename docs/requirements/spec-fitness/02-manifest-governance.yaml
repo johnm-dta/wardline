@@ -102,7 +102,10 @@ requirements:
       - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
         section: "Optional-field declarations"
       - file: docs/spec/wardline-02-A-python-binding.md
-        section: "A.4 Annotation vocabulary"
+        section: "A.3 Interface contract (Wardline-Core)"
+    informative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.4.2 Decorator mapping table"
     verification:
       method: scanner_rule_tests_and_fixtures
       target_paths:
@@ -135,11 +138,13 @@ requirements:
     title: Governance profile is explicit
     statement: >
       A deployment-facing manifest MUST declare whether it operates under the
-      `lite` or `assurance` governance profile, and SARIF output SHOULD carry the
+      `lite` or `assurance` governance profile, and SARIF output MUST carry the
       same declared profile for assessors.
     normative_sources:
       - file: docs/spec/wardline-01-14-conformance.md
         section: "14.3.2 Governance profiles"
+      - file: docs/spec/wardline-01-10-verification-properties.md
+        section: "10.1 Findings interchange format"
     verification:
       method: manifest_schema_review_and_sarif_review
       target_paths:
@@ -147,4 +152,238 @@ requirements:
         - src/wardline/scanner/sarif.py
         - tests/unit/scanner/test_sarif.py
     fitness_dimensions: [governance, conformance]
-    notes: This is a useful fitness discriminator even if the repo is not fully wired for it yet.
+    notes: This is a conformance surface, not just a useful discriminator.
+
+  - id: WL-FIT-MAN-009
+    title: Governance artefacts are path-protected
+    statement: >
+      The declared governance artefacts for the active governance profile MUST be
+      protected by CODEOWNERS or equivalent path-based review controls so that
+      policy changes cannot merge without designated reviewer approval.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.2 Governance profiles"
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "Governance artefact exclusion"
+    verification:
+      method: repository_configuration_review
+      target_paths:
+        - .github/CODEOWNERS
+        - wardline.yaml
+        - src/wardline/manifest/schemas/wardline.schema.json
+    fitness_dimensions: [governance, conformance]
+    notes: For Lite this includes at minimum the root manifest, overlays, and exception register.
+
+  - id: WL-FIT-MAN-010
+    title: Annotation change tracking matches declared governance profile
+    statement: >
+      A Lite deployment MUST provide reviewable annotation change tracking, while
+      an Assurance deployment MUST maintain the full structured fingerprint
+      baseline and use it as a governance artefact.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.2 Governance profiles"
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.2 Conformance criteria"
+    verification:
+      method: cli_and_repository_review
+      target_paths:
+        - src/wardline/cli/fingerprint_cmd.py
+        - src/wardline/scanner/fingerprint.py
+        - tests/unit/cli/test_fingerprint_cmd.py
+        - .github/CODEOWNERS
+    fitness_dimensions: [governance, conformance]
+    notes: Lite may satisfy this with reviewed annotation-surface changes; Assurance requires the baseline itself.
+
+  - id: WL-FIT-MAN-011
+    title: Temporal separation posture is declared and assessable
+    statement: >
+      The deployment MUST either enforce the temporal-separation requirement of
+      its declared governance profile or document the permitted Lite-profile
+      alternative in the manifest so that an assessor can evaluate it.
+    normative_sources:
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.3.2 Governance profiles"
+    verification:
+      method: manifest_and_docs_review
+      target_paths:
+        - wardline.yaml
+        - src/wardline/manifest/models.py
+        - src/wardline/manifest/schemas/wardline.schema.json
+    fitness_dimensions: [governance, conformance]
+    notes: Undocumented reliance on same-actor governance is a conformance gap even for Lite.
+
+  - id: WL-FIT-MAN-012
+    title: Manifest coherence checks cover five conditions
+    statement: >
+      Before code-level enforcement runs, the manifest SHOULD pass a static
+      coherence analysis that verifies: (1) tier–topology consistency,
+      (2) orphaned annotations, (3) undeclared boundaries, (4) unmatched
+      contracts, and (5) stale contract bindings. Under the Assurance
+      governance profile, coherence is a MUST gate; coherence failures MUST
+      block the enforcement run.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.2 Governance mechanisms"
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.6 Assessment procedure"
+    verification:
+      method: cli_and_integration_tests
+      target_paths:
+        - src/wardline/manifest/coherence.py
+        - src/wardline/cli/manifest_cmds.py
+        - tests/unit/manifest/test_coherence.py
+        - tests/integration/test_coherence_cmd.py
+    fitness_dimensions: [governance, correctness]
+    notes: >
+      Coherence check findings appear in SARIF with ruleId prefix COHERENCE-.
+      For Lite, coherence is RECOMMENDED; for Assurance, MUST.
+
+  - id: WL-FIT-MAN-013
+    title: Agent-authored governance changes are detectable
+    statement: >
+      Agent-authored changes to the wardline manifest, the exception register,
+      the allowlist, or any governance artefact MUST be flagged as
+      agent-originated and require human review as a distinct governance step.
+      The detection mechanism MUST distinguish agent-originated from
+      human-originated governance changes.
+    normative_sources:
+      - file: docs/spec/wardline-01-09-governance-model.md
+        section: "9.3 Scope of governance"
+    verification:
+      method: metadata_and_process_review
+      target_paths:
+        - src/wardline/manifest/models.py
+        - src/wardline/scanner/sarif.py
+    fitness_dimensions: [governance, safety]
+    notes: >
+      The spec requires at least one of: metadata field in exception register
+      recording authorship origin, VCS-level provenance tracking, or structured
+      commit message tags. This is a framework invariant.
+
+  - id: WL-FIT-MAN-014
+    title: YAML string identifiers are quoted
+    statement: >
+      All string identifiers in wardline.yaml and wardline.overlay.yaml MUST
+      be quoted to prevent YAML implicit typing (the "Norway problem" where
+      unquoted "NO" becomes boolean false).
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "13.1 Wardline manifest format"
+    verification:
+      method: schema_and_loader_tests
+      target_paths:
+        - src/wardline/manifest/schemas/wardline.schema.json
+        - src/wardline/manifest/loader.py
+        - tests/unit/manifest/test_loader.py
+    fitness_dimensions: [correctness, interoperability]
+    notes: >
+      The JSON Schema should enforce quoted strings. The loader should detect
+      or prevent implicit typing issues.
+
+  - id: WL-FIT-MAN-015
+    title: Delegation policy governs overlay exception authority
+    statement: >
+      The root manifest MUST declare delegation policy controlling which
+      overlays may grant which exception classes. UNCONDITIONAL findings
+      can never be excepted regardless of delegation. Overlays at paths
+      with authority NONE cannot self-grant any exceptions.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "13.1.1 Root manifest schema"
+    verification:
+      method: schema_and_loader_tests
+      target_paths:
+        - src/wardline/manifest/models.py
+        - src/wardline/manifest/schemas/wardline.schema.json
+        - src/wardline/manifest/merge.py
+        - tests/unit/manifest/test_merge.py
+    fitness_dimensions: [governance, safety]
+    notes: >
+      Delegation separates root-level and module-level exception authority.
+      Verify that UNCONDITIONAL is structurally undelegable.
+
+  - id: WL-FIT-MAN-016
+    title: Module-tier mappings assign default taint to unannotated code
+    statement: >
+      The root manifest SHOULD support module-tier mappings that assign a
+      default taint state to unannotated functions within each module path.
+      The enforcement tool MUST use these mappings when functions lack
+      explicit wardline annotations.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "13.1.1 Root manifest schema"
+    verification:
+      method: schema_and_scanner_tests
+      target_paths:
+        - src/wardline/manifest/models.py
+        - src/wardline/manifest/schemas/wardline.schema.json
+        - src/wardline/scanner/context.py
+    fitness_dimensions: [conformance, governance]
+    notes: >
+      Module-tier mappings provide baseline enforcement before full annotation.
+      A module declared as AUDIT_TRAIL context activates the strictest
+      severity on its unannotated functions.
+
+  - id: WL-FIT-MAN-017
+    title: Incompatible overlay declarations are rejected
+    statement: >
+      If two in-scope overlays make incompatible declarations that cannot be
+      composed by narrowing, the enforcement tool MUST reject the manifest
+      set rather than choosing one silently. An overlay widening override
+      MUST be rejected with an error, not a warning.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "Merge semantics"
+    verification:
+      method: loader_and_merge_tests
+      target_paths:
+        - src/wardline/manifest/merge.py
+        - src/wardline/manifest/loader.py
+        - tests/unit/manifest/test_merge.py
+    fitness_dimensions: [correctness, safety]
+    notes: >
+      This refines MAN-003 with the specific rejection behavior. Silent
+      overlay preference is a conformance violation.
+
+  - id: WL-FIT-MAN-018
+    title: Manifest metadata supports ratification and review
+    statement: >
+      The root manifest MUST include metadata fields for organisation name,
+      ratifying authority (name and role), ratification date, and review
+      interval. The enforcement tool MUST compute ratification age and
+      produce a governance-level finding when the review interval is exceeded.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "13.1.1 Root manifest schema"
+    verification:
+      method: schema_and_model_tests
+      target_paths:
+        - src/wardline/manifest/models.py
+        - src/wardline/manifest/schemas/wardline.schema.json
+        - tests/unit/manifest/test_models.py
+    fitness_dimensions: [governance, conformance]
+    notes: >
+      This refines MAN-007 with the specific metadata fields required by
+      the spec. The ratification age computation is an enforcement obligation.
+
+  - id: WL-FIT-MAN-019
+    title: Root manifest MUST NOT alter UNCONDITIONAL cells
+    statement: >
+      The root manifest MUST NOT alter UNCONDITIONAL cells in the severity
+      matrix via rule configuration overrides. Changing an UNCONDITIONAL cell
+      requires modifying the wardline specification itself. The root manifest
+      MUST NOT lower the framework's minimum severity for any cell.
+    normative_sources:
+      - file: docs/spec/wardline-01-13-portability-and-manifest-format.md
+        section: "13.1.1 Root manifest schema"
+    verification:
+      method: loader_and_merge_tests
+      target_paths:
+        - src/wardline/manifest/merge.py
+        - src/wardline/core/matrix.py
+        - tests/unit/manifest/test_merge.py
+    fitness_dimensions: [safety, conformance]
+    notes: >
+      This is the constraint that prevents manifest configuration from
+      converting the specification into decorative wallpaper.

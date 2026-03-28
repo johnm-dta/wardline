@@ -60,8 +60,10 @@ def _check_decorated_methods(cls: type) -> None:
             continue
 
         # Check for wardline decorator attributes
-        groups = getattr(value, "_wardline_groups", None)
-        if groups is None:
+        try:
+            groups = value._wardline_groups
+        except AttributeError:
+            groups = None  # not a wardline-decorated callable — skip
             continue
 
         # Verify decorated methods use registered decorators
@@ -86,8 +88,12 @@ def _validate_decorator_attr(
     manually spoofed ``_wardline_*`` attributes are not silently accepted.
     """
     for entry in REGISTRY.values():
-        if attr_name in entry.attrs:
-            return
+        try:
+            entry.attrs[attr_name]
+        except KeyError:
+            _attr_val = None  # attr_name absent from this registry entry — try next
+            continue
+        return
     raise ValueError(
         f"{cls.__name__}.{method_name} has unrecognized wardline attribute "
         f"{attr_name!r}"

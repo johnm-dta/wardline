@@ -112,6 +112,16 @@
         ],
         "additionalProperties": false
       }
+    },
+    "last_batch_refresh": {
+      "type": "object",
+      "description": "Metadata from the last bulk fingerprint refresh.",
+      "properties": {
+        "at": { "type": "string", "format": "date" },
+        "by": { "type": "string" },
+        "rationale": { "type": "string" }
+      },
+      "additionalProperties": false
     }
   },
   "required": ["exceptions"],

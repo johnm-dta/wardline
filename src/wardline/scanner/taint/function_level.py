@@ -41,6 +41,16 @@ class TaintConflict(NamedTuple):
     ignored_decorator: str
     ignored_taint: TaintState
 
+
+class RestorationOverclaim(NamedTuple):
+    """Diagnostic: decorator claims a restored_tier exceeding its evidence ceiling."""
+
+    qualname: str
+    file_path: str
+    claimed_tier: int
+    evidence_ceiling: int
+    evidence_taint: TaintState
+
 logger = logging.getLogger(__name__)
 
 
@@ -94,7 +104,9 @@ def assign_function_taints(
     file_path: Path | str,
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
     manifest: WardlineManifest | None = None,
-) -> tuple[dict[str, TaintState], dict[str, TaintState], dict[str, TaintSource], list[TaintConflict]]:
+    *,
+    project_root: Path | None = None,
+) -> tuple[dict[str, TaintState], dict[str, TaintState], dict[str, TaintSource], list[TaintConflict], list[RestorationOverclaim]]:
     """Assign taint states to every function in a parsed module.
 
     Args:
@@ -104,9 +116,12 @@ def assign_function_taints(
         manifest: Loaded manifest (for ``module_tiers`` lookup).
             ``None`` means no manifest — all undecorated functions get
             ``UNKNOWN_RAW``.
+        project_root: Project root directory for resolving relative
+            manifest ``module_tiers`` paths against absolute file paths.
 
     Returns:
-        Tuple of (body_taint_map, return_taint_map, taint_sources, taint_conflicts):
+        Tuple of (body_taint_map, return_taint_map, taint_sources,
+        taint_conflicts, restoration_overclaims):
         - body_taint_map: dict mapping qualname → ``TaintState`` for rule
           evaluation inside function bodies (INPUT tier).
         - return_taint_map: dict mapping qualname → ``TaintState`` for
@@ -116,22 +131,25 @@ def assign_function_taints(
           "module_default", or "fallback").
         - taint_conflicts: list of ``TaintConflict`` diagnostics for
           functions with conflicting taint decorators.
+        - restoration_overclaims: list of ``RestorationOverclaim``
+          diagnostics for decorators claiming a tier exceeding evidence.
     """
     path_str = str(file_path)
-    module_default = resolve_module_default(path_str, manifest)
+    module_default = resolve_module_default(path_str, manifest, project_root=project_root)
     body_taint_map: dict[str, TaintState] = {}
     return_taint_map: dict[str, TaintState] = {}
     taint_sources: dict[str, TaintSource] = {}
     taint_conflicts: list[TaintConflict] = []
+    restoration_overclaims: list[RestorationOverclaim] = []
 
     _walk_and_assign(
         tree, path_str, annotations, module_default,
         body_taint_map, return_taint_map, taint_sources,
-        taint_conflicts,
+        taint_conflicts, restoration_overclaims,
         scope="",
     )
 
-    return body_taint_map, return_taint_map, taint_sources, taint_conflicts
+    return body_taint_map, return_taint_map, taint_sources, taint_conflicts, restoration_overclaims
 
 
 # ── Internal helpers ─────────────────────────────────────────────
@@ -140,6 +158,8 @@ def assign_function_taints(
 def resolve_module_default(
     file_path: str,
     manifest: WardlineManifest | None,
+    *,
+    project_root: Path | None = None,
 ) -> TaintState | None:
     """Find the module_tiers default taint for a file path.
 
@@ -147,19 +167,23 @@ def resolve_module_default(
     of ``file_path`` at a directory boundary. When multiple entries
     match, the most-specific (longest path) wins.
 
+    ``project_root`` resolves relative manifest entry paths against the
+    project directory so they match absolute scan file paths.
+
     Returns ``None`` if no manifest or no matching module_tiers entry.
     """
     if manifest is None:
         return None
 
-    from pathlib import PurePath
+    from pathlib import Path as _Path, PurePath
 
     file_p = PurePath(file_path)
+    root = _Path(project_root).resolve() if project_root is not None else None
 
     # Collect all matching entries
     matches: list[tuple[int, str]] = []
     for entry in manifest.module_tiers:
-        entry_p = PurePath(entry.path)
+        entry_p = PurePath(root / entry.path) if root is not None else PurePath(entry.path)
         try:
             file_p.relative_to(entry_p)
         except ValueError:
@@ -241,6 +265,56 @@ def taint_from_annotations(
     return first_taint
 
 
+def _restoration_taint_from_annotations(
+    file_path: str,
+    qualname: str,
+    annotations: dict[tuple[str, str], list[WardlineAnnotation]],
+    overclaims: list[RestorationOverclaim] | None = None,
+) -> TaintState | None:
+    """Resolve taint for restoration_boundary via §5.3 evidence matrix.
+
+    Returns the evidence-derived taint state if the function has a
+    restoration_boundary annotation, or None if it does not.
+
+    When *overclaims* is provided, appends a ``RestorationOverclaim``
+    diagnostic if the decorator's ``restored_tier`` exceeds the evidence
+    ceiling per §5.3.
+    """
+    from wardline.core.evidence import max_restorable_tier
+    from wardline.core.tiers import TAINT_TO_TIER
+
+    key = (file_path, qualname)
+    anns = annotations.get(key)
+    if not anns:
+        return None
+
+    for ann in anns:
+        if ann.canonical_name == "restoration_boundary":
+            structural = bool(ann.attrs.get("structural_evidence", False))
+            semantic = bool(ann.attrs.get("semantic_evidence", False))
+            integrity = bool(ann.attrs.get("integrity_evidence"))
+            institutional = bool(ann.attrs.get("institutional_provenance"))
+            taint = max_restorable_tier(
+                structural, semantic, integrity, institutional,
+            )
+
+            # Check if decorator's claimed tier exceeds evidence ceiling
+            claimed_tier = ann.attrs.get("restored_tier")
+            if claimed_tier is not None and overclaims is not None:
+                ceiling_tier = TAINT_TO_TIER[taint].value
+                if isinstance(claimed_tier, int) and claimed_tier < ceiling_tier:
+                    overclaims.append(RestorationOverclaim(
+                        qualname=qualname,
+                        file_path=file_path,
+                        claimed_tier=claimed_tier,
+                        evidence_ceiling=ceiling_tier,
+                        evidence_taint=taint,
+                    ))
+
+            return taint
+    return None
+
+
 def _walk_and_assign(
     node: ast.AST,
     file_path: str,
@@ -250,6 +324,7 @@ def _walk_and_assign(
     return_taint_map: dict[str, TaintState],
     taint_sources: dict[str, TaintSource],
     taint_conflicts: list[TaintConflict],
+    restoration_overclaims: list[RestorationOverclaim],
     scope: str,
 ) -> None:
     """Recursively walk AST nodes, assigning taint to each function."""
@@ -263,17 +338,29 @@ def _walk_and_assign(
                 decorator_map=BODY_EVAL_TAINT,
                 conflicts=taint_conflicts,
             )
+            # Restoration boundaries use evidence-based taint, not static maps.
+            # Short-circuit: set both body and return taint, skip RETURN_TAINT lookup.
+            restoration_taint = None
+            if body_taint is None:
+                restoration_taint = _restoration_taint_from_annotations(
+                    file_path, qualname, annotations,
+                    overclaims=restoration_overclaims,
+                )
+                body_taint = restoration_taint
+
             if body_taint is not None:
                 source: TaintSource = "decorator"
-                ret_taint = taint_from_annotations(
-                    file_path, qualname, annotations,
-                    decorator_map=RETURN_TAINT,
-                    conflicts=taint_conflicts,
-                )
-                # Fallback: if decorator is in BODY_EVAL_TAINT but not
-                # RETURN_TAINT, use body taint for return too.
-                if ret_taint is None:
-                    ret_taint = body_taint
+                if restoration_taint is not None:
+                    # Evidence-derived: body and return taint are the same.
+                    ret_taint = restoration_taint
+                else:
+                    ret_taint = taint_from_annotations(
+                        file_path, qualname, annotations,
+                        decorator_map=RETURN_TAINT,
+                        conflicts=taint_conflicts,
+                    )
+                    if ret_taint is None:
+                        ret_taint = body_taint
             elif module_default is not None:
                 body_taint = module_default
                 ret_taint = module_default
@@ -291,7 +378,7 @@ def _walk_and_assign(
             _walk_and_assign(
                 child, file_path, annotations, module_default,
                 body_taint_map, return_taint_map, taint_sources,
-                taint_conflicts,
+                taint_conflicts, restoration_overclaims,
                 scope=qualname,
             )
         elif isinstance(child, ast.ClassDef):
@@ -301,13 +388,13 @@ def _walk_and_assign(
             _walk_and_assign(
                 child, file_path, annotations, module_default,
                 body_taint_map, return_taint_map, taint_sources,
-                taint_conflicts,
+                taint_conflicts, restoration_overclaims,
                 scope=class_scope,
             )
         else:
             _walk_and_assign(
                 child, file_path, annotations, module_default,
                 body_taint_map, return_taint_map, taint_sources,
-                taint_conflicts,
+                taint_conflicts, restoration_overclaims,
                 scope=scope,
             )

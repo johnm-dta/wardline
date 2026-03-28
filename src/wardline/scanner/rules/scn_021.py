@@ -65,6 +65,41 @@ _COMBINATIONS: tuple[_CombinationSpec, ...] = (
         "Audit writes create new records; restoration reconstructs existing ones",
     ),
     _CombinationSpec(
+        "external_boundary",
+        "restoration_boundary",
+        _CONTRADICTORY,
+        "External boundaries receive new untrusted data; "
+        "restoration reconstructs previously-known data",
+    ),
+    _CombinationSpec(
+        "validates_shape",
+        "restoration_boundary",
+        _CONTRADICTORY,
+        "Shape validators receive raw input for validation; "
+        "restoration reconstructs previously-known data",
+    ),
+    _CombinationSpec(
+        "validates_semantic",
+        "restoration_boundary",
+        _CONTRADICTORY,
+        "Semantic validators receive shape-validated input; "
+        "restoration reconstructs previously-known data",
+    ),
+    _CombinationSpec(
+        "validates_external",
+        "restoration_boundary",
+        _CONTRADICTORY,
+        "External validators receive raw external input; "
+        "restoration reconstructs previously-known data",
+    ),
+    _CombinationSpec(
+        "authoritative_construction",
+        "restoration_boundary",
+        _CONTRADICTORY,
+        "Construction creates new authoritative objects from validated input; "
+        "restoration reconstructs existing objects from raw representation",
+    ),
+    _CombinationSpec(
         "fail_closed",
         "emits_or_explains",
         _CONTRADICTORY,

@@ -1,0 +1,264 @@
+requirements:
+  - id: WL-FIT-ENF-001
+    title: Static analysis detects pattern rules WL-001 through WL-006
+    statement: >
+      The scanner MUST detect the six active pattern rules (WL-001 through
+      WL-006) within annotated function and method bodies using
+      intraprocedural analysis. This is a framework invariant.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.1 Static analysis"
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.2 Conformance criteria"
+    verification:
+      method: unit_tests_and_corpus
+      target_paths:
+        - src/wardline/scanner/rules
+        - tests/unit/scanner
+        - corpus/specimens
+    fitness_dimensions: [conformance, correctness]
+    notes: >
+      This is conformance criterion 2. The scanner may implement a declared
+      subset; the declared subset must be documented and corpus-tested.
+
+  - id: WL-FIT-ENF-002
+    title: Structural verification WL-007 on all boundary types
+    statement: >
+      The scanner MUST perform structural verification (WL-007) on all
+      validation boundary functions — shape-validation, semantic-validation,
+      combined-validation, and restoration boundary functions. WL-007 is
+      primarily intraprocedural; delegation through two-hop call-graph
+      analysis satisfies the requirement.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.1 Static analysis"
+      - file: docs/spec/wardline-01-07-pattern-rules.md
+        section: "7.2 Structural verification"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/scanner/rules/py_wl_007.py
+        - tests/unit/scanner/test_py_wl_007.py
+        - tests/unit/scanner/test_delegated_rejection.py
+    fitness_dimensions: [conformance, correctness]
+    notes: >
+      This is conformance criterion 3 (first half). Restoration boundaries
+      are subject to WL-007 alongside validation boundaries.
+
+  - id: WL-FIT-ENF-003
+    title: Validation ordering WL-008 is enforced
+    statement: >
+      The scanner MUST enforce validation ordering (WL-008): data reaching a
+      declared semantic-validation boundary MUST have passed through a
+      declared shape-validation boundary. Combined validation boundaries
+      (T4→T2) satisfy this requirement internally.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.1 Static analysis"
+      - file: docs/spec/wardline-01-07-pattern-rules.md
+        section: "7.2 Structural verification"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/scanner/rules/py_wl_008.py
+        - tests/unit/scanner/test_py_wl_008.py
+        - src/wardline/scanner/taint
+    fitness_dimensions: [conformance, safety]
+    notes: >
+      This is conformance criterion 3 (second half). WL-008 fires when any
+      input to a semantic-validation boundary is in EXTERNAL_RAW, UNKNOWN_RAW,
+      or MIXED_RAW.
+
+  - id: WL-FIT-ENF-004
+    title: Taint flow tracing minimum scope
+    statement: >
+      The scanner MUST trace explicit-flow taint between declared boundaries
+      at minimum for direct flows and two-hop through unannotated
+      intermediaries. Functions outside the enforcement perimeter are governed
+      by dependency_taint declarations, not by intermediary tracing.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.1 Static analysis"
+      - file: docs/spec/wardline-01-14-conformance.md
+        section: "14.2 Conformance criteria"
+    verification:
+      method: unit_tests
+      target_paths:
+        - src/wardline/scanner/taint
+        - tests/unit/scanner/test_taint.py
+        - tests/unit/scanner/test_engine_l3.py
+    fitness_dimensions: [conformance, correctness]
+    notes: >
+      This is conformance criterion 4. Direct flows are a framework invariant
+      (MUST); full transitive inference is a tool quality target (MAY).
+
+  - id: WL-FIT-ENF-005
+    title: SARIF output is deterministic and v2.1.0 compliant
+    statement: >
+      The scanner MUST produce deterministic, auditable output in SARIF v2.1.0
+      with the wardline-specific property bags defined in §10.1.
+      Deterministic means byte-identical output from the same binary on
+      identical input in verification mode.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.1 Static analysis"
+      - file: docs/spec/wardline-01-10-verification-properties.md
+        section: "10. Verification properties"
+    verification:
+      method: integration_tests
+      target_paths:
+        - src/wardline/scanner/sarif.py
+        - src/wardline/cli/scan.py
+        - tests/integration/test_determinism.py
+        - tests/integration/test_scan_cmd.py
+    fitness_dimensions: [conformance, interoperability]
+    notes: >
+      This combines conformance criterion 8 and verification property 5.
+      Cross-tool byte-identity is not required; same-tool repeatability is.
+
+  - id: WL-FIT-ENF-006
+    title: join_fuse vs join_product distinction
+    statement: >
+      Bindings SHOULD distinguish join_fuse (genuine data merge) from
+      join_product (product-type composition where components retain identity).
+      Bindings that do not implement the distinction treat all cross-tier
+      joins as join_fuse producing MIXED_RAW — the conservative fallback.
+    normative_sources:
+      - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
+        section: "5.1 Trust classification and validation status"
+    informative_sources:
+      - file: docs/spec/wardline-02-A-python-binding.md
+        section: "A.3 Interface contract (Wardline-Core)"
+    verification:
+      method: code_and_documentation_review
+      target_paths:
+        - src/wardline/scanner/taint
+        - src/wardline/core/taints.py
+    fitness_dimensions: [correctness, conformance]
+    notes: >
+      This is a SHOULD-level binding requirement. Current Python implementation
+      likely treats all joins as join_fuse. Document the current posture.
+
+  - id: WL-FIT-ENF-007
+    title: ACF coverage claims require taint tracking
+    statement: >
+      Implementations that do not implement taint tracking MUST NOT claim
+      coverage of ACF-T1, ACF-E1, or ACF-E2.
+    normative_sources:
+      - file: docs/spec/wardline-01-02-the-problem-a-wardline-solves.md
+        section: "2. The problem a Wardline solves"
+    verification:
+      method: documentation_review
+      target_paths:
+        - docs/spec/wardline-02-A-python-binding.md
+        - src/wardline/scanner/sarif.py
+    fitness_dimensions: [conformance, honesty]
+    notes: >
+      Verify that any ACF coverage claims in documentation or SARIF output
+      are consistent with actual taint tracking implementation status.
+
+  - id: WL-FIT-ENF-008
+    title: Interprocedural analysis (SHOULD)
+    statement: >
+      The scanner SHOULD detect pattern rule violations spanning function
+      boundaries using interprocedural analysis. This is a binding
+      requirement, not a framework invariant.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.1 Static analysis"
+    verification:
+      method: code_review_and_tests
+      target_paths:
+        - src/wardline/scanner/taint
+        - src/wardline/scanner/rules
+        - tests/unit/scanner
+    fitness_dimensions: [conformance, correctness]
+    notes: >
+      Document current interprocedural analysis depth. The minimum
+      conformance requirement is intraprocedural (ENF-001); this is the
+      recommended extension.
+
+  - id: WL-FIT-ENF-009
+    title: Incremental analysis (SHOULD)
+    statement: >
+      The scanner SHOULD support incremental analysis — analysing only
+      changed files and transitive dependents — as this is critical for
+      CI adoption at scale.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.1 Static analysis"
+    verification:
+      method: code_review
+      target_paths:
+        - src/wardline/scanner
+        - src/wardline/cli/scan.py
+    fitness_dimensions: [conformance, performance]
+    notes: >
+      This is a SHOULD-level binding requirement. Document whether
+      incremental analysis is implemented or planned.
+
+  - id: WL-FIT-ENF-010
+    title: Pre-generation context projection content
+    statement: >
+      When pre-generation projection is implemented, for a given file path
+      the projection MUST resolve: taint state summary per-region, active
+      rules with severity, live exceptions, boundary context, optional-field
+      classification, rationale narrative, and currency (commit hash).
+      Projection is advisory and does NOT replace post-generation
+      enforcement.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.5 Pre-generation context projection"
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.5.1 Projection content"
+    verification:
+      method: design_review
+      target_paths:
+        - src/wardline
+        - docs/spec/wardline-02-A-python-binding.md
+    fitness_dimensions: [conformance, assessability]
+    notes: >
+      Under Assurance, deployments SHOULD track whether projection is
+      operational and report availability in SARIF run-level properties.
+      Projection is not an enforcement requirement.
+
+  - id: WL-FIT-ENF-011
+    title: Runtime structural enforcement (SHOULD)
+    statement: >
+      Bindings SHOULD make fabricated defaults on Tier 1 fields
+      structurally impossible, enforce that subclasses of protected base
+      classes cannot add unannotated methods, and make serialisation
+      boundary violations detectable at access time. Bindings implementing
+      runtime structural enforcement MUST include restoration boundary
+      verification.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.3 Runtime structural"
+    verification:
+      method: code_review
+      target_paths:
+        - src/wardline/decorators
+        - src/wardline/core
+    fitness_dimensions: [conformance, safety]
+    notes: >
+      This is the §8.3 enforcement layer. Document which runtime structural
+      mechanisms are implemented and which are deferred.
+
+  - id: WL-FIT-ENF-012
+    title: Type system tier metadata (SHOULD)
+    statement: >
+      Bindings SHOULD make tier mismatches visible at development time —
+      passing raw data where shape-validated data is expected SHOULD produce
+      a type error. Type annotations SHOULD carry tier information.
+    normative_sources:
+      - file: docs/spec/wardline-01-08-enforcement-layers.md
+        section: "8.2 Type system"
+    verification:
+      method: code_review
+      target_paths:
+        - src/wardline/decorators
+        - src/wardline/core
+    fitness_dimensions: [conformance, correctness]
+    notes: >
+      This is the §8.2 enforcement layer. Document current type-system
+      tier enforcement status and any planned Wardline-Type tooling.

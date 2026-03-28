@@ -172,8 +172,10 @@ def _resolve_call(
     """
     if isinstance(node.func, ast.Name):
         callee_name = node.func.id
-        if callee_name in taint_map:
+        try:
             return taint_map[callee_name]
+        except KeyError:
+            callee_name = None  # callee not in taint_map — fall back to function_taint
     return function_taint
 
 
@@ -366,12 +368,20 @@ def _handle_if(
     # Merge: for each variable, join the two branch values.
     all_vars = set(if_taints) | set(else_taints)
     for var in all_vars:
-        if var in if_taints and var in else_taints:
-            var_taints[var] = taint_join(if_taints[var], else_taints[var])
-        elif var in if_taints:
-            var_taints[var] = if_taints[var]
+        try:
+            if_val: TaintState | None = if_taints[var]
+        except KeyError:
+            if_val = None
+        try:
+            else_val: TaintState | None = else_taints[var]
+        except KeyError:
+            else_val = None
+        if if_val is not None and else_val is not None:
+            var_taints[var] = taint_join(if_val, else_val)
+        elif if_val is not None:
+            var_taints[var] = if_val
         else:
-            var_taints[var] = else_taints[var]
+            var_taints[var] = else_val  # type: ignore[assignment]
 
 
 def _handle_for(
@@ -397,9 +407,12 @@ def _handle_for(
     # Merge body state with pre-loop (loop may not execute, or
     # body assignments may differ across iterations).
     for var in set(var_taints) | set(pre_loop):
-        if var in var_taints and var in pre_loop:
-            var_taints[var] = taint_join(var_taints[var], pre_loop[var])
-        # Variables only in var_taints stay as-is.
+        try:
+            current = var_taints[var]
+            prior = pre_loop[var]
+            var_taints[var] = taint_join(current, prior)
+        except KeyError:
+            _taint_val = None  # var only in one side of merge — no join needed
 
     # Walk orelse (runs after normal loop completion).
     if stmt.orelse:
@@ -421,8 +434,12 @@ def _handle_while(
 
     # Merge body state with pre-loop.
     for var in set(var_taints) | set(pre_loop):
-        if var in var_taints and var in pre_loop:
-            var_taints[var] = taint_join(var_taints[var], pre_loop[var])
+        try:
+            current = var_taints[var]
+            prior = pre_loop[var]
+            var_taints[var] = taint_join(current, prior)
+        except KeyError:
+            _taint_val = None  # var only in one side of merge — no join needed
 
     if stmt.orelse:
         _walk_body(stmt.orelse, function_taint, taint_map, var_taints)
@@ -477,13 +494,21 @@ def _handle_try(
         all_vars.update(branch.keys())
 
     for var in all_vars:
-        taints_to_join = [b[var] for b in handler_branches if var in b]
+        taints_to_join: list[TaintState] = []
+        for b in handler_branches:
+            try:
+                taints_to_join.append(b[var])
+            except KeyError:
+                _taint_val = None  # var absent from this handler branch — skip
         if taints_to_join:
             var_taints[var] = taints_to_join[0]
             for t in taints_to_join[1:]:
                 var_taints[var] = taint_join(var_taints[var], t)
-        elif var in pre_try:
-            var_taints[var] = pre_try[var]
+        else:
+            try:
+                var_taints[var] = pre_try[var]
+            except KeyError:
+                _taint_val = None  # var absent from pre-try state — leave unset
 
     # finalbody runs unconditionally after merge.
     if stmt.finalbody:

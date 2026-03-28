@@ -717,7 +717,7 @@ class TestScanResolved:
         # Write a resolved JSON with one boundary
         resolved = tmp_path / "wardline.resolved.json"
         resolved.write_text(json.dumps({
-            "format_version": "0.1",
+            "format_version": "0.2",
             "resolved_at": "2026-01-01T00:00:00Z",
             "root": ".",
             "manifest_source": "wardline.yaml",
@@ -754,3 +754,116 @@ class TestScanResolved:
         sarif = json.loads(result.stdout)
         assert isinstance(sarif, dict)
         assert "runs" in sarif
+
+
+@pytest.mark.integration
+class TestSarifRunLevelProperties:
+    """Gap 3: SARIF run-level identity properties (§10.1)."""
+
+    def test_sarif_output_contains_input_hash(self, tmp_path: Path) -> None:
+        """wardline.inputHash present and starts with sha256:."""
+        manifest = _minimal_manifest(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--allow-registry-mismatch",
+        ])
+        sarif = json.loads(result.stdout)
+        props = sarif["runs"][0]["properties"]
+        assert "wardline.inputHash" in props
+        assert props["wardline.inputHash"].startswith("sha256:")
+
+    def test_sarif_output_contains_input_files(self, tmp_path: Path) -> None:
+        """wardline.inputFiles matches scanned file count."""
+        manifest = _minimal_manifest(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--allow-registry-mismatch",
+        ])
+        sarif = json.loads(result.stdout)
+        props = sarif["runs"][0]["properties"]
+        assert "wardline.inputFiles" in props
+        assert props["wardline.inputFiles"] == 1
+
+    def test_sarif_output_overlay_hashes_present(self, tmp_path: Path) -> None:
+        """wardline.overlayHashes is a list (empty when no overlays)."""
+        manifest = _minimal_manifest(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--allow-registry-mismatch",
+        ])
+        sarif = json.loads(result.stdout)
+        props = sarif["runs"][0]["properties"]
+        assert "wardline.overlayHashes" in props
+        assert isinstance(props["wardline.overlayHashes"], list)
+
+    def test_sarif_input_hash_deterministic(self, tmp_path: Path) -> None:
+        """Two identical runs produce same inputHash."""
+        manifest = _minimal_manifest(tmp_path)
+        runner = CliRunner()
+        args = [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--allow-registry-mismatch",
+            "--verification-mode",
+        ]
+        r1 = runner.invoke(cli, args)
+        r2 = runner.invoke(cli, args)
+        sarif1 = json.loads(r1.stdout)
+        sarif2 = json.loads(r2.stdout)
+        assert (
+            sarif1["runs"][0]["properties"]["wardline.inputHash"]
+            == sarif2["runs"][0]["properties"]["wardline.inputHash"]
+        )
+
+    def test_sarif_property_bag_version_is_0_3(self, tmp_path: Path) -> None:
+        """Property bag version is 0.3 after Gap 3."""
+        manifest = _minimal_manifest(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--allow-registry-mismatch",
+        ])
+        sarif = json.loads(result.stdout)
+        props = sarif["runs"][0]["properties"]
+        assert props["wardline.propertyBagVersion"] == "0.4"
+
+    def test_input_hash_failure_exits_tool_error(self, tmp_path: Path) -> None:
+        """inputHash OSError produces TOOL_ERROR finding AND exit code 3."""
+        from unittest.mock import patch
+
+        from wardline.scanner.engine import ScanResult
+
+        manifest = _minimal_manifest(tmp_path)
+        # Fake a scan result with a file path that no longer exists
+        ghost = tmp_path / "ghost.py"
+        fake_result = ScanResult(
+            findings=[],
+            files_scanned=1,
+            scanned_file_paths=[ghost],  # does not exist on disk
+        )
+
+        with patch(
+            "wardline.scanner.engine.ScanEngine.scan",
+            return_value=fake_result,
+        ):
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                "scan", str(tmp_path),
+                "--manifest", str(manifest),
+                "--allow-registry-mismatch",
+            ])
+
+        assert result.exit_code == 3
+        sarif = json.loads(result.stdout)
+        tool_errors = [
+            r for r in sarif["runs"][0]["results"]
+            if r["ruleId"] == "TOOL-ERROR"
+        ]
+        assert len(tool_errors) == 1
