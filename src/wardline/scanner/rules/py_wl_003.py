@@ -69,6 +69,38 @@ def _annotation_is_set_type(ann: ast.expr) -> bool:
     return False
 
 
+def _iter_likely_yields_sets(node: ast.expr) -> bool:
+    """Heuristic: does iterating this expression likely yield set elements?
+
+    Matches calls like ``compute_sccs(graph)`` where the function name
+    suggests it returns a collection of sets (e.g., ``_sccs``, ``_sets``).
+    """
+    if isinstance(node, ast.Call):
+        name = _extract_call_name(node)
+        if name is not None and any(s in name.lower() for s in ("scc", "_sets", "_groups")):
+            return True
+    return False
+
+
+def _extract_call_name(call: ast.Call) -> str | None:
+    """Extract the terminal function/method name from a Call node."""
+    if isinstance(call.func, ast.Name):
+        return call.func.id
+    if isinstance(call.func, ast.Attribute):
+        return call.func.attr
+    return None
+
+
+# Suffixes that strongly suggest a function/method returns a set or frozenset.
+_SET_RETURN_SUFFIXES = ("_names", "_set", "_keys", "_ids", "_set_names", "_name_set")
+
+
+def _name_suggests_set(name: str) -> bool:
+    """Return True if a function/method name suggests it returns a set."""
+    lower = name.lower()
+    return any(lower.endswith(suffix) for suffix in _SET_RETURN_SUFFIXES)
+
+
 class RulePyWl003(RuleBase):
     """Detect existence-checking as structural gate patterns.
 
@@ -189,6 +221,37 @@ class RulePyWl003(RuleBase):
                 and isinstance(child.target, ast.Name)
             ):
                 set_names.add(child.target.id)
+
+            # For-loop targets iterating known set collections or set-returning calls:
+            #   for scc in sccs  (where sccs is known set or list of sets)
+            #   for item in set_items  (name suggests set content)
+            elif isinstance(child, ast.For) and isinstance(child.target, ast.Name):
+                iter_val = child.iter
+                # Iterating a known set variable → loop var elements are set items (not sets themselves)
+                # But iterating a *collection of sets* → loop var IS a set
+                # We can't distinguish these at AST level, so check if the iterable
+                # is a known set variable — if so, items aren't sets.
+                # Instead, check if the iterable NAME suggests it's a collection of sets
+                # or if the iterable was assigned from a call returning sets.
+                if isinstance(iter_val, ast.Name) and iter_val.id in set_names:
+                    # Iterating a set itself — items are values, not sets. Skip.
+                    pass
+                elif _iter_likely_yields_sets(iter_val):
+                    set_names.add(child.target.id)
+
+        # Second pass: track names assigned from calls to methods whose names
+        # strongly suggest set return types. This catches patterns like
+        # `annotations = self._annotation_names()` returning frozenset[str].
+        for child in walk_skip_nested_defs(node):
+            if not isinstance(child, ast.Assign):
+                continue
+            if not isinstance(child.value, ast.Call):
+                continue
+            call_name = _extract_call_name(child.value)
+            if call_name is not None and _name_suggests_set(call_name):
+                for target in child.targets:
+                    if isinstance(target, ast.Name):
+                        set_names.add(target.id)
 
         return frozenset(set_names)
 
