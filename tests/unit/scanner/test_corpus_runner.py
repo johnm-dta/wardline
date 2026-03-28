@@ -583,7 +583,7 @@ class TestCorpusPublish:
                     "wardline.inputHash": "sha256:abc",
                     "wardline.manifestHash": "sha256:def",
                 },
-                "tool": {"driver": {"version": "0.1.0"}},
+                "tool": {"driver": {"version": "0.4.0"}},
             }],
         }
         sarif_path = tmp_path / "self-hosting.sarif.json"
@@ -618,7 +618,7 @@ class TestCorpusPublish:
                     "wardline.inputHash": "sha256:abc123",
                     "wardline.manifestHash": "sha256:manifest456",
                 },
-                "tool": {"driver": {"version": "0.1.0"}},
+                "tool": {"driver": {"version": "0.4.0"}},
             }],
         }
         sarif_path = tmp_path / "self-hosting.sarif.json"
@@ -636,7 +636,7 @@ class TestCorpusPublish:
         )
         conf = json.loads((tmp_path / "wardline.conformance.json").read_text())
         inputs = conf["inputs"]
-        assert inputs["tool_version"] == "0.1.0"
+        assert inputs["tool_version"] == "0.4.0"
         assert inputs["self_hosting_input_hash"] == "sha256:abc123"
         assert inputs["manifest_hash"] == "sha256:manifest456"
         assert "corpus_hash" in inputs
@@ -655,7 +655,7 @@ class TestCorpusPublish:
                     "wardline.inputHash": "sha256:test",
                     "wardline.manifestHash": "sha256:test",
                 },
-                "tool": {"driver": {"version": "0.1.0"}},
+                "tool": {"driver": {"version": "0.4.0"}},
             }],
         }
         sarif_path = tmp_path / "self-hosting.sarif.json"
