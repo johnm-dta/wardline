@@ -197,6 +197,8 @@ def _make_result(finding: Finding, *, base_path: str | None) -> dict[str, Any]:
         properties["wardline.exceptionId"] = finding.exception_id
     if finding.exception_expires is not None:
         properties["wardline.exceptionExpires"] = finding.exception_expires
+    if finding.retroactive_scan:
+        properties["wardline.retroactiveScan"] = True
     return {
         "level": _SEVERITY_TO_SARIF_LEVEL.get(finding.severity, "note"),
         "locations": [
@@ -261,6 +263,8 @@ class SarifReport:
     overlay_hashes: tuple[str, ...] = ()
     coverage_ratio: float | None = None
     conformance_gaps: tuple[str, ...] = ()
+    retroactive_scan: bool = False
+    retroactive_scan_range: str | None = None
 
     def _implemented_rules(self) -> list[str]:
         """Return sorted list of canonical rule ID values (excludes pseudo-IDs).
@@ -317,6 +321,10 @@ class SarifReport:
                    if self.control_law_degradations else {}),
                 **({"wardline.coverageRatio": round(self.coverage_ratio, 4)}
                    if self.coverage_ratio is not None else {}),
+                **({"wardline.retroactiveScan": True,
+                    "wardline.retroactiveScanRange": self.retroactive_scan_range}
+                   if self.retroactive_scan and self.retroactive_scan_range
+                   else {}),
                 "wardline.governanceProfile": self.governance_profile,
                 "wardline.implementedRules": self._implemented_rules(),
                 "wardline.inputFiles": self.input_files,

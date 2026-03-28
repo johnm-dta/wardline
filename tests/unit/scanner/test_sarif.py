@@ -28,6 +28,7 @@ def _make_finding(
     analysis_level: int = 1,
     source_snippet: str | None = None,
     qualname: str | None = None,
+    retroactive_scan: bool = False,
 ) -> Finding:
     return Finding(
         rule_id=rule_id,
@@ -43,6 +44,7 @@ def _make_finding(
         analysis_level=analysis_level,
         source_snippet=source_snippet,
         qualname=qualname,
+        retroactive_scan=retroactive_scan,
     )
 
 
@@ -649,3 +651,40 @@ class TestControlLawDegradationsEmission:
         assert props["wardline.controlLawDegradations"] == [
             "ratification_overdue", "stale_exceptions_present"
         ]
+
+
+# ---------------------------------------------------------------------------
+# TestRetrospectiveScan
+# ---------------------------------------------------------------------------
+
+
+class TestRetrospectiveScan:
+    """§9.5 retrospective scan SARIF properties."""
+
+    def test_run_level_retroactive_scan_emitted(self) -> None:
+        report = SarifReport(
+            findings=[],
+            retroactive_scan=True,
+            retroactive_scan_range="abc123..def456",
+        )
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.retroactiveScan"] is True
+        assert props["wardline.retroactiveScanRange"] == "abc123..def456"
+
+    def test_run_level_retroactive_omitted_when_false(self) -> None:
+        report = SarifReport(findings=[])
+        props = report.to_dict()["runs"][0]["properties"]
+        assert "wardline.retroactiveScan" not in props
+        assert "wardline.retroactiveScanRange" not in props
+
+    def test_result_level_retroactive_scan_emitted(self) -> None:
+        finding = _make_finding(retroactive_scan=True)
+        report = SarifReport(findings=[finding])
+        result = report.to_dict()["runs"][0]["results"][0]
+        assert result["properties"]["wardline.retroactiveScan"] is True
+
+    def test_result_level_retroactive_omitted_when_false(self) -> None:
+        finding = _make_finding()
+        report = SarifReport(findings=[finding])
+        result = report.to_dict()["runs"][0]["results"][0]
+        assert "wardline.retroactiveScan" not in result["properties"]
