@@ -411,6 +411,8 @@ def _custom_known_validator_findings(
               help="Output Phase 2 migration impact report (JSON) instead of SARIF.")
 @click.option("--resolved", default=None, type=click.Path(exists=True),
               help="Pre-resolved manifest (wardline.resolved.json)")
+@click.option("--allow-stale-resolved", is_flag=True, default=False,
+              help="Warn instead of exit 2 when resolved file's manifest hash is stale.")
 @click.option("--strict-governance", is_flag=True, default=False,
               help="Treat GOVERNANCE findings as scan failures (exit 1).")
 @click.option("--retrospective", default=None, type=str,
@@ -428,6 +430,7 @@ def scan(
     allow_permissive_distribution: bool,
     preview_phase2: bool,
     resolved: str | None,
+    allow_stale_resolved: bool,
     strict_governance: bool,
     retrospective: str | None,
 ) -> None:
@@ -530,7 +533,7 @@ def scan(
     consumed_overlay_paths: tuple[Path, ...] = ()
 
     if resolved:
-        loaded = _load_resolved(resolved, manifest_path)
+        loaded = _load_resolved(resolved, manifest_path, allow_stale=allow_stale_resolved)
         if loaded is None:
             sys.exit(EXIT_CONFIG_ERROR)
         boundaries, resolved_rule_overrides, optional_fields, consumed_overlay_paths = loaded
@@ -956,6 +959,8 @@ def _load_config(config_arg: str | None) -> ScannerConfig | None | _ConfigError:
 def _load_resolved(
     resolved_path: str,
     manifest_path: Path,
+    *,
+    allow_stale: bool = False,
 ) -> tuple[
     tuple[_BoundaryEntry, ...],
     tuple[dict[str, object], ...] | None,
@@ -988,9 +993,16 @@ def _load_resolved(
         ).hexdigest()
         resolved_hash = data.get("manifest_hash", "")
         if current_hash != resolved_hash:
-            click.echo(
-                "warning: resolved file is stale (manifest changed)", err=True
-            )
+            if allow_stale:
+                click.echo(
+                    "warning: resolved file is stale (manifest changed)", err=True
+                )
+            else:
+                cli_error(
+                    "resolved file is stale (manifest hash mismatch). "
+                    "Re-run `wardline resolve` or pass --allow-stale-resolved."
+                )
+                return None
 
         project_root = manifest_path.parent
 

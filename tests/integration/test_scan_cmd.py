@@ -126,7 +126,7 @@ class TestScanProducesSarif:
                 "--allow-registry-mismatch",
             ])
 
-        assert result.exit_code == 1
+        assert result.exit_code == 0  # WARNING severity — not gate-blocking
         sarif = json.loads(result.stdout)
         run = sarif["runs"][0]
         assert run["properties"]["wardline.filesWithDegradedTaint"] == 1
@@ -151,7 +151,7 @@ class TestScanProducesSarif:
             "--allow-registry-mismatch",
         ])
 
-        assert result.exit_code == 1
+        assert result.exit_code == 0  # WARNING severity — not gate-blocking
         sarif = json.loads(result.stdout)
         dynamic_imports = [
             r for r in sarif["runs"][0]["results"]
@@ -172,12 +172,13 @@ class TestScanProducesSarif:
         ])
         sarif = json.loads(result.stdout)
         implemented = sarif["runs"][0]["properties"]["wardline.implementedRules"]
-        # 11 rules loaded (PY-WL-001 through PY-WL-009 plus SCN-021 and SUP-001)
+        # 12 rules loaded (PY-WL-001 through PY-WL-009, SCN-021, SCN-022, SUP-001)
         assert "PY-WL-001" in implemented
         assert "PY-WL-009" in implemented
         assert "SCN-021" in implemented
+        assert "SCN-022" in implemented
         assert "SUP-001" in implemented
-        assert len(implemented) == 11
+        assert len(implemented) == 12
 
     def test_sarif_findings_present_for_fixture(self) -> None:
         """Scanning fixture project produces SARIF results."""
@@ -749,11 +750,41 @@ class TestScanResolved:
             "--manifest", str(manifest),
             "--resolved", str(resolved),
             "--allow-registry-mismatch",
+            "--allow-stale-resolved",
         ])
         # Should produce valid SARIF — the resolved boundaries are loaded
         sarif = json.loads(result.stdout)
         assert isinstance(sarif, dict)
         assert "runs" in sarif
+
+    def test_stale_resolved_blocks_by_default(self, tmp_path: Path) -> None:
+        """Hash mismatch without --allow-stale-resolved must exit 2."""
+        manifest = _minimal_manifest(tmp_path)
+
+        resolved = tmp_path / "wardline.resolved.json"
+        resolved.write_text(json.dumps({
+            "format_version": "0.2",
+            "resolved_at": "2026-01-01T00:00:00Z",
+            "root": ".",
+            "manifest_source": "wardline.yaml",
+            "manifest_hash": "sha256:wrong",
+            "tiers": [],
+            "module_tiers": [],
+            "boundaries": [],
+            "governance_signals": [],
+            "overlays_discovered": [],
+            "scanner_config": None,
+            "metadata": {},
+        }), encoding="utf-8")
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "scan", str(tmp_path),
+            "--manifest", str(manifest),
+            "--resolved", str(resolved),
+        ])
+        assert result.exit_code == 2
+        assert "stale" in result.output or "stale" in (result.stderr or "")
 
 
 @pytest.mark.integration
