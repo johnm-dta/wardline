@@ -13,15 +13,15 @@
       "expires": "2027-03-28",
       "provenance": "cli",
       "agent_originated": true,
-      "ast_fingerprint": "f06410352ea51028",
+      "ast_fingerprint": "e4fea35dc4cbafcb",
       "recurrence_count": 0,
       "governance_path": "standard",
       "analysis_level": 1,
       "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
       "migrated_by": "Claude",
       "last_refreshed_by": "Claude",
-      "last_refresh_rationale": "Fingerprints stale after try/except refactors for PY-WL-001/002/003 compliance \u2014 code behaviour unchanged",
-      "last_refreshed_at": "2026-03-28"
+      "last_refresh_rationale": "AST fingerprints stale after ADR-001/002 taint state and decorator rename \u2014 code behaviour unchanged",
+      "last_refreshed_at": "2026-03-29"
     },
     {
       "id": "EXC-2FAEA819",
@@ -166,10 +166,13 @@
       "expires": "2027-03-28",
       "provenance": "cli",
       "agent_originated": true,
-      "ast_fingerprint": "360d38c3b054ebcb",
+      "ast_fingerprint": "a5b71fad3367aa67",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "last_refreshed_by": "Claude",
+      "last_refresh_rationale": "AST fingerprints stale after ADR-001/002 taint state and decorator rename \u2014 code behaviour unchanged",
+      "last_refreshed_at": "2026-03-29"
     },
     {
       "id": "EXC-F696E4DB",
@@ -320,15 +323,15 @@
       "expires": "2027-03-28",
       "provenance": "cli",
       "agent_originated": true,
-      "ast_fingerprint": "3fbb16f9ac6c425f",
+      "ast_fingerprint": "b6e8c8ba95c9bd66",
       "recurrence_count": 0,
       "governance_path": "standard",
       "analysis_level": 1,
       "migrated_from": "taint_state was UNKNOWN_RAW at level 1",
       "migrated_by": "Claude",
       "last_refreshed_by": "Claude",
-      "last_refresh_rationale": "Fingerprints stale after try/except refactors for PY-WL-001/002/003 compliance \u2014 code behaviour unchanged",
-      "last_refreshed_at": "2026-03-28"
+      "last_refresh_rationale": "AST fingerprints stale after ADR-001/002 taint state and decorator rename \u2014 code behaviour unchanged",
+      "last_refreshed_at": "2026-03-29"
     },
     {
       "id": "EXC-0689F558",
@@ -605,13 +608,13 @@
       "expires": "2027-03-28",
       "provenance": "cli",
       "agent_originated": true,
-      "ast_fingerprint": "dd87089f6b8cc7fb",
+      "ast_fingerprint": "e213f0f95666b9fc",
       "recurrence_count": 0,
       "governance_path": "standard",
       "analysis_level": 1,
       "last_refreshed_by": "Claude",
-      "last_refresh_rationale": "Fingerprints stale after try/except refactors for PY-WL-001/002/003 compliance \u2014 code behaviour unchanged",
-      "last_refreshed_at": "2026-03-28"
+      "last_refresh_rationale": "AST fingerprints stale after ADR-001/002 taint state and decorator rename \u2014 code behaviour unchanged",
+      "last_refreshed_at": "2026-03-29"
     },
     {
       "id": "EXC-8DC74334",
@@ -1085,10 +1088,13 @@
       "expires": "2027-03-28",
       "provenance": "cli",
       "agent_originated": true,
-      "ast_fingerprint": "77091f3cfd0c4f7c",
+      "ast_fingerprint": "0f6ba02a2d8d3f4e",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "last_refreshed_by": "Claude",
+      "last_refresh_rationale": "AST fingerprints stale after ADR-001/002 taint state and decorator rename \u2014 code behaviour unchanged",
+      "last_refreshed_at": "2026-03-29"
     },
     {
       "id": "EXC-2D49F581",
@@ -1391,10 +1397,13 @@
       "expires": "2027-03-28",
       "provenance": "cli",
       "agent_originated": true,
-      "ast_fingerprint": "7f129b9a1a513384",
+      "ast_fingerprint": "e077e6cab557888f",
       "recurrence_count": 0,
       "governance_path": "standard",
-      "analysis_level": 1
+      "analysis_level": 1,
+      "last_refreshed_by": "Claude",
+      "last_refresh_rationale": "AST fingerprints stale after ADR-001/002 taint state and decorator rename \u2014 code behaviour unchanged",
+      "last_refreshed_at": "2026-03-29"
     },
     {
       "id": "EXC-53957A32",
@@ -1415,8 +1424,8 @@
     }
   ],
   "last_batch_refresh": {
-    "at": "2026-03-28",
+    "at": "2026-03-29",
     "by": "Claude",
-    "rationale": "Fingerprints stale after try/except refactors for PY-WL-001/002/003 compliance \u2014 code behaviour unchanged"
+    "rationale": "AST fingerprints stale after ADR-001/002 taint state and decorator rename \u2014 code behaviour unchanged"
   }
 }
