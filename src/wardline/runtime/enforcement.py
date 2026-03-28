@@ -74,10 +74,18 @@ def disable() -> None:
 
 def _reset_enforcement_state() -> None:
     """Reset enforcement state to defaults. INTERNAL — for test fixtures only."""
-    if "pytest" not in sys.modules and not os.environ.get("WARDLINE_TESTING"):
-        raise RuntimeError("_reset_enforcement_state is for test use only")
+    try:
+        _ = sys.modules["pytest"]
+    except KeyError:
+        try:
+            _ = os.environ["WARDLINE_TESTING"]
+        except KeyError:
+            raise RuntimeError("_reset_enforcement_state is for test use only")
     global _enforcement_enabled, _first_check_done  # noqa: PLW0603
-    _enforcement_enabled = os.environ.get("WARDLINE_ENFORCE", "") == "1"
+    try:
+        _enforcement_enabled = os.environ["WARDLINE_ENFORCE"] == "1"
+    except KeyError:
+        _enforcement_enabled = False
     _first_check_done = False
 
 
@@ -176,11 +184,16 @@ def stamp_tier(
     if not isinstance(tier, int) or not (1 <= tier <= 4):
         raise ValueError(f"tier must be int 1-4, got {tier!r}")
 
-    if not overwrite and hasattr(obj, "_wardline_tier"):
-        raise ValueError(
-            f"Object already has _wardline_tier={obj._wardline_tier}; "
-            f"pass overwrite=True to re-stamp"
-        )
+    if not overwrite:
+        try:
+            existing_tier = obj._wardline_tier
+        except AttributeError:
+            existing_tier = None  # object not yet stamped — continue
+        else:
+            raise ValueError(
+                f"Object already has _wardline_tier={existing_tier}; "
+                f"pass overwrite=True to re-stamp"
+            )
 
     normalized_groups = tuple(sorted(groups))
 
@@ -233,8 +246,9 @@ def check_tier_boundary(
     if not _enforcement_enabled:
         return
 
-    tier = getattr(obj, "_wardline_tier", None)
-    if tier is None:
+    try:
+        tier = obj._wardline_tier
+    except AttributeError:
         ctx = f" (context: {context})" if context else ""
         msg = f"{type(obj).__name__} has no _wardline_tier attribute{ctx}"
         logger.warning("Tier boundary violation: %s", msg)
@@ -357,6 +371,18 @@ def check_validated_record(obj: Any) -> None:
 # ── WardlineBase enforcement extension ────────────────────────
 
 
+def _add_tier_method(
+    tier_methods: dict[int, set[str]], tier: int, name: str,
+) -> None:
+    """Add *name* to the method set for *tier*, creating the set if needed."""
+    try:
+        methods = tier_methods[tier]
+    except KeyError:
+        methods = set()
+        tier_methods[tier] = methods
+    methods.add(name)
+
+
 def check_subclass_tier_consistency(cls: type) -> list[str]:
     """Check tier consistency across decorated methods in a class.
 
@@ -376,24 +402,38 @@ def check_subclass_tier_consistency(cls: type) -> list[str]:
         if not callable(value):
             continue
 
-        groups = getattr(value, "_wardline_groups", None)
-        if groups is None:
+        try:
+            groups = value._wardline_groups
+        except AttributeError:
+            groups = None  # not a wardline-decorated callable — skip
             continue
 
         # Derive tier from _wardline_tier_source
-        tier_source = getattr(value, "_wardline_tier_source", None)
+        try:
+            tier_source = value._wardline_tier_source
+        except AttributeError:
+            tier_source = None
         if tier_source is not None:
-            tier_val = TAINT_TO_TIER.get(tier_source)
-            if tier_val is not None:
-                tier_methods.setdefault(int(tier_val), set()).add(name)
+            try:
+                tier_val = TAINT_TO_TIER[tier_source]
+            except KeyError:
+                tier_val = None  # tier_source not in TAINT_TO_TIER — unrecognised taint
+            else:
+                _add_tier_method(tier_methods, int(tier_val), name)
 
         # Derive tier from _wardline_transition (use "to" state = index 1)
-        transition = getattr(value, "_wardline_transition", None)
+        try:
+            transition = value._wardline_transition
+        except AttributeError:
+            transition = None
         if transition is not None and len(transition) >= 2:
             to_state = transition[1]
-            tier_val = TAINT_TO_TIER.get(to_state)
-            if tier_val is not None:
-                tier_methods.setdefault(int(tier_val), set()).add(name)
+            try:
+                tier_val = TAINT_TO_TIER[to_state]
+            except KeyError:
+                tier_val = None  # to_state not in TAINT_TO_TIER — unrecognised taint
+            else:
+                _add_tier_method(tier_methods, int(tier_val), name)
 
     if len(tier_methods) > 1:
         tiers_str = ", ".join(

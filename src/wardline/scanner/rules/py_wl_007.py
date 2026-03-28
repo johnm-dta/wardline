@@ -33,13 +33,17 @@ _COMPARISON_DUNDERS = frozenset({
 
 
 def _is_ast_qualified_type(node: ast.expr) -> bool:
-    """Check if a type argument is ``ast.SomeType`` (qualified AST node type).
+    """Check if a type argument is an AST node type reference.
 
-    Matches ``ast.X`` where ``ast`` is the receiver. Unqualified names
-    like ``Name`` are not matched — they could be anything.
+    Matches:
+    - ``ast.X`` where ``ast`` is the receiver (qualified access).
+    - ``_AST_*`` module-level names — the established convention for
+      version-compatibility aliases like ``_AST_TRY_STAR = getattr(ast, "TryStar", None)``.
     """
     if isinstance(node, ast.Attribute):
         return isinstance(node.value, ast.Name) and node.value.id == "ast"
+    if isinstance(node, ast.Name) and node.id.startswith("_AST_"):
+        return True
     return False
 
 

@@ -73,14 +73,18 @@ def extract_call_edges(
             # Check if this is actually under a class by looking for other
             # methods in the same class or by examining the qualname structure.
             # We track all two-part qualnames as potential class methods.
-            if cls_name not in class_methods:
+            try:
+                class_methods[cls_name]
+            except KeyError:
                 class_methods[cls_name] = {}
             class_methods[cls_name][method_name] = qualname
         elif len(parts) >= 3:
             # Nested: e.g. "ClassName.method.inner" — register in class_methods
             # for the top-level class if applicable.
             cls_name = parts[0]
-            if cls_name not in class_methods:
+            try:
+                class_methods[cls_name]
+            except KeyError:
                 class_methods[cls_name] = {}
             # Register using full method path under the class
             method_path = ".".join(parts[1:])
@@ -129,22 +133,24 @@ def extract_call_edges(
             if isinstance(func, ast.Name):
                 name = func.id
                 # Rule 1: module-level function call
-                if name in module_defs:
+                try:
                     target = module_defs[name]
                     edges.add(target)
                     resolved += 1
-                # Rule 3: constructor call — ClassName()
-                elif name in class_names:
-                    init_qualname = f"{name}.__init__"
-                    if name in class_methods and "__init__" in class_methods[name]:
-                        edges.add(init_qualname)
-                        resolved += 1
+                except KeyError:
+                    # Rule 3: constructor call — ClassName()
+                    if name in class_names:
+                        init_qualname = f"{name}.__init__"
+                        try:
+                            _ = class_methods[name]["__init__"]
+                            edges.add(init_qualname)
+                            resolved += 1
+                        except KeyError:
+                            # Class exists but no __init__ defined
+                            unresolved += 1
                     else:
-                        # Class exists but no __init__ defined
+                        # Could be a parameter, builtin, or import — unresolved
                         unresolved += 1
-                else:
-                    # Could be a parameter, builtin, or import — unresolved
-                    unresolved += 1
 
             elif (
                 isinstance(func, ast.Attribute)
@@ -154,13 +160,11 @@ def extract_call_edges(
             ):
                 # Rule 2: self.method() call
                 method_name = func.attr
-                if (
-                    caller_class in class_methods
-                    and method_name in class_methods[caller_class]
-                ):
-                    edges.add(class_methods[caller_class][method_name])
+                try:
+                    callee_qualname = class_methods[caller_class][method_name]
+                    edges.add(callee_qualname)
                     resolved += 1
-                else:
+                except KeyError:
                     unresolved += 1
             else:
                 # Everything else (chained attrs, subscripts, etc.) — unresolved

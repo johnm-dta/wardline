@@ -216,22 +216,25 @@ def check_tier_downgrades(
 
     issues: list[CoherenceIssue] = []
     for mt in module_tiers:
-        if mt.path in baseline_modules:
+        try:
             old_taint = baseline_modules[mt.path]
-            old_tier = baseline_tiers.get(old_taint)
-            new_tier = current_tier_map.get(mt.default_taint)
-            if old_tier is not None and new_tier is not None and new_tier > old_tier:
-                issues.append(
-                    CoherenceIssue(
-                        kind="tier_downgrade",
-                        function="",
-                        file_path=mt.path,
-                        detail=(
-                            f"Tier downgrade: module '{mt.path}' changed from "
-                            f"tier {old_tier} to tier {new_tier}."
-                        ),
-                    )
+        except KeyError:
+            old_taint = None  # module absent from baseline — newly introduced, skip
+            continue
+        old_tier = baseline_tiers.get(old_taint)
+        new_tier = current_tier_map.get(mt.default_taint)
+        if old_tier is not None and new_tier is not None and new_tier > old_tier:
+            issues.append(
+                CoherenceIssue(
+                    kind="tier_downgrade",
+                    function="",
+                    file_path=mt.path,
+                    detail=(
+                        f"Tier downgrade: module '{mt.path}' changed from "
+                        f"tier {old_tier} to tier {new_tier}."
+                    ),
                 )
+            )
     return issues
 
 
@@ -285,36 +288,39 @@ def check_tier_upgrade_without_evidence(
 
     issues: list[CoherenceIssue] = []
     for mt in module_tiers:
-        if mt.path in baseline_modules:
+        try:
             old_taint = baseline_modules[mt.path]
-            old_tier = baseline_tiers.get(old_taint)
-            new_tier = current_tier_map.get(mt.default_taint)
-            if old_tier is not None and new_tier is not None and new_tier < old_tier:
-                # Check if any boundary's overlay scope covers this module path.
-                # Module paths are relative (e.g. "src/wardline/scanner"),
-                # overlay scopes are absolute. A scope covers a module if
-                # the scope path ends with the module path.
-                module_prefix = mt.path.rstrip("/")
-                has_evidence = any(
-                    scope.endswith("/" + module_prefix)
-                    or scope.endswith("/" + module_prefix + "/")
-                    or scope == module_prefix
-                    for scope in boundary_scopes
-                )
-                if not has_evidence:
-                    issues.append(
-                        CoherenceIssue(
-                            kind="tier_upgrade_without_evidence",
-                            function="",
-                            file_path=mt.path,
-                            detail=(
-                                f"Tier upgrade without evidence: module "
-                                f"'{mt.path}' changed from tier {old_tier} to "
-                                f"tier {new_tier} but no overlay boundary "
-                                f"covers this module."
-                            ),
-                        )
+        except KeyError:
+            old_taint = None  # module absent from baseline — newly introduced, skip
+            continue
+        old_tier = baseline_tiers.get(old_taint)
+        new_tier = current_tier_map.get(mt.default_taint)
+        if old_tier is not None and new_tier is not None and new_tier < old_tier:
+            # Check if any boundary's overlay scope covers this module path.
+            # Module paths are relative (e.g. "src/wardline/scanner"),
+            # overlay scopes are absolute. A scope covers a module if
+            # the scope path ends with the module path.
+            module_prefix = mt.path.rstrip("/")
+            has_evidence = any(
+                scope.endswith("/" + module_prefix)
+                or scope.endswith("/" + module_prefix + "/")
+                or scope == module_prefix
+                for scope in boundary_scopes
+            )
+            if not has_evidence:
+                issues.append(
+                    CoherenceIssue(
+                        kind="tier_upgrade_without_evidence",
+                        function="",
+                        file_path=mt.path,
+                        detail=(
+                            f"Tier upgrade without evidence: module "
+                            f"'{mt.path}' changed from tier {old_tier} to "
+                            f"tier {new_tier} but no overlay boundary "
+                            f"covers this module."
+                        ),
                     )
+                )
     return issues
 
 
@@ -485,9 +491,14 @@ def check_unmatched_contracts(
             continue
 
         if boundary.function not in annotated_functions:
-            contract_names = ", ".join(
-                c["name"] for c in contracts if isinstance(c, dict) and "name" in c
-            )
+            _names: list[str] = []
+            for _c in contracts:
+                if isinstance(_c, dict):
+                    try:
+                        _names.append(_c["name"])
+                    except KeyError:
+                        _names_key = None  # contract dict has no 'name' field — skip
+            contract_names = ", ".join(_names)
             issues.append(
                 CoherenceIssue(
                     kind="unmatched_contract",

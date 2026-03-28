@@ -56,4 +56,7 @@ def taint_join(a: TaintState, b: TaintState) -> TaintState:
 
     # Normalise order for lookup (by string value for determinism)
     key = (min(a, b, key=lambda x: x.value), max(a, b, key=lambda x: x.value))
-    return _JOIN_TABLE.get(key, TaintState.MIXED_RAW)
+    if key in _JOIN_TABLE:
+        return _JOIN_TABLE[key]
+    # Pairs not in the join table collapse to the absorbing element.
+    return TaintState.MIXED_RAW

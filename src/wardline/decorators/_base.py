@@ -12,6 +12,14 @@ from wardline.core.registry import REGISTRY
 logger = logging.getLogger(__name__)
 
 
+def _safe_name(obj: object) -> str:
+    """Return __name__ if available, otherwise repr."""
+    try:
+        return obj.__name__  # type: ignore[union-attr]
+    except AttributeError:
+        return repr(obj)
+
+
 class _WardlineDecorated(Protocol):
     """Protocol for callables already marked with wardline metadata."""
 
@@ -113,7 +121,9 @@ def wardline_decorator(
     for key in semantic_attrs:
         attr_key = f"_wardline_{key}" if not key.startswith("_wardline_") else key
         # Check against entry.attrs contract
-        if attr_key not in entry.attrs:
+        try:
+            entry.attrs[attr_key]
+        except KeyError:
             raise ValueError(
                 f"Unknown attribute '{key}' for decorator '{name}'. "
                 f"Allowed: {sorted(entry.attrs.keys())}"
@@ -147,7 +157,10 @@ def wardline_decorator(
                 if output_tier is not None:
                     from wardline.runtime.enforcement import is_enabled
                     if is_enabled() and result is not None:
-                        current_groups = tuple(sorted(getattr(wrapper, "_wardline_groups", set())))
+                        try:
+                            current_groups = tuple(sorted(wrapper._wardline_groups))
+                        except AttributeError:
+                            current_groups = ()
                         result = _try_stamp_tier(result, output_tier, current_groups, wrapper.__qualname__)
                 return result
         else:
@@ -157,15 +170,20 @@ def wardline_decorator(
                 if output_tier is not None:
                     from wardline.runtime.enforcement import is_enabled
                     if is_enabled() and result is not None:
-                        current_groups = tuple(sorted(getattr(wrapper, "_wardline_groups", set())))
+                        try:
+                            current_groups = tuple(sorted(wrapper._wardline_groups))
+                        except AttributeError:
+                            current_groups = ()
                         result = _try_stamp_tier(result, output_tier, current_groups, wrapper.__qualname__)
                 return result
 
         # CRITICAL: set _wardline_groups AFTER functools.wraps()
         # Copy-on-accumulate: don't mutate inner decorator's set
-        wrapper._wardline_groups = set(  # type: ignore[attr-defined]
-            getattr(wrapper, "_wardline_groups", set())
-        )
+        try:
+            existing_groups = wrapper._wardline_groups  # type: ignore[attr-defined]
+        except AttributeError:
+            existing_groups = set()
+        wrapper._wardline_groups = set(existing_groups)  # type: ignore[attr-defined]
         wrapper._wardline_groups.add(group)  # type: ignore[attr-defined]
 
         # Set semantic attributes
@@ -202,9 +220,13 @@ def get_wardline_attrs(fn: Any) -> dict[str, Any] | None:
     seen: set[int] = set()
 
     while current is not None:
-        if id(current) in seen:
+        current_id = id(current)
+        # Cycle detection: frozenset.add() is not available, but we can
+        # detect duplicates by checking set size before/after.
+        prev_size = len(seen)
+        seen.add(current_id)
+        if len(seen) == prev_size:
             break
-        seen.add(id(current))
 
         # Collect wardline attrs from current level only (not inherited via MRO).
         # Use vars() when available; fall back to dir() for objects without __dict__.
@@ -213,11 +235,18 @@ def get_wardline_attrs(fn: Any) -> dict[str, Any] | None:
         except TypeError:
             current_keys = dir(current)
         for key in current_keys:
-            if key.startswith("_wardline_") and key not in attrs:
+            if not key.startswith("_wardline_"):
+                continue
+            try:
+                attrs[key]
+            except KeyError:
                 attrs[key] = getattr(current, key)
 
         # Follow __wrapped__ chain
-        next_fn = getattr(current, "__wrapped__", None)
+        try:
+            next_fn = current.__wrapped__
+        except AttributeError:
+            next_fn = None
         if next_fn is None:
             # Only warn about severed chains when the wrapping function
             # is actually a wardline decorator (has _wardline_ attrs).
@@ -231,7 +260,7 @@ def get_wardline_attrs(fn: Any) -> dict[str, Any] | None:
                 logger.warning(
                     "Severed __wrapped__ chain on %s — "
                     "wardline attributes may be lost",
-                    getattr(fn, "__name__", repr(fn)),
+                    _safe_name(fn),
                 )
                 return None
             break

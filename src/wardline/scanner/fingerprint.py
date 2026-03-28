@@ -77,7 +77,7 @@ def compute_ast_fingerprint(
 
     if project_root is not None:
         try:
-            display_path = str(file_path.relative_to(project_root))
+            display_path = str(file_path.relative_to(project_root.resolve()))
         except ValueError:
             display_path = str(file_path)
     else:
