@@ -43,6 +43,7 @@ class Finding:
     exception_id: str | None = None
     exception_expires: str | None = None
     original_rule: str | None = None
+    retroactive_scan: bool = False
 
 
 @dataclass(frozen=True)
