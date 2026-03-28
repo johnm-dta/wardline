@@ -55,7 +55,7 @@ MATRIX: dict[RuleId, list[tuple[Severity, Exceptionability]]] = {
     RuleId.PY_WL_002: [(E, U), (E, St), (W, R), (W, R), (W, R), (W, R), (E, St), (W, St)],
     RuleId.PY_WL_003: [(E, U), (E, U), (E, St), (Su, T), (Su, T), (E, St), (E, St), (Su, T)],
     RuleId.PY_WL_004: [(E, U), (E, St), (W, St), (W, R), (E, St), (W, St), (W, St), (E, St)],
-    RuleId.PY_WL_005: [(E, U), (E, St), (E, St), (E, St), (E, St), (E, St), (E, St), (E, St)],
+    RuleId.PY_WL_005: [(E, U), (E, St), (W, St), (W, R), (E, St), (W, St), (W, St), (E, St)],
     RuleId.PY_WL_006: [(E, U), (E, U), (E, St), (E, St), (E, St), (E, St), (E, St), (E, St)],
     RuleId.PY_WL_007: [(E, St), (W, R), (W, R), (Su, T), (Su, T), (W, R), (W, R), (W, St)],
     RuleId.PY_WL_008: [(E, U), (E, U), (E, U), (E, U), (E, U), (E, U), (E, U), (E, U)],

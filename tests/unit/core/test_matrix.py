@@ -67,11 +67,11 @@ EXPECTED: list[tuple[RuleId, TaintState, Severity, Exceptionability]] = [
     # PY-WL-005 = WL-004 (catching exceptions silently)
     (RuleId.PY_WL_005, TaintState.AUDIT_TRAIL, E, U),
     (RuleId.PY_WL_005, TaintState.PIPELINE, E, St),
-    (RuleId.PY_WL_005, TaintState.SHAPE_VALIDATED, E, St),
-    (RuleId.PY_WL_005, TaintState.EXTERNAL_RAW, E, St),
+    (RuleId.PY_WL_005, TaintState.SHAPE_VALIDATED, W, St),
+    (RuleId.PY_WL_005, TaintState.EXTERNAL_RAW, W, R),
     (RuleId.PY_WL_005, TaintState.UNKNOWN_RAW, E, St),
-    (RuleId.PY_WL_005, TaintState.UNKNOWN_SHAPE_VALIDATED, E, St),
-    (RuleId.PY_WL_005, TaintState.UNKNOWN_SEM_VALIDATED, E, St),
+    (RuleId.PY_WL_005, TaintState.UNKNOWN_SHAPE_VALIDATED, W, St),
+    (RuleId.PY_WL_005, TaintState.UNKNOWN_SEM_VALIDATED, W, St),
     (RuleId.PY_WL_005, TaintState.MIXED_RAW, E, St),
 
     # PY-WL-006 = WL-005 (audit-critical writes in broad handlers)

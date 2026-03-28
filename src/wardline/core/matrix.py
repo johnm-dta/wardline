@@ -106,7 +106,10 @@ _MATRIX_DATA: list[tuple[RuleId, list[tuple[Severity, Exceptionability]]]] = [
     # PY-WL-004 = WL-003 (catching all exceptions broadly)
     (RuleId.PY_WL_004, [(_E,_U), (_E,_St), (_W,_St), (_W,_R), (_E,_St), (_W,_St), (_W,_St), (_E,_St)]),
     # PY-WL-005 = WL-004 (catching exceptions silently)
-    (RuleId.PY_WL_005, [(_E,_U), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St)]),
+    # T1/T2: ERROR — silent catch in trusted code destroys diagnostic evidence
+    # T3: WARNING — partially validated; flag for review
+    # T4: WARNING/RELAXED — boundary code may legitimately suppress parse errors
+    (RuleId.PY_WL_005, [(_E,_U), (_E,_St), (_W,_St), (_W,_R), (_E,_St), (_W,_St), (_W,_St), (_E,_St)]),
     # PY-WL-006 = WL-005 (audit-critical writes in broad handlers)
     (RuleId.PY_WL_006, [(_E,_U), (_E,_U), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St), (_E,_St)]),
     # PY-WL-007 = WL-006 (runtime type-checking internal data)

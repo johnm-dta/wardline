@@ -101,6 +101,27 @@ def _name_suggests_set(name: str) -> bool:
     return any(lower.endswith(suffix) for suffix in _SET_RETURN_SUFFIXES)
 
 
+_STRING_NAME_SUFFIXES = ("_lower", "_upper", "_name", "_text", "_str", "_msg", "_message", "_label")
+
+
+def _comparator_looks_like_string(node: ast.expr) -> bool:
+    """Heuristic: does the comparator look like it holds a string value?
+
+    When a string literal is tested with ``in`` against a variable whose
+    name suggests it's a string (e.g., ``receiver_lower``, ``func_name``),
+    the operation is substring containment, not key-existence checking.
+    """
+    name: str | None = None
+    if isinstance(node, ast.Name):
+        name = node.id
+    elif isinstance(node, ast.Attribute):
+        name = node.attr
+    if name is None:
+        return False
+    lower = name.lower()
+    return any(lower.endswith(suffix) for suffix in _STRING_NAME_SUFFIXES)
+
+
 class RulePyWl003(RuleBase):
     """Detect existence-checking as structural gate patterns.
 
@@ -297,6 +318,23 @@ class RulePyWl003(RuleBase):
         # Suppress membership tests against known set-typed variables.
         # ``x in my_set`` is value classification, not structural gating.
         if isinstance(comparator, ast.Name) and comparator.id in known_set_names:
+            return False
+        # Suppress membership tests against self.attr — these are typically
+        # frozenset/set instance attributes used for classification.
+        if (
+            isinstance(comparator, ast.Attribute)
+            and isinstance(comparator.value, ast.Name)
+            and comparator.value.id == "self"
+        ):
+            return False
+        # Suppress substring containment: "literal" in string_var where
+        # the comparator name suggests it holds a string (e.g., _lower,
+        # _name, _text).  This is substring search, not key existence.
+        if (
+            isinstance(left, ast.Constant)
+            and isinstance(left.value, str)
+            and _comparator_looks_like_string(comparator)
+        ):
             return False
         if isinstance(comparator, ast.Call):
             return self._is_mapping_keys_call(comparator)
