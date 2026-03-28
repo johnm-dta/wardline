@@ -322,7 +322,7 @@ requirements:
     fitness_dimensions: [conformance, governance]
     notes: >
       Module-tier mappings provide baseline enforcement before full annotation.
-      A module declared as AUDIT_TRAIL context activates the strictest
+      A module declared as INTEGRAL context activates the strictest
       severity on its unannotated functions.
 
   - id: WL-FIT-MAN-017

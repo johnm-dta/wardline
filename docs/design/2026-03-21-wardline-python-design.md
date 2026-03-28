@@ -59,7 +59,7 @@ wardline/
 │       │   ├── __init__.py          # Re-exports all decorators
 │       │   ├── _base.py             # Decorator factory infrastructure
 │       │   ├── authority.py         # Group 1: external_boundary, validates_shape, etc.
-│       │   ├── audit.py             # Group 2: audit_critical
+│       │   ├── audit.py             # Group 2: integrity_critical
 │       │   ├── plugin.py            # Group 3: system_plugin
 │       │   ├── provenance.py        # Group 4: int_data
 │       │   ├── schema.py            # Group 5: all_fields_mapped, output_schema, schema_default
@@ -122,7 +122,7 @@ wardline/
 │   ├── corpus_manifest.yaml         # Maps specimens to expected (rule, taint, severity, verdict)
 │   └── specimens/                   # Organised per spec: corpus/{rule}/{taint_state}/
 │       ├── PY-WL-001/
-│       │   ├── AUDIT_TRAIL/
+│       │   ├── INTEGRAL/
 │       │   │   ├── positive/        # True positives (should fire)
 │       │   │   └── negative/        # True negatives (should not fire)
 │       │   ├── EXTERNAL_RAW/
@@ -228,8 +228,8 @@ Version skew detection is **bidirectional** and covers both decorator names and 
 
 **WP-1a: Enums and Constants**
 - `AuthorityTier` IntEnum: `TIER_1 = 1` through `TIER_4 = 4`
-- **Serialisation note:** `AuthorityTier` values appear in SARIF output as `wardline.enclosingTier` (integer). This is intentional — the spec uses integer tier numbers (1-4) in SARIF property bags. `TaintState` uses `StrEnum` because taint state tokens are string identifiers (`AUDIT_TRAIL`, `PIPELINE`, etc.). The mixed serialisation (integer tiers, string taint states) is consistent with the spec's SARIF example (§10.1) where `wardline.enclosingTier: 1` and `wardline.taintState: "AUDIT_TRAIL"` appear in the same property bag.
-- `TaintState` StrEnum: 8 canonical tokens — **values MUST be assigned explicitly as uppercase strings** (e.g., `AUDIT_TRAIL = "AUDIT_TRAIL"`, `PIPELINE = "PIPELINE"`, etc.). Do NOT use `auto()` — `StrEnum` with `auto()` produces lowercase values (`"audit_trail"`), which would silently break SARIF output, matrix lookups, and corpus matching where the spec uses uppercase tokens. Add a serialisation round-trip test to `test_taints.py` asserting `str(TaintState.AUDIT_TRAIL) == "AUDIT_TRAIL"`.
+- **Serialisation note:** `AuthorityTier` values appear in SARIF output as `wardline.enclosingTier` (integer). This is intentional — the spec uses integer tier numbers (1-4) in SARIF property bags. `TaintState` uses `StrEnum` because taint state tokens are string identifiers (`INTEGRAL`, `ASSURED`, etc.). The mixed serialisation (integer tiers, string taint states) is consistent with the spec's SARIF example (§10.1) where `wardline.enclosingTier: 1` and `wardline.taintState: "INTEGRAL"` appear in the same property bag.
+- `TaintState` StrEnum: 8 canonical tokens — **values MUST be assigned explicitly as uppercase strings** (e.g., `INTEGRAL = "INTEGRAL"`, `ASSURED = "ASSURED"`, etc.). Do NOT use `auto()` — `StrEnum` with `auto()` produces lowercase values (`"audit_trail"`), which would silently break SARIF output, matrix lookups, and corpus matching where the spec uses uppercase tokens. Add a serialisation round-trip test to `test_taints.py` asserting `str(TaintState.INTEGRAL) == "INTEGRAL"`.
 - `Severity` StrEnum: `ERROR = "ERROR"`, `WARNING = "WARNING"`, `SUPPRESS = "SUPPRESS"` — explicit string assignments, not `auto()`
 - `Exceptionability` StrEnum: `UNCONDITIONAL = "UNCONDITIONAL"`, `STANDARD = "STANDARD"`, `RELAXED = "RELAXED"`, `TRANSPARENT = "TRANSPARENT"` — explicit string assignments, not `auto()`
 - `RuleId` StrEnum: `PY_WL_001 = "PY-WL-001"` through `PY_WL_009 = "PY-WL-009"` — note the member names use underscores but the string values use hyphens per the spec's SARIF format. `auto()` cannot produce hyphenated values. Add a round-trip test asserting `str(RuleId.PY_WL_001) == "PY-WL-001"`.
@@ -300,14 +300,14 @@ Each Group 1 decorator uses the factory to set semantic attributes that the scan
 - `@validates_shape` — sets `_wardline_transition = (4, 3)`
 - `@validates_semantic` — sets `_wardline_transition = (3, 2)`
 - `@validates_external` — sets `_wardline_transition = (4, 2)`
-- `@tier1_read` — sets `_wardline_tier_source = TaintState.AUDIT_TRAIL`
-- `@audit_writer` — sets `_wardline_tier_source = TaintState.AUDIT_TRAIL` + `_wardline_audit_writer = True`
-- `@authoritative_construction` — sets `_wardline_transition = (2, 1)`
+- `@integral_read` — sets `_wardline_tier_source = TaintState.INTEGRAL`
+- `@integral_writer` — sets `_wardline_tier_source = TaintState.INTEGRAL` + `_wardline_integral_writer = True`
+- `@integral_construction` — sets `_wardline_transition = (2, 1)`
 
 The scanner discovers these via AST (matching decorator names from `core/registry.py`), not by reading the attributes at runtime.
 
 **WP-2c: Group 2 Decorator**
-- `@audit_critical` — sets `_wardline_audit_critical = True`
+- `@integrity_critical` — sets `_wardline_integrity_critical = True`
 
 **WP-2d: Groups 3–5 Decorators**
 - `@system_plugin`, `@int_data`
@@ -446,8 +446,8 @@ PY-WL-006 through PY-WL-009 are **suppressed entirely in the MVP scanner** — t
 
 | Rule | Requires | Implementation |
 |------|----------|----------------|
-| PY-WL-006 | Audit context | PY-WL-004 pattern, but only when enclosing function has `@audit_writer` or `@audit_critical` — AND the broad handler wraps a call to an audit-decorated function |
-| PY-WL-007 | Tier context | `isinstance()` calls where enclosing function's taint is AUDIT_TRAIL or PIPELINE |
+| PY-WL-006 | Audit context | PY-WL-004 pattern, but only when enclosing function has `@integral_writer` or `@integrity_critical` — AND the broad handler wraps a call to an audit-decorated function |
+| PY-WL-007 | Tier context | `isinstance()` calls where enclosing function's taint is INTEGRAL or ASSURED |
 | PY-WL-008 | Structural analysis | Functions with validation decorators — check body for at least one rejection path. Valid rejection paths: `raise`, conditional early `return`, call to unconditionally-raising function (2-hop). **NOT valid:** `assert` (stripped by `-O`), `if False: raise` (unreachable — scanner SHOULD detect constant-False guards), `return None` without preceding conditional (unconditional, not a rejection). |
 | PY-WL-009 | Annotation ordering | Functions with `@validates_semantic` — check that their parameters trace to functions with `@validates_shape`. The MVP approximation (module-level co-presence check) **produces false negatives for cross-module flows (the common case)** since shape validators are typically in `adapters/` while semantic validators are in `domain/`. PY-WL-009 is effectively advisory-only until Level 2+ taint analysis (WP-7) enables cross-function flow tracking. |
 
@@ -544,7 +544,7 @@ PY-WL-006 through PY-WL-009 are **suppressed entirely in the MVP scanner** — t
 **WP-6c: Self-Hosting Gate**
 - `wardline.yaml` at repo root declaring the scanner's own modules and tiers — designed BEFORE WP-3 (see Section 11, Risk 3)
 - `wardline scan src/` passes with zero ERROR findings (or documented exceptions in `wardline.exceptions.json`)
-- **Coverage metric gate:** Coverage metric gate has two parts: (1) 80% of functions in modules declared at Tier 1 (`AUDIT_TRAIL`) or Tier 4 (`EXTERNAL_RAW`) must have explicit tier declarations via decorator (not just module-level `module_tiers` fallback). Module-level `module_tiers` entries alone do not count toward the decorator-level coverage numerator — they provide taint defaults but do not prove annotation investment. (2) Tier-distribution check: if more than a configurable threshold (default: 60%, set via `max_permissive_percent` in `wardline.yaml` or `wardline.toml`) of all declared functions are at the most permissive tiers (Tier 3 or Tier 4), emit an **ERROR** governance-level finding. **Threshold derivation:** The default of 60% is a starting point. During WP-0b (self-hosting manifest design), sketch the expected tier distribution of the scanner's own modules and validate whether 60% is appropriate — a scanner with legitimately high Tier 4 coverage in boundary modules (manifest loader, CLI input parsing, SARIF output) may naturally push past 60%. Set the threshold empirically at 10 percentage points above the observed scanner distribution, and use that as the self-hosting gate's configured value. The 60% default remains for new adopters. This prevents the gate from being satisfied by annotating everything at SUPPRESS-friendly tiers. The distribution check is ERROR from day one — a WARNING-only distribution check is trivially ignorable and undermines the self-hosting gate's integrity. A developer under pressure can declare scanner internals at Tier 3 across the board, satisfy the 80% decorator coverage floor, and pass the gate without proving the code is clean. An ERROR forces the conversation. An override flag (`--allow-permissive-distribution`) is available for exceptional circumstances but must be documented in CI config, making the override visible to reviewers.
+- **Coverage metric gate:** Coverage metric gate has two parts: (1) 80% of functions in modules declared at Tier 1 (`INTEGRAL`) or Tier 4 (`EXTERNAL_RAW`) must have explicit tier declarations via decorator (not just module-level `module_tiers` fallback). Module-level `module_tiers` entries alone do not count toward the decorator-level coverage numerator — they provide taint defaults but do not prove annotation investment. (2) Tier-distribution check: if more than a configurable threshold (default: 60%, set via `max_permissive_percent` in `wardline.yaml` or `wardline.toml`) of all declared functions are at the most permissive tiers (Tier 3 or Tier 4), emit an **ERROR** governance-level finding. **Threshold derivation:** The default of 60% is a starting point. During WP-0b (self-hosting manifest design), sketch the expected tier distribution of the scanner's own modules and validate whether 60% is appropriate — a scanner with legitimately high Tier 4 coverage in boundary modules (manifest loader, CLI input parsing, SARIF output) may naturally push past 60%. Set the threshold empirically at 10 percentage points above the observed scanner distribution, and use that as the self-hosting gate's configured value. The 60% default remains for new adopters. This prevents the gate from being satisfied by annotating everything at SUPPRESS-friendly tiers. The distribution check is ERROR from day one — a WARNING-only distribution check is trivially ignorable and undermines the self-hosting gate's integrity. A developer under pressure can declare scanner internals at Tier 3 across the board, satisfy the 80% decorator coverage floor, and pass the gate without proving the code is clean. An ERROR forces the conversation. An override flag (`--allow-permissive-distribution`) is available for exceptional circumstances but must be documented in CI config, making the override visible to reviewers.
 - **Determinism check:** Run the scanner twice, assert byte-identical SARIF output
 - **Regression baseline:** Commit the self-hosting SARIF output as a baseline. The CI regression check MUST compare `runs[].results` arrays only (the findings themselves), not run-level properties (`manifestHash`, `registryVersion`, etc.) — these change for legitimate reasons (adding modules, updating tiers) and create noise in raw diffs. The comparison MUST distinguish between: (a) a finding count that went **down** (possible suppression regression — always require explicit human sign-off, not just a baseline re-commit), and (b) a finding count that went up or changed content (code change — require acknowledgement). Baseline updates MUST be separate commits from code changes to prevent invisible simultaneous modification. Add the regression baseline file to CODEOWNERS alongside `wardline.yaml` and corpus files.
 - CI gate: self-hosting check runs on every merge to main (consistent with the integration test CI policy in Section 9). The `@pytest.mark.integration` marker on `test_self_hosting.py` places it in the `test-integration` CI job, which runs on every merge to main. Running on every commit is permitted if CI budget allows but is not required.

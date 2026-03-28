@@ -1,12 +1,12 @@
 ---
 # schema_version: 0.1
 specimen_id: "L3-anchored-not-demoted"
-description: "L3: @external_boundary A calls @tier1_read B — A stays EXTERNAL_RAW (anchored)"
+description: "L3: @external_boundary A calls @integral_read B — A stays EXTERNAL_RAW (anchored)"
 rule: "PY-WL-001"
 fragment: |
-  from wardline.decorators import external_boundary, tier1_read
+  from wardline.decorators import external_boundary, integral_read
   
-  @tier1_read
+  @integral_read
   def get_config():
       return {"safe": True}
   

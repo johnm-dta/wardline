@@ -132,20 +132,20 @@ class TestAnchoredBehavior:
         """Decorated function not changed by callees."""
         edges = {"anchor": {"dirty"}, "dirty": set()}
         taint_map = {
-            "anchor": TaintState.AUDIT_TRAIL,
+            "anchor": TaintState.INTEGRAL,
             "dirty": TaintState.EXTERNAL_RAW,
         }
         taint_sources = {"anchor": "decorator", "dirty": "fallback"}
         result, prov, _diags = propagate_callgraph_taints(
             edges, taint_map, taint_sources, {"anchor": 1, "dirty": 0}, {"anchor": 0, "dirty": 0}, return_taint_map=taint_map,
 )
-        assert result["anchor"] == TaintState.AUDIT_TRAIL
+        assert result["anchor"] == TaintState.INTEGRAL
 
     def test_anchored_not_changed_when_caller_more_trusted(self) -> None:
-        """Anchored EXTERNAL_RAW called by floating AUDIT_TRAIL stays EXTERNAL_RAW."""
+        """Anchored EXTERNAL_RAW called by floating INTEGRAL stays EXTERNAL_RAW."""
         edges = {"caller": {"anchored_ext"}, "anchored_ext": set()}
         taint_map = {
-            "caller": TaintState.AUDIT_TRAIL,
+            "caller": TaintState.INTEGRAL,
             "anchored_ext": TaintState.EXTERNAL_RAW,
         }
         taint_sources = {"caller": "fallback", "anchored_ext": "decorator"}
@@ -159,10 +159,10 @@ class TestModuleDefaultBehavior:
     """Module_default (floating-downward) functions: can demote, cannot upgrade."""
 
     def test_module_default_downward_only(self) -> None:
-        """PIPELINE calling EXTERNAL_RAW -> refined to EXTERNAL_RAW."""
+        """ASSURED calling EXTERNAL_RAW -> refined to EXTERNAL_RAW."""
         edges = {"pipe_fn": {"ext_fn"}, "ext_fn": set()}
         taint_map = {
-            "pipe_fn": TaintState.PIPELINE,
+            "pipe_fn": TaintState.ASSURED,
             "ext_fn": TaintState.EXTERNAL_RAW,
         }
         taint_sources = {"pipe_fn": "module_default", "ext_fn": "decorator"}
@@ -172,44 +172,44 @@ class TestModuleDefaultBehavior:
         assert result["pipe_fn"] == TaintState.EXTERNAL_RAW
 
     def test_module_default_not_upgraded(self) -> None:
-        """PIPELINE calling only AUDIT_TRAIL stays PIPELINE."""
+        """ASSURED calling only INTEGRAL stays ASSURED."""
         edges = {"pipe_fn": {"audit_fn"}, "audit_fn": set()}
         taint_map = {
-            "pipe_fn": TaintState.PIPELINE,
-            "audit_fn": TaintState.AUDIT_TRAIL,
+            "pipe_fn": TaintState.ASSURED,
+            "audit_fn": TaintState.INTEGRAL,
         }
         taint_sources = {"pipe_fn": "module_default", "audit_fn": "decorator"}
         result, _, _diags = propagate_callgraph_taints(
             edges, taint_map, taint_sources, {"pipe_fn": 1, "audit_fn": 0}, {"pipe_fn": 0, "audit_fn": 0}, return_taint_map=taint_map,
 )
-        assert result["pipe_fn"] == TaintState.PIPELINE
+        assert result["pipe_fn"] == TaintState.ASSURED
 
     def test_module_default_floor_enforced(self) -> None:
-        """Module_default PIPELINE calling only AUDIT_TRAIL stays PIPELINE (floor clamp)."""
+        """Module_default ASSURED calling only INTEGRAL stays ASSURED (floor clamp)."""
         edges = {"pipe_fn": {"audit_fn"}, "audit_fn": set()}
         taint_map = {
-            "pipe_fn": TaintState.PIPELINE,
-            "audit_fn": TaintState.AUDIT_TRAIL,
+            "pipe_fn": TaintState.ASSURED,
+            "audit_fn": TaintState.INTEGRAL,
         }
         taint_sources = {"pipe_fn": "module_default", "audit_fn": "decorator"}
         result, _, _diags = propagate_callgraph_taints(
             edges, taint_map, taint_sources, {"pipe_fn": 1, "audit_fn": 0}, {"pipe_fn": 0, "audit_fn": 0}, return_taint_map=taint_map,
 )
-        # Floor is PIPELINE (rank 1), AUDIT_TRAIL is rank 0 -> max(0, 1) = 1 = PIPELINE
-        assert result["pipe_fn"] == TaintState.PIPELINE
+        # Floor is ASSURED (rank 1), INTEGRAL is rank 0 -> max(0, 1) = 1 = ASSURED
+        assert result["pipe_fn"] == TaintState.ASSURED
 
     def test_module_default_unknown_raw_cannot_upgrade(self) -> None:
-        """Module_default at UNKNOWN_RAW calling only AUDIT_TRAIL stays UNKNOWN_RAW."""
+        """Module_default at UNKNOWN_RAW calling only INTEGRAL stays UNKNOWN_RAW."""
         edges = {"mod_fn": {"audit_fn"}, "audit_fn": set()}
         taint_map = {
             "mod_fn": TaintState.UNKNOWN_RAW,
-            "audit_fn": TaintState.AUDIT_TRAIL,
+            "audit_fn": TaintState.INTEGRAL,
         }
         taint_sources = {"mod_fn": "module_default", "audit_fn": "decorator"}
         result, _, _diags = propagate_callgraph_taints(
             edges, taint_map, taint_sources, {"mod_fn": 1, "audit_fn": 0}, {"mod_fn": 0, "audit_fn": 0}, return_taint_map=taint_map,
 )
-        # Floor is UNKNOWN_RAW (rank 6), AUDIT_TRAIL is rank 0 -> max(0, 6) = 6 = UNKNOWN_RAW
+        # Floor is UNKNOWN_RAW (rank 6), INTEGRAL is rank 0 -> max(0, 6) = 6 = UNKNOWN_RAW
         assert result["mod_fn"] == TaintState.UNKNOWN_RAW
 
 
@@ -222,17 +222,17 @@ class TestFallbackBehavior:
     """
 
     def test_fallback_floor_clamp_prevents_upgrade(self) -> None:
-        """UNKNOWN_RAW calling only AUDIT_TRAIL -> stays UNKNOWN_RAW (floor clamp)."""
+        """UNKNOWN_RAW calling only INTEGRAL -> stays UNKNOWN_RAW (floor clamp)."""
         edges = {"fb_fn": {"audit_fn"}, "audit_fn": set()}
         taint_map = {
             "fb_fn": TaintState.UNKNOWN_RAW,
-            "audit_fn": TaintState.AUDIT_TRAIL,
+            "audit_fn": TaintState.INTEGRAL,
         }
         taint_sources = {"fb_fn": "fallback", "audit_fn": "decorator"}
         result, _, _diags = propagate_callgraph_taints(
             edges, taint_map, taint_sources, {"fb_fn": 1, "audit_fn": 0}, {"fb_fn": 0, "audit_fn": 0}, return_taint_map=taint_map,
 )
-        # Floor clamp: max(AUDIT_TRAIL=0, UNKNOWN_RAW=6) = 6 = UNKNOWN_RAW
+        # Floor clamp: max(INTEGRAL=0, UNKNOWN_RAW=6) = 6 = UNKNOWN_RAW
         assert result["fb_fn"] == TaintState.UNKNOWN_RAW
 
     def test_fallback_floor_clamp_at_unknown_raw(self) -> None:
@@ -250,17 +250,17 @@ class TestFallbackBehavior:
         assert result["fb_fn"] == TaintState.UNKNOWN_RAW
 
     def test_fallback_degraded_by_callee(self) -> None:
-        """PIPELINE fallback calling EXTERNAL_RAW -> degraded to EXTERNAL_RAW."""
+        """ASSURED fallback calling EXTERNAL_RAW -> degraded to EXTERNAL_RAW."""
         edges = {"fb_fn": {"ext_fn"}, "ext_fn": set()}
         taint_map = {
-            "fb_fn": TaintState.PIPELINE,
+            "fb_fn": TaintState.ASSURED,
             "ext_fn": TaintState.EXTERNAL_RAW,
         }
         taint_sources = {"fb_fn": "fallback", "ext_fn": "decorator"}
         result, _, _diags = propagate_callgraph_taints(
             edges, taint_map, taint_sources, {"fb_fn": 1, "ext_fn": 0}, {"fb_fn": 0, "ext_fn": 0}, return_taint_map=taint_map,
 )
-        # max(EXTERNAL_RAW=5, PIPELINE=1) = 5 = EXTERNAL_RAW
+        # max(EXTERNAL_RAW=5, ASSURED=1) = 5 = EXTERNAL_RAW
         assert result["fb_fn"] == TaintState.EXTERNAL_RAW
 
 
@@ -304,11 +304,11 @@ class TestDiamondPattern:
     """Diamond call pattern."""
 
     def test_diamond_pattern(self) -> None:
-        """A calls B(PIPELINE) and C(EXTERNAL_RAW) -> A stays UNKNOWN_RAW (floor clamp)."""
+        """A calls B(ASSURED) and C(EXTERNAL_RAW) -> A stays UNKNOWN_RAW (floor clamp)."""
         edges = {"A": {"B", "C"}, "B": set(), "C": set()}
         taint_map = {
             "A": TaintState.UNKNOWN_RAW,
-            "B": TaintState.PIPELINE,
+            "B": TaintState.ASSURED,
             "C": TaintState.EXTERNAL_RAW,
         }
         taint_sources = {"A": "fallback", "B": "decorator", "C": "decorator"}
@@ -404,7 +404,7 @@ class TestPostAssertions:
         # Test the assertion path by patching `current` after the loop.
         edges = {"anchor": {"dirty"}, "dirty": set()}
         taint_map = {
-            "anchor": TaintState.AUDIT_TRAIL,
+            "anchor": TaintState.INTEGRAL,
             "dirty": TaintState.EXTERNAL_RAW,
         }
         taint_sources = {"anchor": "decorator", "dirty": "fallback"}
@@ -414,7 +414,7 @@ class TestPostAssertions:
             edges, taint_map, taint_sources,
             {"anchor": 1, "dirty": 0}, {"anchor": 0, "dirty": 0}, return_taint_map=taint_map,
 )
-        assert result["anchor"] == TaintState.AUDIT_TRAIL
+        assert result["anchor"] == TaintState.INTEGRAL
 
         # Test the assertion path by monkey-patching. We simulate a bug where
         # the anchored value gets corrupted after the main loop.
@@ -437,15 +437,15 @@ class TestPostAssertions:
         # invariant: trust_rank(result) >= trust_rank(input) for module_default.
         edges = {"mod_fn": {"audit_fn"}, "audit_fn": set()}
         taint_map = {
-            "mod_fn": TaintState.PIPELINE,
-            "audit_fn": TaintState.AUDIT_TRAIL,
+            "mod_fn": TaintState.ASSURED,
+            "audit_fn": TaintState.INTEGRAL,
         }
         taint_sources = {"mod_fn": "module_default", "audit_fn": "decorator"}
         result, _, _diags = propagate_callgraph_taints(
             edges, taint_map, taint_sources,
             {"mod_fn": 1, "audit_fn": 0}, {"mod_fn": 0, "audit_fn": 0}, return_taint_map=taint_map,
 )
-        # PIPELINE rank = 1, result should be >= 1
+        # ASSURED rank = 1, result should be >= 1
         assert TRUST_RANK[result["mod_fn"]] >= TRUST_RANK[taint_map["mod_fn"]]
 
 
@@ -454,11 +454,11 @@ class TestProvenanceRecords:
 
     def test_provenance_records(self) -> None:
         """Each function has correct provenance source and via_callee."""
-        # Use PIPELINE fallback so A CAN be refined (floor clamp at PIPELINE=rank 1)
+        # Use ASSURED fallback so A CAN be refined (floor clamp at ASSURED=rank 1)
         edges = {"A": {"B", "C"}, "B": set(), "C": set()}
         taint_map = {
-            "A": TaintState.PIPELINE,
-            "B": TaintState.PIPELINE,
+            "A": TaintState.ASSURED,
+            "B": TaintState.ASSURED,
             "C": TaintState.EXTERNAL_RAW,
         }
         taint_sources = {"A": "fallback", "B": "decorator", "C": "decorator"}
@@ -488,7 +488,7 @@ class TestProvenanceRecords:
         """Unrefined floating functions have provenance with correct source."""
         edges = {"mod_fn": set(), "fb_fn": set()}
         taint_map = {
-            "mod_fn": TaintState.PIPELINE,
+            "mod_fn": TaintState.ASSURED,
             "fb_fn": TaintState.UNKNOWN_RAW,
         }
         taint_sources = {"mod_fn": "module_default", "fb_fn": "fallback"}
@@ -530,7 +530,7 @@ class TestL3LowResolution:
         edges = {"fn": {"callee"}, "callee": set()}
         taint_map = {
             "fn": TaintState.UNKNOWN_RAW,
-            "callee": TaintState.AUDIT_TRAIL,
+            "callee": TaintState.INTEGRAL,
         }
         taint_sources = {"fn": "fallback", "callee": "decorator"}
         _, prov, _diags = propagate_callgraph_taints(
@@ -548,10 +548,10 @@ class TestL3LowResolution:
         edges = {"fn": {"c1", "c2", "c3", "c4"}, "c1": set(), "c2": set(), "c3": set(), "c4": set()}
         taint_map = {
             "fn": TaintState.UNKNOWN_RAW,
-            "c1": TaintState.AUDIT_TRAIL,
-            "c2": TaintState.AUDIT_TRAIL,
-            "c3": TaintState.AUDIT_TRAIL,
-            "c4": TaintState.AUDIT_TRAIL,
+            "c1": TaintState.INTEGRAL,
+            "c2": TaintState.INTEGRAL,
+            "c3": TaintState.INTEGRAL,
+            "c4": TaintState.INTEGRAL,
         }
         taint_sources = {
             "fn": "fallback",
@@ -576,10 +576,10 @@ class TestDriftAndStale:
 
     def test_drift_and_stale_both_emitted(self) -> None:
         """Exception with both taint drift AND level stale -> both detectable from output."""
-        # Setup: function was PIPELINE at L1, now EXTERNAL_RAW at L3
+        # Setup: function was ASSURED at L1, now EXTERNAL_RAW at L3
         edges = {"fn": {"ext"}, "ext": set()}
         taint_map = {
-            "fn": TaintState.PIPELINE,
+            "fn": TaintState.ASSURED,
             "ext": TaintState.EXTERNAL_RAW,
         }
         taint_sources = {"fn": "module_default", "ext": "decorator"}
@@ -587,7 +587,7 @@ class TestDriftAndStale:
             edges, taint_map, taint_sources,
             {"fn": 1, "ext": 0}, {"fn": 0, "ext": 0}, return_taint_map=taint_map,
 )
-        # Taint drifted from PIPELINE to EXTERNAL_RAW
+        # Taint drifted from ASSURED to EXTERNAL_RAW
         assert result["fn"] != taint_map["fn"] or result["fn"] == TaintState.EXTERNAL_RAW
         assert result["fn"] == TaintState.EXTERNAL_RAW
         # Provenance records the refinement
@@ -600,10 +600,10 @@ class TestViaCalleeTieBreaking:
 
     def test_via_callee_tie_breaking(self) -> None:
         """When two callees have the same rank, via_callee is alphabetically first."""
-        # Use PIPELINE fallback so floor clamp allows refinement to EXTERNAL_RAW
+        # Use ASSURED fallback so floor clamp allows refinement to EXTERNAL_RAW
         edges = {"A": {"beta", "alpha"}, "alpha": set(), "beta": set()}
         taint_map = {
-            "A": TaintState.PIPELINE,
+            "A": TaintState.ASSURED,
             "alpha": TaintState.EXTERNAL_RAW,
             "beta": TaintState.EXTERNAL_RAW,
         }
@@ -617,11 +617,11 @@ class TestViaCalleeTieBreaking:
 
     def test_via_callee_picks_least_trusted(self) -> None:
         """via_callee records the callee with highest trust rank (least trusted)."""
-        # Use PIPELINE fallback so floor clamp allows refinement
+        # Use ASSURED fallback so floor clamp allows refinement
         edges = {"A": {"safe", "dirty"}, "safe": set(), "dirty": set()}
         taint_map = {
-            "A": TaintState.PIPELINE,
-            "safe": TaintState.AUDIT_TRAIL,
+            "A": TaintState.ASSURED,
+            "safe": TaintState.INTEGRAL,
             "dirty": TaintState.EXTERNAL_RAW,
         }
         taint_sources = {"A": "fallback", "safe": "decorator", "dirty": "decorator"}
@@ -637,11 +637,11 @@ class TestSafetyBoundNotHit:
 
     def test_safety_bound_not_hit(self) -> None:
         """Normal graph -> iterations < bound (no warning)."""
-        # Simple chain with PIPELINE fallbacks so floor clamp allows refinement
+        # Simple chain with ASSURED fallbacks so floor clamp allows refinement
         edges = {"A": {"B"}, "B": {"C"}, "C": set()}
         taint_map = {
-            "A": TaintState.PIPELINE,
-            "B": TaintState.PIPELINE,
+            "A": TaintState.ASSURED,
+            "B": TaintState.ASSURED,
             "C": TaintState.EXTERNAL_RAW,
         }
         taint_sources = {"A": "fallback", "B": "fallback", "C": "decorator"}
@@ -659,10 +659,10 @@ class TestReturnTaintMapSplit:
 
     def test_floating_caller_gets_callee_return_taint(self) -> None:
         """A floating function calling @validates_shape should be refined
-        using the callee's RETURN taint (SHAPE_VALIDATED), not its body
+        using the callee's RETURN taint (GUARDED), not its body
         taint (EXTERNAL_RAW).
         """
-        # caller (floating) → validator (anchored, body=EXTERNAL_RAW, return=SHAPE_VALIDATED)
+        # caller (floating) → validator (anchored, body=EXTERNAL_RAW, return=GUARDED)
         edges = {"caller": {"validator"}, "validator": set()}
         body_taint_map = {
             "caller": TaintState.UNKNOWN_RAW,
@@ -670,7 +670,7 @@ class TestReturnTaintMapSplit:
         }
         return_taint_map = {
             "caller": TaintState.UNKNOWN_RAW,
-            "validator": TaintState.SHAPE_VALIDATED,  # return taint (OUTPUT tier)
+            "validator": TaintState.GUARDED,  # return taint (OUTPUT tier)
         }
         taint_sources = {"caller": "fallback", "validator": "decorator"}
 
@@ -681,7 +681,7 @@ class TestReturnTaintMapSplit:
         )
 
         # caller's L3-refined taint should reflect the RETURN taint of the
-        # validator (SHAPE_VALIDATED rank=2), floored by its L1 rank
+        # validator (GUARDED rank=2), floored by its L1 rank
         # (UNKNOWN_RAW rank=6). max(2, 6) = 6 → UNKNOWN_RAW.
         # The key assertion: the validator's BODY taint (EXTERNAL_RAW rank=5)
         # was NOT used — if it were, we'd get the same result here but for
@@ -690,17 +690,17 @@ class TestReturnTaintMapSplit:
         assert result["validator"] == TaintState.EXTERNAL_RAW  # anchored, unchanged
 
     def test_module_default_caller_refined_by_return_taint(self) -> None:
-        """A module_default AUDIT_TRAIL function calling @validates_shape
-        should be refined using SHAPE_VALIDATED (return), not EXTERNAL_RAW (body).
+        """A module_default INTEGRAL function calling @validates_shape
+        should be refined using GUARDED (return), not EXTERNAL_RAW (body).
         """
         edges = {"caller": {"validator"}, "validator": set()}
         body_taint_map = {
-            "caller": TaintState.AUDIT_TRAIL,
+            "caller": TaintState.INTEGRAL,
             "validator": TaintState.EXTERNAL_RAW,
         }
         return_taint_map = {
-            "caller": TaintState.AUDIT_TRAIL,
-            "validator": TaintState.SHAPE_VALIDATED,
+            "caller": TaintState.INTEGRAL,
+            "validator": TaintState.GUARDED,
         }
         taint_sources = {"caller": "module_default", "validator": "decorator"}
 
@@ -710,8 +710,8 @@ class TestReturnTaintMapSplit:
             return_taint_map=return_taint_map,
         )
 
-        # caller: max(SHAPE_VALIDATED_rank=2, AUDIT_TRAIL_rank=0) = 2 → SHAPE_VALIDATED
+        # caller: max(GUARDED_rank=2, INTEGRAL_rank=0) = 2 → GUARDED
         # If body taint (EXTERNAL_RAW rank=5) were used instead:
         #   max(5, 0) = 5 → EXTERNAL_RAW (WRONG — over-tainting)
-        assert result["caller"] == TaintState.SHAPE_VALIDATED
+        assert result["caller"] == TaintState.GUARDED
         assert prov["caller"].source == "callgraph"

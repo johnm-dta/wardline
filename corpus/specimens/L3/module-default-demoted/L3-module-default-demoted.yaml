@@ -1,7 +1,7 @@
 ---
 # schema_version: 0.1
 specimen_id: "L3-module-default-demoted"
-description: "L3: module_tiers PIPELINE function calls @external_boundary — refined to EXTERNAL_RAW"
+description: "L3: module_tiers ASSURED function calls @external_boundary — refined to EXTERNAL_RAW"
 rule: "PY-WL-001"
 fragment: |
   from wardline.decorators import external_boundary

@@ -99,9 +99,9 @@ class TestResolveBoundaries:
             ),
         )
         manifest = WardlineManifest(
-            module_tiers=(ModuleTierEntry(path="core", default_taint="AUDIT_TRAIL"),),
+            module_tiers=(ModuleTierEntry(path="core", default_taint="INTEGRAL"),),
             tiers=(
-                TierEntry(id="AUDIT_TRAIL", tier=1),
+                TierEntry(id="INTEGRAL", tier=1),
                 TierEntry(id="EXTERNAL_RAW", tier=4),
             ),
         )

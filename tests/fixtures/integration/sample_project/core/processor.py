@@ -1,6 +1,6 @@
 """Fixture: core module with PY-WL-002 and PY-WL-003 patterns.
 
-This file lives under core/ which has PIPELINE default taint
+This file lives under core/ which has ASSURED default taint
 in the fixture manifest.
 """
 

@@ -21,22 +21,22 @@ from wardline.scanner.taint.function_level import assign_function_taints
 BODY_EVAL_EXPECTED: dict[str, TaintState] = {
     "validates_shape": TaintState.EXTERNAL_RAW,
     "validates_external": TaintState.EXTERNAL_RAW,
-    "validates_semantic": TaintState.SHAPE_VALIDATED,
-    "tier1_read": TaintState.AUDIT_TRAIL,
-    "audit_writer": TaintState.AUDIT_TRAIL,
-    "authoritative_construction": TaintState.AUDIT_TRAIL,
+    "validates_semantic": TaintState.GUARDED,
+    "integral_read": TaintState.INTEGRAL,
+    "integral_writer": TaintState.INTEGRAL,
+    "integral_construction": TaintState.INTEGRAL,
     "external_boundary": TaintState.EXTERNAL_RAW,
 }
 
 # ── Expected return taints (OUTPUT tier) ───────────────────────
 
 RETURN_EXPECTED: dict[str, TaintState] = {
-    "validates_shape": TaintState.SHAPE_VALIDATED,
-    "validates_external": TaintState.PIPELINE,
-    "validates_semantic": TaintState.PIPELINE,
-    "tier1_read": TaintState.AUDIT_TRAIL,
-    "audit_writer": TaintState.AUDIT_TRAIL,
-    "authoritative_construction": TaintState.AUDIT_TRAIL,
+    "validates_shape": TaintState.GUARDED,
+    "validates_external": TaintState.ASSURED,
+    "validates_semantic": TaintState.ASSURED,
+    "integral_read": TaintState.INTEGRAL,
+    "integral_writer": TaintState.INTEGRAL,
+    "integral_construction": TaintState.INTEGRAL,
     "external_boundary": TaintState.EXTERNAL_RAW,
 }
 

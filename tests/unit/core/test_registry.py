@@ -31,18 +31,18 @@ def test_registry_has_all_group1_decorators() -> None:
         "validates_shape",
         "validates_semantic",
         "validates_external",
-        "tier1_read",
-        "audit_writer",
-        "authoritative_construction",
+        "integral_read",
+        "integral_writer",
+        "integral_construction",
     }
     registered = {name for name, entry in REGISTRY.items() if entry.group == 1}
     assert registered == group1_names
 
 
 def test_registry_has_group2_decorator() -> None:
-    """Group 2 audit_critical must be registered."""
-    assert "audit_critical" in REGISTRY
-    assert REGISTRY["audit_critical"].group == 2
+    """Group 2 integrity_critical must be registered."""
+    assert "integrity_critical" in REGISTRY
+    assert REGISTRY["integrity_critical"].group == 2
 
 
 def test_group_10_matches_authoritative_binding() -> None:

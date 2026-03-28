@@ -104,9 +104,9 @@ class TestSarifResults:
         assert "wardline.analysisLevel" in props
 
     def test_result_property_bag_contains_explicit_taint_state(self) -> None:
-        report = SarifReport(findings=[_make_finding(taint_state="PIPELINE")])
+        report = SarifReport(findings=[_make_finding(taint_state="ASSURED")])
         result = report.to_dict()["runs"][0]["results"][0]
-        assert result["properties"]["wardline.taintState"] == "PIPELINE"
+        assert result["properties"]["wardline.taintState"] == "ASSURED"
 
     def test_result_property_bag_defaults_taint_state_when_missing(self) -> None:
         report = SarifReport(findings=[_make_finding(taint_state=None)])

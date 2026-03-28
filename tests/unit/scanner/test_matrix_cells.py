@@ -39,13 +39,13 @@ T = Exceptionability.TRANSPARENT
 
 # Taint states in canonical matrix column order
 TAINT_STATES = [
-    TaintState.AUDIT_TRAIL,
-    TaintState.PIPELINE,
-    TaintState.SHAPE_VALIDATED,
+    TaintState.INTEGRAL,
+    TaintState.ASSURED,
+    TaintState.GUARDED,
     TaintState.EXTERNAL_RAW,
     TaintState.UNKNOWN_RAW,
-    TaintState.UNKNOWN_SHAPE_VALIDATED,
-    TaintState.UNKNOWN_SEM_VALIDATED,
+    TaintState.UNKNOWN_GUARDED,
+    TaintState.UNKNOWN_ASSURED,
     TaintState.MIXED_RAW,
 ]
 

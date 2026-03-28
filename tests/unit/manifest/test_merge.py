@@ -270,14 +270,14 @@ class TestResolveModuleTier:
     def test_longest_prefix_wins(self) -> None:
         module_tiers = (
             ModuleTierEntry(path="src/adapters", default_taint="EXTERNAL_RAW"),
-            ModuleTierEntry(path="src/adapters/partner", default_taint="PIPELINE"),
+            ModuleTierEntry(path="src/adapters/partner", default_taint="ASSURED"),
         )
-        tier_map = {"EXTERNAL_RAW": 4, "PIPELINE": 2}
+        tier_map = {"EXTERNAL_RAW": 4, "ASSURED": 2}
         assert _resolve_module_tier("src/adapters/partner", module_tiers, tier_map) == 2
 
     def test_no_match_returns_none(self) -> None:
-        module_tiers = (ModuleTierEntry(path="src/core", default_taint="AUDIT_TRAIL"),)
-        tier_map = {"AUDIT_TRAIL": 1}
+        module_tiers = (ModuleTierEntry(path="src/core", default_taint="INTEGRAL"),)
+        tier_map = {"INTEGRAL": 1}
         assert _resolve_module_tier("src/other", module_tiers, tier_map) is None
 
     def test_default_taint_not_in_tiers_returns_none(self) -> None:
@@ -300,12 +300,12 @@ class TestBoundaryTierEnforcement:
     def _manifest_with_tiers(self) -> WardlineManifest:
         return WardlineManifest(
             tiers=(
-                TierEntry(id="AUDIT_TRAIL", tier=1),
-                TierEntry(id="PIPELINE", tier=2),
+                TierEntry(id="INTEGRAL", tier=1),
+                TierEntry(id="ASSURED", tier=2),
                 TierEntry(id="EXTERNAL_RAW", tier=4),
             ),
             module_tiers=(
-                ModuleTierEntry(path="src/core", default_taint="AUDIT_TRAIL"),
+                ModuleTierEntry(path="src/core", default_taint="INTEGRAL"),
                 ModuleTierEntry(path="src/adapters", default_taint="EXTERNAL_RAW"),
             ),
         )

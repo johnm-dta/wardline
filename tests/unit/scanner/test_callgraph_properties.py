@@ -23,8 +23,8 @@ if TYPE_CHECKING:
 _ALL_TAINT_STATES = list(TaintState)
 _ALL_SOURCES: list[TaintSource] = ["decorator", "module_default", "fallback"]
 
-# L1 rank for AUDIT_TRAIL (most trusted, used as default for empty callee sets)
-_L1_RANK = TRUST_RANK[TaintState.AUDIT_TRAIL]
+# L1 rank for INTEGRAL (most trusted, used as default for empty callee sets)
+_L1_RANK = TRUST_RANK[TaintState.INTEGRAL]
 
 
 def _node_names(n: int) -> list[str]:

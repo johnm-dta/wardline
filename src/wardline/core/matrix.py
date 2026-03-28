@@ -11,12 +11,12 @@ permitted.
 
 Severity scales with the *consequence* of the pattern at that tier:
 
-- **T1 (INTEGRAL/AUDIT_TRAIL):** ERROR or UNCONDITIONAL — fabricated
+- **T1 (INTEGRAL/INTEGRAL):** ERROR or UNCONDITIONAL — fabricated
   defaults or unchecked structure in authoritative code undermines the
   guarantees that tier exists to provide.
-- **T2 (ASSURED/PIPELINE):** ERROR/STANDARD — validated data should not
+- **T2 (ASSURED/ASSURED):** ERROR/STANDARD — validated data should not
   need fallback defaults; if it does, that's suspicious but exceptionable.
-- **T3 (GUARDED/SHAPE_VALIDATED):** WARNING — partially validated data
+- **T3 (GUARDED/GUARDED):** WARNING — partially validated data
   may legitimately use defensive access; flag for review, don't block.
 - **T4 (EXTERNAL_RAW):** SUPPRESS or WARNING — this IS boundary code;
   the enforcement happens when data crosses upward, not at the access site.
@@ -54,16 +54,16 @@ class SeverityCell:
 
 
 # Column order matches spec §7.3:
-# AUDIT_TRAIL, PIPELINE, SHAPE_VALIDATED, EXTERNAL_RAW,
-# UNKNOWN_RAW, UNKNOWN_SHAPE_VALIDATED, UNKNOWN_SEM_VALIDATED, MIXED_RAW
+# INTEGRAL, ASSURED, GUARDED, EXTERNAL_RAW,
+# UNKNOWN_RAW, UNKNOWN_GUARDED, UNKNOWN_ASSURED, MIXED_RAW
 _TAINT_ORDER = [
-    TaintState.AUDIT_TRAIL,
-    TaintState.PIPELINE,
-    TaintState.SHAPE_VALIDATED,
+    TaintState.INTEGRAL,
+    TaintState.ASSURED,
+    TaintState.GUARDED,
     TaintState.EXTERNAL_RAW,
     TaintState.UNKNOWN_RAW,
-    TaintState.UNKNOWN_SHAPE_VALIDATED,
-    TaintState.UNKNOWN_SEM_VALIDATED,
+    TaintState.UNKNOWN_GUARDED,
+    TaintState.UNKNOWN_ASSURED,
     TaintState.MIXED_RAW,
 ]
 

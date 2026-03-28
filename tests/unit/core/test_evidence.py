@@ -11,11 +11,11 @@ from wardline.core.taints import TaintState
 EVIDENCE_MATRIX = [
     # (structural, semantic, integrity, institutional, expected)
     # --- 6 spec-table rows ---
-    (True, True, True, True, TaintState.AUDIT_TRAIL),
-    (True, True, False, True, TaintState.PIPELINE),
-    (True, False, False, True, TaintState.SHAPE_VALIDATED),
-    (True, True, False, False, TaintState.UNKNOWN_SEM_VALIDATED),
-    (True, False, False, False, TaintState.UNKNOWN_SHAPE_VALIDATED),
+    (True, True, True, True, TaintState.INTEGRAL),
+    (True, True, False, True, TaintState.ASSURED),
+    (True, False, False, True, TaintState.GUARDED),
+    (True, True, False, False, TaintState.UNKNOWN_ASSURED),
+    (True, False, False, False, TaintState.UNKNOWN_GUARDED),
     (False, False, False, False, TaintState.UNKNOWN_RAW),
     # --- Off-table: structural=False with downstream True ---
     (False, True, False, False, TaintState.UNKNOWN_RAW),
@@ -26,9 +26,9 @@ EVIDENCE_MATRIX = [
     (False, False, True, True, TaintState.UNKNOWN_RAW),
     (False, True, True, True, TaintState.UNKNOWN_RAW),
     # --- Off-table: structural=True, institutional-gate ---
-    (True, True, True, False, TaintState.UNKNOWN_SEM_VALIDATED),
-    (True, False, True, False, TaintState.UNKNOWN_SHAPE_VALIDATED),
-    (True, False, True, True, TaintState.SHAPE_VALIDATED),
+    (True, True, True, False, TaintState.UNKNOWN_ASSURED),
+    (True, False, True, False, TaintState.UNKNOWN_GUARDED),
+    (True, False, True, True, TaintState.GUARDED),
 ]
 
 @pytest.mark.parametrize(

@@ -63,14 +63,14 @@ class TestTaintMapMissLogging:
         rule = _StubRule()
         ctx = ScanContext(
             file_path="example.py",
-            function_level_taint_map={"known_func": TaintState.PIPELINE},
+            function_level_taint_map={"known_func": TaintState.ASSURED},
         )
         rule.set_context(ctx)
 
         with caplog.at_level(logging.DEBUG, logger="wardline.scanner.rules.base"):
             result = rule._get_function_taint("known_func")
 
-        assert result == TaintState.PIPELINE
+        assert result == TaintState.ASSURED
         assert not any("Taint map miss" in r.message for r in caplog.records)
 
     def test_no_context_returns_unknown_raw_no_log(
@@ -105,7 +105,7 @@ class TestPyWl003SuppressionLogging:
 
         ctx = ScanContext(
             file_path="/mod.py",
-            function_level_taint_map={"validate_input": TaintState.SHAPE_VALIDATED},
+            function_level_taint_map={"validate_input": TaintState.GUARDED},
             boundaries=(boundary,),
         )
         rule.set_context(ctx)
@@ -188,7 +188,7 @@ class TestTaintHitRateWarning:
 
         manifest = WardlineManifest(
             module_tiers=(
-                ModuleTierEntry(path=str(tmp_path), default_taint="PIPELINE"),
+                ModuleTierEntry(path=str(tmp_path), default_taint="ASSURED"),
             ),
         )
 
@@ -242,9 +242,9 @@ class TestTaintConflictFinding:
 
         py_file = tmp_path / "conflict.py"
         py_file.write_text(
-            "from wardline.decorators import external_boundary, tier1_read\n"
+            "from wardline.decorators import external_boundary, integral_read\n"
             "@external_boundary\n"
-            "@tier1_read\n"
+            "@integral_read\n"
             "def mixed():\n"
             "    pass\n"
         )

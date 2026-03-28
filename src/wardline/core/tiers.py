@@ -24,11 +24,11 @@ class AuthorityTier(IntEnum):
 
 
 TAINT_TO_TIER: MappingProxyType[TaintState, AuthorityTier] = MappingProxyType({
-    TaintState.AUDIT_TRAIL: AuthorityTier.TIER_1,
-    TaintState.PIPELINE: AuthorityTier.TIER_2,
-    TaintState.SHAPE_VALIDATED: AuthorityTier.TIER_3,
-    TaintState.UNKNOWN_SEM_VALIDATED: AuthorityTier.TIER_3,
-    TaintState.UNKNOWN_SHAPE_VALIDATED: AuthorityTier.TIER_3,
+    TaintState.INTEGRAL: AuthorityTier.TIER_1,
+    TaintState.ASSURED: AuthorityTier.TIER_2,
+    TaintState.GUARDED: AuthorityTier.TIER_3,
+    TaintState.UNKNOWN_ASSURED: AuthorityTier.TIER_3,
+    TaintState.UNKNOWN_GUARDED: AuthorityTier.TIER_3,
     TaintState.EXTERNAL_RAW: AuthorityTier.TIER_4,
     TaintState.UNKNOWN_RAW: AuthorityTier.TIER_4,
     TaintState.MIXED_RAW: AuthorityTier.TIER_4,

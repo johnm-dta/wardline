@@ -9,6 +9,6 @@ module_tiers:
   - path: "adapters/"
     default_taint: "EXTERNAL_RAW"
   - path: "core/"
-    default_taint: "PIPELINE"
+    default_taint: "ASSURED"
 metadata:
   organisation: "WardlineTestOrg"

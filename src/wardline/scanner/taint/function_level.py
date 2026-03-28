@@ -62,23 +62,23 @@ logger = logging.getLogger(__name__)
 BODY_EVAL_TAINT: dict[str, TaintState] = {
     "external_boundary": TaintState.EXTERNAL_RAW,
     "validates_shape": TaintState.EXTERNAL_RAW,      # input: T4
-    "validates_semantic": TaintState.SHAPE_VALIDATED,  # input: T3
+    "validates_semantic": TaintState.GUARDED,  # input: T3
     "validates_external": TaintState.EXTERNAL_RAW,     # input: T4
-    "tier1_read": TaintState.AUDIT_TRAIL,
-    "audit_writer": TaintState.AUDIT_TRAIL,
-    "authoritative_construction": TaintState.AUDIT_TRAIL,
+    "integral_read": TaintState.INTEGRAL,
+    "integral_writer": TaintState.INTEGRAL,
+    "integral_construction": TaintState.INTEGRAL,
 }
 
 # Return value taint: the taint state assigned to the function's
 # return value for propagation to callers. This is the OUTPUT tier.
 RETURN_TAINT: dict[str, TaintState] = {
     "external_boundary": TaintState.EXTERNAL_RAW,
-    "validates_shape": TaintState.SHAPE_VALIDATED,     # output: T3
-    "validates_semantic": TaintState.PIPELINE,          # output: T2
-    "validates_external": TaintState.PIPELINE,          # output: T2
-    "tier1_read": TaintState.AUDIT_TRAIL,
-    "audit_writer": TaintState.AUDIT_TRAIL,
-    "authoritative_construction": TaintState.AUDIT_TRAIL,
+    "validates_shape": TaintState.GUARDED,     # output: T3
+    "validates_semantic": TaintState.ASSURED,          # output: T2
+    "validates_external": TaintState.ASSURED,          # output: T2
+    "integral_read": TaintState.INTEGRAL,
+    "integral_writer": TaintState.INTEGRAL,
+    "integral_construction": TaintState.INTEGRAL,
 }
 
 # Structural invariant: both maps must cover exactly the same decorators.

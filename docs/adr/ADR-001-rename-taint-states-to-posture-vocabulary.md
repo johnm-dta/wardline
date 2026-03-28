@@ -1,6 +1,6 @@
 # ADR-001: Rename taint state tokens from prototype names to posture vocabulary
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-03-28
 **Deciders**: Project Lead, Review Board
 **Context**: Canonical taint state tokens use prototype-era names that misrepresent their semantic scope

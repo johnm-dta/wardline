@@ -80,7 +80,7 @@ Any tool that implements Wardline-Core rules for the Python regime — whether a
     | Key | Type | Description |
     |-----|------|-------------|
     | `wardline.rule` | string | Binding rule ID (e.g., `PY-WL-001`) |
-    | `wardline.taintState` | string | Canonical taint state token (e.g., `AUDIT_TRAIL`) |
+    | `wardline.taintState` | string | Canonical taint state token (e.g., `INTEGRAL`) |
     | `wardline.severity` | string | `ERROR`, `WARNING`, or `SUPPRESS` |
     | `wardline.exceptionability` | string | `UNCONDITIONAL`, `STANDARD`, `RELAXED`, or `TRANSPARENT` |
     | `wardline.analysisLevel` | integer | Analysis level that produced the finding (1, 2, or 3) |
@@ -160,10 +160,10 @@ The 17 annotation groups are defined as language-agnostic semantic requirements 
 | 1 | | `@validates_shape` | *(none)* | Absence of rejection path in body produces a finding (WL-007). T4 → T3 constructor. |
 | 1 | | `@validates_semantic` | *(none)* | Absence of rejection path in body produces a finding (WL-007). Inputs that do not trace to `@validates_shape` output produce a finding (WL-008/PY-WL-009). T3 → T2 constructor. Validation scope declared in the overlay per Part I §13.1.2. |
 | 1 | | `@validates_external` | *(none)* | Combined T4 → T2. Absence of rejection path in body produces a finding (WL-007). The scanner verifies that the body performs both structural and semantic checks (§5.2). |
-| 1 | | `@tier1_read` | *(none)* | Body bans: `.get()` with defaults, `getattr()` with fallbacks, `hasattr()`, broad `except`. Return tagged TIER_1. |
-| 1 | | `@audit_writer` | *(none)* | Call-site bans: enclosing swallowing `except`. Audit call MUST dominate telemetry on shared execution paths. Violation produces a finding. Fallback paths that bypass the audit call produce a finding. Return tagged TIER_1. |
-| 1 | | `@authoritative_construction` | *(none)* | Same body restrictions as `@tier1_read`. Semantically equivalent to `@audit_writer` but for non-audit authoritative artefacts. Return tagged TIER_1. |
-| 2 | Audit Primacy | `@audit_critical` | *(none)* | Superset of `@audit_writer` — fallback paths at call sites that skip the audit call produce a finding. |
+| 1 | | `@integral_read` | *(none)* | Body bans: `.get()` with defaults, `getattr()` with fallbacks, `hasattr()`, broad `except`. Return tagged TIER_1. |
+| 1 | | `@integral_writer` | *(none)* | Call-site bans: enclosing swallowing `except`. Audit call MUST dominate telemetry on shared execution paths. Violation produces a finding. Fallback paths that bypass the audit call produce a finding. Return tagged TIER_1. |
+| 1 | | `@integral_construction` | *(none)* | Same body restrictions as `@integral_read`. Semantically equivalent to `@integral_writer` but for non-audit authoritative artefacts. Return tagged TIER_1. |
+| 2 | Audit Primacy | `@integrity_critical` | *(none)* | Superset of `@integral_writer` — fallback paths at call sites that skip the audit call produce a finding. |
 | 3 | Plugin Contract | `@system_plugin` | *(none)* | Body bans top-level broad `except`. Allows narrower `except` for external calls and row-value operations. "Wrap your external calls; let your own bugs crash." |
 | 4 | Data Provenance | `@int_data` | *(none)* | Tier 1 body restrictions. Return value is UNKNOWN_RAW unless composed with `@restoration_boundary`. Allow-list/deny-list on call targets. |
 | 5 | Schema Contracts | `@all_fields_mapped(source=Class)` | `source`: the class whose fields are verified to all appear in the body | Verifies every field on `source` appears as attribute access on the parameter. |
@@ -175,7 +175,7 @@ The 17 annotation groups are defined as language-agnostic semantic requirements 
 | 9 | Operation Semantics | `@idempotent` | *(none)* | First state-modifying call not preceded by existence/dedup guard produces a finding. |
 | 9 | | `@atomic` | *(none)* | Multiple state-modifying calls outside transaction context produce a finding. |
 | 9 | | `@compensatable(rollback=fn)` | `rollback`: reference to rollback function | Scanner verifies rollback function exists with compatible signature. |
-| 10 | Failure Mode | `@fail_closed` | *(none)* | Same body restrictions as `@tier1_read`. Carries implicit `@must_propagate`. Severity lookups use AUDIT_TRAIL. |
+| 10 | Failure Mode | `@fail_closed` | *(none)* | Same body restrictions as `@integral_read`. Carries implicit `@must_propagate`. Severity lookups use INTEGRAL. |
 | 10 | | `@fail_open` | *(none)* | Explicitly permits graceful degradation patterns. Composition requirement: absence of a trust classification decorator produces a WARNING. |
 | 10 | | `@emits_or_explains` | *(none)* | Return/exit paths that do not reach an emit call or an explain/logging call produce a finding. |
 | 10 | | `@exception_boundary` | *(none)* | Authorises exception handling from high-stakes call sites. Still subject to PY-WL-005. Placement governed via `wardline.toml` (lenient/controlled/strict modes). |
@@ -189,7 +189,7 @@ The 17 annotation groups are defined as language-agnostic semantic requirements 
 | 13 | Concurrency/Ordering | `@thread_safe` | *(none)* | Body that does not protect shared mutable state and is not pure produces a finding. |
 | 13 | | `@ordered_after(name)` | `name`: function name that is verified to precede | At call sites where both functions appear, the named function not lexically preceding produces a finding. |
 | 13 | | `@not_reentrant` | *(none)* | Call graph cycle detection through the decorated function. |
-| 14 | Access/Attribution | `@requires_identity` | *(none)* | Absence of identity-typed parameter in `@audit_writer`/`@audit_critical` call within body produces a finding. |
+| 14 | Access/Attribution | `@requires_identity` | *(none)* | Absence of identity-typed parameter in `@integral_writer`/`@integrity_critical` call within body produces a finding. |
 | 14 | | `@privileged_operation` | *(none)* | State-modifying call not preceded by authorisation check produces a finding. |
 | 15 | Lifecycle/Scope | `@test_only` | *(none)* | Import of this symbol from a production module produces a finding. |
 | 15 | | `@deprecated_by(date=str, replacement=str)` | `date`: expiry date; `replacement`: replacement function | Post-expiry: blocking. Pre-expiry: advisory. |
@@ -206,9 +206,9 @@ The 17 annotation groups are defined as language-agnostic semantic requirements 
 | `@validates_shape` | `@trust_boundary(from_tier=4, to_tier=3)` | |
 | `@validates_semantic` | `@trust_boundary(from_tier=3, to_tier=2)` | |
 | `@validates_external` | `@trust_boundary(from_tier=4, to_tier=2)` | |
-| `@tier1_read` | Sources TIER_1 (no `from_tier`) | |
-| `@audit_writer` | `@trust_boundary(from_tier=2, to_tier=1)` + call-site enforcement | Audit-ordering semantics not expressible via `@trust_boundary` alone |
-| `@authoritative_construction` | `@trust_boundary(from_tier=2, to_tier=1)` | |
+| `@integral_read` | Sources TIER_1 (no `from_tier`) | |
+| `@integral_writer` | `@trust_boundary(from_tier=2, to_tier=1)` + call-site enforcement | Audit-ordering semantics not expressible via `@trust_boundary` alone |
+| `@integral_construction` | `@trust_boundary(from_tier=2, to_tier=1)` | |
 
 ##### A.4.3 Non-obvious design rationale
 
@@ -227,50 +227,50 @@ The 17 annotation groups are defined as language-agnostic semantic requirements 
 | Decorator | Input tier | Body evaluation severity | PY-WL-003 (existence-checking) suppression |
 |-----------|-----------|-------------------------|----------------------|
 | `@validates_shape` | TIER_4 | EXTERNAL_RAW | Yes — existence-checking is the purpose of shape validation |
-| `@validates_semantic` | TIER_3 | SHAPE_VALIDATED | No — structural guarantees already established |
+| `@validates_semantic` | TIER_3 | GUARDED | No — structural guarantees already established |
 | `@validates_external` | TIER_4 | EXTERNAL_RAW | Yes — encompasses shape validation |
 
-**`@fail_closed` strictness ordering.** When decorators compose, severity dominates exceptionability: ERROR > WARNING > SUPPRESS regardless of exceptionability class. Within the same severity, exceptionability is ordered UNCONDITIONAL > STANDARD > RELAXED. When `@fail_closed` is composed with a validation boundary decorator, body pattern rules fire at ERROR severity but exceptionability is capped at STANDARD — the findings remain governable. UNCONDITIONAL exceptionability is reserved for AUDIT_TRAIL-native contexts.
+**`@fail_closed` strictness ordering.** When decorators compose, severity dominates exceptionability: ERROR > WARNING > SUPPRESS regardless of exceptionability class. Within the same severity, exceptionability is ordered UNCONDITIONAL > STANDARD > RELAXED. When `@fail_closed` is composed with a validation boundary decorator, body pattern rules fire at ERROR severity but exceptionability is capped at STANDARD — the findings remain governable. UNCONDITIONAL exceptionability is reserved for INTEGRAL-native contexts.
 
-**Exception translation boundaries.** The failure mode decorators (`@fail_closed`, `@fail_open`, `@emits_or_explains`) govern what happens *within* a function. The exception propagation decorators (`@exception_boundary`, `@must_propagate`, `@preserve_cause`) govern what happens to exceptions *after* they leave the function. Without `@exception_boundary`, a `@fail_closed` function correctly raises on failure — and then a caller three frames up catches with `except Exception: use_default()`, defeating the `@fail_closed` intent entirely. `@exception_boundary` declares which functions are architecturally authorised to make terminal policy decisions about exceptions from high-stakes paths. `@must_propagate` carries implicit from `@fail_closed` and `@audit_critical`.
+**Exception translation boundaries.** The failure mode decorators (`@fail_closed`, `@fail_open`, `@emits_or_explains`) govern what happens *within* a function. The exception propagation decorators (`@exception_boundary`, `@must_propagate`, `@preserve_cause`) govern what happens to exceptions *after* they leave the function. Without `@exception_boundary`, a `@fail_closed` function correctly raises on failure — and then a caller three frames up catches with `except Exception: use_default()`, defeating the `@fail_closed` intent entirely. `@exception_boundary` declares which functions are architecturally authorised to make terminal policy decisions about exceptions from high-stakes paths. `@must_propagate` carries implicit from `@fail_closed` and `@integrity_critical`.
 
 **Contradictory combination detection (SCN-021).** The scanner detects mutually exclusive decorator combinations as ERROR findings. The 29 detected combinations (26 contradictory, 3 suspicious) are:
 
 | # | Combination | Type | Rationale |
 |---|---|---|---|
 | 1 | `@fail_open` + `@fail_closed` | Contradictory | Mutually exclusive failure modes |
-| 2 | `@fail_open` + `@tier1_read` | Contradictory | Tier 1 requires strict (offensive) programming — fail-open is structurally incompatible |
-| 3 | `@fail_open` + `@audit_writer` | Contradictory | Audit writes must not silently degrade |
-| 4 | `@fail_open` + `@authoritative_construction` | Contradictory | Authoritative artefacts must not have fallback construction paths |
-| 5 | `@fail_open` + `@audit_critical` | Contradictory | Audit-critical paths must not have fallback paths |
+| 2 | `@fail_open` + `@integral_read` | Contradictory | Tier 1 requires strict (offensive) programming — fail-open is structurally incompatible |
+| 3 | `@fail_open` + `@integral_writer` | Contradictory | Audit writes must not silently degrade |
+| 4 | `@fail_open` + `@integral_construction` | Contradictory | Authoritative artefacts must not have fallback construction paths |
+| 5 | `@fail_open` + `@integrity_critical` | Contradictory | Audit-critical paths must not have fallback paths |
 | 6 | `@external_boundary` + `@int_data` | Contradictory | External and internal data sources are mutually exclusive |
-| 7 | `@external_boundary` + `@tier1_read` | Contradictory | External data is Tier 4; Tier 1 reads are internal |
-| 8 | `@external_boundary` + `@authoritative_construction` | Contradictory | External data cannot be directly authoritative |
+| 7 | `@external_boundary` + `@integral_read` | Contradictory | External data is Tier 4; Tier 1 reads are internal |
+| 8 | `@external_boundary` + `@integral_construction` | Contradictory | External data cannot be directly authoritative |
 | 9 | `@validates_shape` + `@validates_semantic` | Contradictory | Use `@validates_external` for combined T4→T2 |
-| 10 | `@validates_shape` + `@tier1_read` | Contradictory | Shape validation produces T3, not T1 |
+| 10 | `@validates_shape` + `@integral_read` | Contradictory | Shape validation produces T3, not T1 |
 | 11 | `@validates_semantic` + `@external_boundary` | Contradictory | Semantic validation operates on T3 input, not T4 |
 | 12 | `@exception_boundary` + `@must_propagate` | Contradictory | Exception boundaries terminate; must-propagate requires forwarding |
 | 13 | `@idempotent` + `@compensatable` | Contradictory | Idempotent operations need no compensation |
 | 14 | `@deterministic` + `@time_dependent` | Contradictory | Time-dependent operations are inherently non-deterministic |
 | 15 | `@deterministic` + `@external_boundary` | Contradictory | External calls are non-deterministic by definition |
-| 16 | `@tier1_read` + `@restoration_boundary` | Contradictory | Tier 1 reads access existing authoritative data; restoration reconstructs from raw representation |
-| 17 | `@audit_writer` + `@restoration_boundary` | Contradictory | Audit writes create new records; restoration reconstructs existing ones |
+| 16 | `@integral_read` + `@restoration_boundary` | Contradictory | Tier 1 reads access existing authoritative data; restoration reconstructs from raw representation |
+| 17 | `@integral_writer` + `@restoration_boundary` | Contradictory | Audit writes create new records; restoration reconstructs existing ones |
 | 18 | `@fail_closed` + `@emits_or_explains` | Contradictory | Fail-closed raises on failure; emits-or-explains requires structured error output |
-| 19 | `@audit_critical` + `@fail_open` | Contradictory | (Alias of #5 — caught regardless of decorator ordering) |
+| 19 | `@integrity_critical` + `@fail_open` | Contradictory | (Alias of #5 — caught regardless of decorator ordering) |
 | 20 | `@validates_external` + `@validates_shape` | Contradictory | `@validates_external` already encompasses shape validation |
 | 21 | `@validates_external` + `@validates_semantic` | Contradictory | `@validates_external` already encompasses semantic validation |
 | 22 | `@int_data` + `@validates_shape` | Contradictory | Internal data does not need shape validation (already T1) |
 | 23 | `@preserve_cause` + `@exception_boundary` | Contradictory | (Alias of #12 — `@preserve_cause` implies propagation) |
-| 24 | `@compensatable` + `@audit_writer` | Contradictory | Audit writes must not be compensated (reversed) |
+| 24 | `@compensatable` + `@integral_writer` | Contradictory | Audit writes must not be compensated (reversed) |
 | 25 | `@data_flow(produces=...)` + `@external_boundary` | Contradictory | External boundaries produce T4 data; data-flow produces declared-tier data |
-| 26 | `@system_plugin` + `@tier1_read` | Contradictory | Plugins receive external input; Tier 1 reads are internal |
+| 26 | `@system_plugin` + `@integral_read` | Contradictory | Plugins receive external input; Tier 1 reads are internal |
 | 27 | `@fail_open` + `@deterministic` | Suspicious | Fail-open with fallback defaults may produce non-deterministic output |
 | 28 | `@compensatable` + `@deterministic` | Suspicious | Compensation introduces state changes that may affect determinism |
 | 29 | `@time_dependent` + `@idempotent` | Suspicious | Time-dependent operations may not be idempotent across invocations |
 
 **Severity matrix.** The Python binding inherits the parent specification's 8×8 severity matrix (Part I §7.3). Where the binding splits a framework rule into binding-specific sub-rules (e.g., WL-001 → PY-WL-001 and PY-WL-002), the sub-rules inherit the framework rule's severity matrix entries with the following binding-level deviation:
 
-**PY-WL-002 (attribute access with fallback default).** PY-WL-002 derives from WL-001 but covers `getattr(obj, name, default)` and `obj.attr or default`. The `obj.attr or default` form has a falsy-substitution risk absent from dict-key access: it silently replaces *present but falsy* attribute values (0, `""`, `False`, `None`) with the default, not just missing attributes. For this reason, PY-WL-002 uses WARNING/RELAXED (not SUPPRESS/TRANSPARENT) at EXTERNAL_RAW, UNKNOWN_RAW, UNKNOWN_SHAPE_VALIDATED, and MIXED_RAW — the pattern is expected at T4 boundaries but the falsy-substitution risk warrants visibility. This deviation *narrows* relative to the framework's WL-001 SUPPRESS at those cells (it uses WARNING where the framework uses SUPPRESS), which is permitted by §7.3.
+**PY-WL-002 (attribute access with fallback default).** PY-WL-002 derives from WL-001 but covers `getattr(obj, name, default)` and `obj.attr or default`. The `obj.attr or default` form has a falsy-substitution risk absent from dict-key access: it silently replaces *present but falsy* attribute values (0, `""`, `False`, `None`) with the default, not just missing attributes. For this reason, PY-WL-002 uses WARNING/RELAXED (not SUPPRESS/TRANSPARENT) at EXTERNAL_RAW, UNKNOWN_RAW, UNKNOWN_GUARDED, and MIXED_RAW — the pattern is expected at T4 boundaries but the falsy-substitution risk warrants visibility. This deviation *narrows* relative to the framework's WL-001 SUPPRESS at those cells (it uses WARNING where the framework uses SUPPRESS), which is permitted by §7.3.
 
 The Python binding matrix for PY-WL-001 through PY-WL-009 (72 cells) is:
 
@@ -515,9 +515,9 @@ def validate_partner_semantics(dto: PartnerDTO) -> ValidatedPartner:
 **Step 4: Trusted construction — creating institutional authority (T2 → T1)**
 
 ```python
-from wardline import authoritative_construction
+from wardline import integral_construction
 
-@authoritative_construction
+@integral_construction
 def create_risk_assessment(
     partner: ValidatedPartner,
     context: AuditContext,
@@ -595,7 +595,7 @@ Each line is a tier transition. Each function has one decorator declaring one tr
       }],
       "properties": {
         "wardline.rule": "PY-WL-001",
-        "wardline.taintState": "AUDIT_TRAIL",
+        "wardline.taintState": "INTEGRAL",
         "wardline.severity": "ERROR",
         "wardline.exceptionability": "UNCONDITIONAL",
         "wardline.analysisLevel": 1,
@@ -615,7 +615,7 @@ Each line is a tier transition. Each function has one decorator declaring one tr
 }
 ```
 
-The SARIF output carries: the binding rule ID (`PY-WL-001`), the taint state of the enclosing context (`AUDIT_TRAIL`), the tier-graded severity (`ERROR`), the exceptionability class (`UNCONDITIONAL` — this finding cannot be excepted), and the analysis level. An assessor reading this finding knows immediately: a fabricated default was detected in a Tier 1 (audit trail) context, it is an unconditional error, and no exception can suppress it.
+The SARIF output carries: the binding rule ID (`PY-WL-001`), the taint state of the enclosing context (`INTEGRAL`), the tier-graded severity (`ERROR`), the exceptionability class (`UNCONDITIONAL` — this finding cannot be excepted), and the analysis level. An assessor reading this finding knows immediately: a fabricated default was detected in a Tier 1 (audit trail) context, it is an unconditional error, and no exception can suppress it.
 
 **Agent guidance note.** When generating code that interacts with wardline-annotated boundaries, agents should determine the input tier, the expected output tier, and the required transition — then apply the most specific decorator. If the tier is unknown, leave the function unannotated; UNKNOWN is safer than a wrong declaration. Full agent guidance is maintained as a living document outside the specification (evolved from Part III §37).
 

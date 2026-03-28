@@ -25,93 +25,93 @@ T = Exceptionability.TRANSPARENT
 # fmt: off
 EXPECTED: list[tuple[RuleId, TaintState, Severity, Exceptionability]] = [
     # PY-WL-001 (dict key access with fallback default) — inherits WL-001
-    (RuleId.PY_WL_001, TaintState.AUDIT_TRAIL, E, U),
-    (RuleId.PY_WL_001, TaintState.PIPELINE, E, St),
-    (RuleId.PY_WL_001, TaintState.SHAPE_VALIDATED, W, R),
+    (RuleId.PY_WL_001, TaintState.INTEGRAL, E, U),
+    (RuleId.PY_WL_001, TaintState.ASSURED, E, St),
+    (RuleId.PY_WL_001, TaintState.GUARDED, W, R),
     (RuleId.PY_WL_001, TaintState.EXTERNAL_RAW, Su, T),
     (RuleId.PY_WL_001, TaintState.UNKNOWN_RAW, Su, T),
-    (RuleId.PY_WL_001, TaintState.UNKNOWN_SHAPE_VALIDATED, W, R),
-    (RuleId.PY_WL_001, TaintState.UNKNOWN_SEM_VALIDATED, E, St),
+    (RuleId.PY_WL_001, TaintState.UNKNOWN_GUARDED, W, R),
+    (RuleId.PY_WL_001, TaintState.UNKNOWN_ASSURED, E, St),
     (RuleId.PY_WL_001, TaintState.MIXED_RAW, Su, T),
 
     # PY-WL-002 (attribute access with fallback default) — inherits WL-001
-    (RuleId.PY_WL_002, TaintState.AUDIT_TRAIL, E, U),
-    (RuleId.PY_WL_002, TaintState.PIPELINE, E, St),
-    (RuleId.PY_WL_002, TaintState.SHAPE_VALIDATED, W, R),
+    (RuleId.PY_WL_002, TaintState.INTEGRAL, E, U),
+    (RuleId.PY_WL_002, TaintState.ASSURED, E, St),
+    (RuleId.PY_WL_002, TaintState.GUARDED, W, R),
     (RuleId.PY_WL_002, TaintState.EXTERNAL_RAW, W, R),
     (RuleId.PY_WL_002, TaintState.UNKNOWN_RAW, W, R),
-    (RuleId.PY_WL_002, TaintState.UNKNOWN_SHAPE_VALIDATED, W, R),
-    (RuleId.PY_WL_002, TaintState.UNKNOWN_SEM_VALIDATED, E, St),
+    (RuleId.PY_WL_002, TaintState.UNKNOWN_GUARDED, W, R),
+    (RuleId.PY_WL_002, TaintState.UNKNOWN_ASSURED, E, St),
     (RuleId.PY_WL_002, TaintState.MIXED_RAW, W, St),
 
     # PY-WL-003 = WL-002 (existence-checking as structural gate)
-    (RuleId.PY_WL_003, TaintState.AUDIT_TRAIL, E, U),
-    (RuleId.PY_WL_003, TaintState.PIPELINE, E, U),
-    (RuleId.PY_WL_003, TaintState.SHAPE_VALIDATED, E, St),
+    (RuleId.PY_WL_003, TaintState.INTEGRAL, E, U),
+    (RuleId.PY_WL_003, TaintState.ASSURED, E, U),
+    (RuleId.PY_WL_003, TaintState.GUARDED, E, St),
     (RuleId.PY_WL_003, TaintState.EXTERNAL_RAW, Su, T),
     (RuleId.PY_WL_003, TaintState.UNKNOWN_RAW, Su, T),
-    (RuleId.PY_WL_003, TaintState.UNKNOWN_SHAPE_VALIDATED, E, St),
-    (RuleId.PY_WL_003, TaintState.UNKNOWN_SEM_VALIDATED, E, St),
+    (RuleId.PY_WL_003, TaintState.UNKNOWN_GUARDED, E, St),
+    (RuleId.PY_WL_003, TaintState.UNKNOWN_ASSURED, E, St),
     (RuleId.PY_WL_003, TaintState.MIXED_RAW, Su, T),
 
     # PY-WL-004 = WL-003 (catching all exceptions broadly)
-    (RuleId.PY_WL_004, TaintState.AUDIT_TRAIL, E, U),
-    (RuleId.PY_WL_004, TaintState.PIPELINE, E, St),
-    (RuleId.PY_WL_004, TaintState.SHAPE_VALIDATED, W, St),
+    (RuleId.PY_WL_004, TaintState.INTEGRAL, E, U),
+    (RuleId.PY_WL_004, TaintState.ASSURED, E, St),
+    (RuleId.PY_WL_004, TaintState.GUARDED, W, St),
     (RuleId.PY_WL_004, TaintState.EXTERNAL_RAW, W, R),
     (RuleId.PY_WL_004, TaintState.UNKNOWN_RAW, E, St),
-    (RuleId.PY_WL_004, TaintState.UNKNOWN_SHAPE_VALIDATED, W, St),
-    (RuleId.PY_WL_004, TaintState.UNKNOWN_SEM_VALIDATED, W, St),
+    (RuleId.PY_WL_004, TaintState.UNKNOWN_GUARDED, W, St),
+    (RuleId.PY_WL_004, TaintState.UNKNOWN_ASSURED, W, St),
     (RuleId.PY_WL_004, TaintState.MIXED_RAW, E, St),
 
     # PY-WL-005 = WL-004 (catching exceptions silently)
-    (RuleId.PY_WL_005, TaintState.AUDIT_TRAIL, E, U),
-    (RuleId.PY_WL_005, TaintState.PIPELINE, E, St),
-    (RuleId.PY_WL_005, TaintState.SHAPE_VALIDATED, W, St),
+    (RuleId.PY_WL_005, TaintState.INTEGRAL, E, U),
+    (RuleId.PY_WL_005, TaintState.ASSURED, E, St),
+    (RuleId.PY_WL_005, TaintState.GUARDED, W, St),
     (RuleId.PY_WL_005, TaintState.EXTERNAL_RAW, W, R),
     (RuleId.PY_WL_005, TaintState.UNKNOWN_RAW, E, St),
-    (RuleId.PY_WL_005, TaintState.UNKNOWN_SHAPE_VALIDATED, W, St),
-    (RuleId.PY_WL_005, TaintState.UNKNOWN_SEM_VALIDATED, W, St),
+    (RuleId.PY_WL_005, TaintState.UNKNOWN_GUARDED, W, St),
+    (RuleId.PY_WL_005, TaintState.UNKNOWN_ASSURED, W, St),
     (RuleId.PY_WL_005, TaintState.MIXED_RAW, E, St),
 
     # PY-WL-006 = WL-005 (audit-critical writes in broad handlers)
-    (RuleId.PY_WL_006, TaintState.AUDIT_TRAIL, E, U),
-    (RuleId.PY_WL_006, TaintState.PIPELINE, E, U),
-    (RuleId.PY_WL_006, TaintState.SHAPE_VALIDATED, E, St),
+    (RuleId.PY_WL_006, TaintState.INTEGRAL, E, U),
+    (RuleId.PY_WL_006, TaintState.ASSURED, E, U),
+    (RuleId.PY_WL_006, TaintState.GUARDED, E, St),
     (RuleId.PY_WL_006, TaintState.EXTERNAL_RAW, E, St),
     (RuleId.PY_WL_006, TaintState.UNKNOWN_RAW, E, St),
-    (RuleId.PY_WL_006, TaintState.UNKNOWN_SHAPE_VALIDATED, E, St),
-    (RuleId.PY_WL_006, TaintState.UNKNOWN_SEM_VALIDATED, E, St),
+    (RuleId.PY_WL_006, TaintState.UNKNOWN_GUARDED, E, St),
+    (RuleId.PY_WL_006, TaintState.UNKNOWN_ASSURED, E, St),
     (RuleId.PY_WL_006, TaintState.MIXED_RAW, E, St),
 
     # PY-WL-007 = WL-006 (runtime type-checking internal data)
-    (RuleId.PY_WL_007, TaintState.AUDIT_TRAIL, E, St),
-    (RuleId.PY_WL_007, TaintState.PIPELINE, W, R),
-    (RuleId.PY_WL_007, TaintState.SHAPE_VALIDATED, W, R),
+    (RuleId.PY_WL_007, TaintState.INTEGRAL, E, St),
+    (RuleId.PY_WL_007, TaintState.ASSURED, W, R),
+    (RuleId.PY_WL_007, TaintState.GUARDED, W, R),
     (RuleId.PY_WL_007, TaintState.EXTERNAL_RAW, Su, T),
     (RuleId.PY_WL_007, TaintState.UNKNOWN_RAW, Su, T),
-    (RuleId.PY_WL_007, TaintState.UNKNOWN_SHAPE_VALIDATED, W, R),
-    (RuleId.PY_WL_007, TaintState.UNKNOWN_SEM_VALIDATED, W, R),
+    (RuleId.PY_WL_007, TaintState.UNKNOWN_GUARDED, W, R),
+    (RuleId.PY_WL_007, TaintState.UNKNOWN_ASSURED, W, R),
     (RuleId.PY_WL_007, TaintState.MIXED_RAW, W, St),
 
     # PY-WL-008 = WL-007 (validation with no rejection path)
-    (RuleId.PY_WL_008, TaintState.AUDIT_TRAIL, E, U),
-    (RuleId.PY_WL_008, TaintState.PIPELINE, E, U),
-    (RuleId.PY_WL_008, TaintState.SHAPE_VALIDATED, E, U),
+    (RuleId.PY_WL_008, TaintState.INTEGRAL, E, U),
+    (RuleId.PY_WL_008, TaintState.ASSURED, E, U),
+    (RuleId.PY_WL_008, TaintState.GUARDED, E, U),
     (RuleId.PY_WL_008, TaintState.EXTERNAL_RAW, E, U),
     (RuleId.PY_WL_008, TaintState.UNKNOWN_RAW, E, U),
-    (RuleId.PY_WL_008, TaintState.UNKNOWN_SHAPE_VALIDATED, E, U),
-    (RuleId.PY_WL_008, TaintState.UNKNOWN_SEM_VALIDATED, E, U),
+    (RuleId.PY_WL_008, TaintState.UNKNOWN_GUARDED, E, U),
+    (RuleId.PY_WL_008, TaintState.UNKNOWN_ASSURED, E, U),
     (RuleId.PY_WL_008, TaintState.MIXED_RAW, E, U),
 
     # PY-WL-009 = WL-008 (semantic validation without shape validation)
-    (RuleId.PY_WL_009, TaintState.AUDIT_TRAIL, E, U),
-    (RuleId.PY_WL_009, TaintState.PIPELINE, E, U),
-    (RuleId.PY_WL_009, TaintState.SHAPE_VALIDATED, E, U),
+    (RuleId.PY_WL_009, TaintState.INTEGRAL, E, U),
+    (RuleId.PY_WL_009, TaintState.ASSURED, E, U),
+    (RuleId.PY_WL_009, TaintState.GUARDED, E, U),
     (RuleId.PY_WL_009, TaintState.EXTERNAL_RAW, E, U),
     (RuleId.PY_WL_009, TaintState.UNKNOWN_RAW, E, U),
-    (RuleId.PY_WL_009, TaintState.UNKNOWN_SHAPE_VALIDATED, E, U),
-    (RuleId.PY_WL_009, TaintState.UNKNOWN_SEM_VALIDATED, E, U),
+    (RuleId.PY_WL_009, TaintState.UNKNOWN_GUARDED, E, U),
+    (RuleId.PY_WL_009, TaintState.UNKNOWN_ASSURED, E, U),
     (RuleId.PY_WL_009, TaintState.MIXED_RAW, E, U),
 ]
 # fmt: on
@@ -149,7 +149,7 @@ def test_lookup_raises_on_invalid_combo() -> None:
     from wardline.core.matrix import lookup
 
     with pytest.raises(KeyError):
-        lookup(RuleId.TOOL_ERROR, TaintState.AUDIT_TRAIL)
+        lookup(RuleId.TOOL_ERROR, TaintState.INTEGRAL)
 
 
 def test_severity_matrix_is_immutable() -> None:
@@ -160,7 +160,7 @@ def test_severity_matrix_is_immutable() -> None:
 
     assert isinstance(SEVERITY_MATRIX, MappingProxyType)
     with pytest.raises(TypeError):
-        SEVERITY_MATRIX[(RuleId.PY_WL_001, TaintState.AUDIT_TRAIL)] = None  # type: ignore[index]
+        SEVERITY_MATRIX[(RuleId.PY_WL_001, TaintState.INTEGRAL)] = None  # type: ignore[index]
 
 
 # Canonical analysis rules (those with matrix entries)

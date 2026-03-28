@@ -42,7 +42,7 @@ def _read_exceptions(tmp_path: Path) -> list[dict[str, Any]]:
 def _base_exception(
     exc_id: str = "EXC-AAAA0001",
     rule: str = "PY-WL-001",
-    taint_state: str = "PIPELINE",
+    taint_state: str = "ASSURED",
     location: str = "src/app.py::App.handle",
     analysis_level: int = 1,
 ) -> dict[str, Any]:
@@ -75,7 +75,7 @@ def _mock_compute_taints(taint_results: dict[str, TaintState]):
 class TestPreviewDrift:
     def test_preview_drift_reports_changes(self, tmp_path: Path) -> None:
         """Exceptions at L1 taints, L3 changes some -> report."""
-        exc = _base_exception(taint_state="PIPELINE")
+        exc = _base_exception(taint_state="ASSURED")
         _make_exceptions_file(tmp_path, [exc])
 
         taint_results = {"App.handle": TaintState.EXTERNAL_RAW}
@@ -95,15 +95,15 @@ class TestPreviewDrift:
         assert result.exit_code == 0
         output = json.loads(result.output)
         assert output["count"] == 1
-        assert output["drifted"][0]["old_taint"] == "PIPELINE"
+        assert output["drifted"][0]["old_taint"] == "ASSURED"
         assert output["drifted"][0]["new_taint"] == "EXTERNAL_RAW"
 
     def test_preview_drift_no_changes(self, tmp_path: Path) -> None:
         """All match -> 'no drift'."""
-        exc = _base_exception(taint_state="PIPELINE")
+        exc = _base_exception(taint_state="ASSURED")
         _make_exceptions_file(tmp_path, [exc])
 
-        taint_results = {"App.handle": TaintState.PIPELINE}
+        taint_results = {"App.handle": TaintState.ASSURED}
 
         runner = CliRunner()
         with (
@@ -128,7 +128,7 @@ class TestPreviewDrift:
 class TestMigrate:
     def test_migrate_updates_taint_state(self, tmp_path: Path) -> None:
         """taint_state field updated in JSON."""
-        exc = _base_exception(taint_state="PIPELINE")
+        exc = _base_exception(taint_state="ASSURED")
         _make_exceptions_file(tmp_path, [exc])
 
         taint_results = {"App.handle": TaintState.EXTERNAL_RAW}
@@ -152,7 +152,7 @@ class TestMigrate:
 
     def test_migrate_stamps_analysis_level(self, tmp_path: Path) -> None:
         """Migrated entries have analysis_level: 3."""
-        exc = _base_exception(taint_state="PIPELINE", analysis_level=1)
+        exc = _base_exception(taint_state="ASSURED", analysis_level=1)
         _make_exceptions_file(tmp_path, [exc])
 
         taint_results = {"App.handle": TaintState.EXTERNAL_RAW}
@@ -176,7 +176,7 @@ class TestMigrate:
 
     def test_migrate_adds_audit_trail(self, tmp_path: Path) -> None:
         """migrated_from note added."""
-        exc = _base_exception(taint_state="PIPELINE", analysis_level=1)
+        exc = _base_exception(taint_state="ASSURED", analysis_level=1)
         _make_exceptions_file(tmp_path, [exc])
 
         taint_results = {"App.handle": TaintState.EXTERNAL_RAW}
@@ -196,11 +196,11 @@ class TestMigrate:
 
         assert result.exit_code == 0
         entries = _read_exceptions(tmp_path)
-        assert entries[0]["migrated_from"] == "taint_state was PIPELINE at level 1"
+        assert entries[0]["migrated_from"] == "taint_state was ASSURED at level 1"
 
     def test_migrate_idempotent(self, tmp_path: Path) -> None:
         """Running twice produces stable output."""
-        exc = _base_exception(taint_state="PIPELINE", analysis_level=1)
+        exc = _base_exception(taint_state="ASSURED", analysis_level=1)
         _make_exceptions_file(tmp_path, [exc])
 
         taint_results = {"App.handle": TaintState.EXTERNAL_RAW}
@@ -227,11 +227,11 @@ class TestMigrate:
         assert entries[0]["taint_state"] == "EXTERNAL_RAW"
         assert entries[0]["analysis_level"] == 3
         # migrated_from should be from the first migration, not overwritten
-        assert entries[0]["migrated_from"] == "taint_state was PIPELINE at level 1"
+        assert entries[0]["migrated_from"] == "taint_state was ASSURED at level 1"
 
     def test_migrate_requires_confirm(self, tmp_path: Path) -> None:
         """Without --confirm -> error, no file changes."""
-        exc = _base_exception(taint_state="PIPELINE")
+        exc = _base_exception(taint_state="ASSURED")
         _make_exceptions_file(tmp_path, [exc])
 
         runner = CliRunner()
@@ -250,7 +250,7 @@ class TestMigrate:
 
         # File should be unchanged
         entries = _read_exceptions(tmp_path)
-        assert entries[0]["taint_state"] == "PIPELINE"
+        assert entries[0]["taint_state"] == "ASSURED"
 
 
 # ---------------------------------------------------------------------------

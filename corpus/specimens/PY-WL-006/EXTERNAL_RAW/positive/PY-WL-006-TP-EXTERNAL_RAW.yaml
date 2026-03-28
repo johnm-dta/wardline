@@ -3,12 +3,12 @@ specimen_id: PY-WL-006-TP-EXTERNAL_RAW
 description: PY-WL-006 true_positive at EXTERNAL_RAW
 rule: PY-WL-006
 fragment: "def process():\n    try:\n        risky()\n    except Exception:\n    \
-  \    audit.emit(\"failed\")\n"
+  \    logger.error(\"failed\")\n"
 taint_state: EXTERNAL_RAW
 expected_rules:
 - PY-WL-006
 expected_severity: ERROR
 expected_exceptionability: STANDARD
 expected_match: true
-sha256: 7f2d0e204395f923dd5621a284caa0ab70fb0a1cd99b121f91e2ad9a9b8a9300
+sha256: c7eae2aef49a3d7b1b4dab451d1cd931556aabbae7fdf9aafb04b6c7bbe11f12
 verdict: true_positive

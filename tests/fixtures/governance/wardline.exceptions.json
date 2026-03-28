@@ -42,7 +42,7 @@
     {
       "id": "EXC-003",
       "rule": "PY-WL-005",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/example.py::get_config",
       "exceptionability": "STANDARD",
       "severity_at_grant": "WARNING",

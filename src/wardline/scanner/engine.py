@@ -375,7 +375,7 @@ class ScanEngine:
         # Module-tiers auditability: detect blanket suppression and
         # high-trust taint without decorator evidence.
         _HIGH_TRUST_TAINTS = frozenset({
-            TaintState.AUDIT_TRAIL, TaintState.PIPELINE,
+            TaintState.INTEGRAL, TaintState.ASSURED,
         })
         _MIN_FUNCTIONS_FOR_BLANKET = 5
         _BLANKET_THRESHOLD = 0.80
@@ -650,7 +650,7 @@ class ScanEngine:
         """
         # Build callee resolution map: for decorator-anchored callees, use
         # the return (OUTPUT) tier taint so that `x = validates_shape(data)`
-        # assigns SHAPE_VALIDATED to x. For non-anchored callees, keep the
+        # assigns GUARDED to x. For non-anchored callees, keep the
         # L3-refined body taint (which equals return taint at L1, but may
         # have been demoted by L3 callgraph analysis).
         callee_taint_map: dict[str, TaintState] = dict(taint_map)

@@ -1,6 +1,6 @@
 # ADR-002: Rename tier-source decorators to match posture vocabulary
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-03-28
 **Deciders**: Project Lead, Review Board
 **Context**: Tier-source decorator names use audit-specific language inherited from the prototype exemplar

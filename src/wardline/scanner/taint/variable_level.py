@@ -92,7 +92,7 @@ def _resolve_expr(
     """Resolve the taint of an expression node.
 
     Rules:
-    - Literals (Constant, JoinedStr with all-constant parts) → AUDIT_TRAIL
+    - Literals (Constant, JoinedStr with all-constant parts) → INTEGRAL
     - Name references → look up in var_taints
     - Function calls → look up callee in taint_map
     - Binary ops → join(left, right)
@@ -101,7 +101,7 @@ def _resolve_expr(
     - Fallback → function_taint
     """
     if isinstance(node, ast.Constant):
-        return TaintState.AUDIT_TRAIL
+        return TaintState.INTEGRAL
 
     if isinstance(node, ast.Name):
         return var_taints.get(node.id, function_taint)
@@ -116,7 +116,7 @@ def _resolve_expr(
 
     if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
         if not node.elts:
-            return TaintState.AUDIT_TRAIL
+            return TaintState.INTEGRAL
         result = _resolve_expr(node.elts[0], function_taint, taint_map, var_taints)
         for elt in node.elts[1:]:
             result = taint_join(
@@ -127,7 +127,7 @@ def _resolve_expr(
 
     if isinstance(node, ast.Dict):
         if not node.values:
-            return TaintState.AUDIT_TRAIL
+            return TaintState.INTEGRAL
         parts: list[TaintState] = []
         for v in node.values:
             if v is not None:
@@ -135,7 +135,7 @@ def _resolve_expr(
                     _resolve_expr(v, function_taint, taint_map, var_taints)
                 )
         if not parts:
-            return TaintState.AUDIT_TRAIL
+            return TaintState.INTEGRAL
         result = parts[0]
         for p in parts[1:]:
             result = taint_join(result, p)

@@ -15,7 +15,7 @@ def _run_rule(
     source: str,
     *,
     qualname: str = "target",
-    taint: TaintState = TaintState.PIPELINE,
+    taint: TaintState = TaintState.ASSURED,
     boundaries: tuple[BoundaryEntry, ...] = (),
     file_path: str = "/project/src/api/handler.py",
 ) -> RulePyWl009:
@@ -37,7 +37,7 @@ def _run_rule_module(
     source: str,
     *,
     qualname: str = "target",
-    taint: TaintState = TaintState.PIPELINE,
+    taint: TaintState = TaintState.ASSURED,
     boundaries: tuple[BoundaryEntry, ...] = (),
     file_path: str = "/project/src/api/handler.py",
 ) -> RulePyWl009:
@@ -261,7 +261,7 @@ if data["amount"] > 100:
     def test_audit_trail_error_unconditional(self) -> None:
         rule = _run_rule(
             self._SRC,
-            taint=TaintState.AUDIT_TRAIL,
+            taint=TaintState.INTEGRAL,
             boundaries=(_boundary(),),
         )
 
@@ -272,7 +272,7 @@ if data["amount"] > 100:
     def test_unknown_shape_validated_error_unconditional(self) -> None:
         rule = _run_rule(
             self._SRC,
-            taint=TaintState.UNKNOWN_SHAPE_VALIDATED,
+            taint=TaintState.UNKNOWN_GUARDED,
             boundaries=(_boundary(),),
         )
 

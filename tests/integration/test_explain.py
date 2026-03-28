@@ -87,7 +87,7 @@ class TestExplainUndeclaredModule:
                     description: Core tier
                 module_tiers:
                   - path: /some/other/path
-                    default_taint: PIPELINE
+                    default_taint: ASSURED
             """)
         )
 
@@ -156,10 +156,10 @@ class TestExplainUnresolvedDecorator:
         py_file.write_text(
             textwrap.dedent("""\
                 from wardline.decorators.authority import external_boundary
-                from wardline.decorators.audit import audit_critical
+                from wardline.decorators.integrity import integrity_critical
 
                 @external_boundary
-                @audit_critical
+                @integrity_critical
                 def process(data):
                     return data
             """)
@@ -174,10 +174,10 @@ class TestExplainUnresolvedDecorator:
         # Should show EXTERNAL_RAW from external_boundary
         assert "EXTERNAL_RAW" in result.output
         assert "decorator" in result.output.lower()
-        # audit_critical is not in DECORATOR_TAINT_MAP but IS in registry,
+        # integrity_critical is not in DECORATOR_TAINT_MAP but IS in registry,
         # so it appears as an unresolved decorator
         assert "unresolved" in result.output.lower()
-        assert "audit_critical" in result.output
+        assert "integrity_critical" in result.output
 
 
 @pytest.mark.integration
@@ -214,7 +214,7 @@ def _build_governance_fixture(tmp_path: Path, *, with_overlay: bool = False) -> 
         textwrap.dedent("""\
             from wardline.decorators.authority import external_boundary
             from wardline.decorators.validation import validates_shape
-            from wardline.decorators.data_access import tier1_read
+            from wardline.decorators.data_access import integral_read
             from wardline import schema_default
 
             @external_boundary
@@ -230,7 +230,7 @@ def _build_governance_fixture(tmp_path: Path, *, with_overlay: bool = False) -> 
             def governed_default(data: dict) -> str:
                 return schema_default(data.get("key", ""))
 
-            @tier1_read
+            @integral_read
             def get_config() -> dict:
                 return {"key": "value"}
         """)
@@ -249,7 +249,7 @@ def _build_governance_fixture(tmp_path: Path, *, with_overlay: bool = False) -> 
                 description: "Tier 4 — external raw input"
             module_tiers:
               - path: "src/"
-                default_taint: "PIPELINE"
+                default_taint: "ASSURED"
             delegation:
               default_authority: "RELAXED"
             rules:

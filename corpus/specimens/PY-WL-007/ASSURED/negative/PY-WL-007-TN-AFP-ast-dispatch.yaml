@@ -1,0 +1,22 @@
+---
+specimen_id: "PY-WL-007-TN-AFP-ast-dispatch"
+description: "Adversarial false positive: isinstance on ast.* types is AST dispatch, structurally exempt"
+rule: "PY-WL-007"
+category: "adversarial_false_positive"
+fragment: |
+  import ast
+  
+  def extract_names(node):
+      """isinstance on ast.Name is structural dispatch, not trust boundary check."""
+      if isinstance(node, ast.Name):
+          return [node.id]
+      elif isinstance(node, ast.Attribute):
+          return [node.attr]
+      return []
+taint_state: "ASSURED"
+expected_rules: []
+expected_severity: null
+expected_exceptionability: null
+expected_match: false
+sha256: "48a4e93198f53c3b0aa33e3c65485eae2aafef190cf5aa3dcf5c5729c94f7e3d"
+verdict: "true_negative"

@@ -42,7 +42,7 @@ tiers:
     tier: 4
 module_tiers:
   - path: "audit/"
-    default_taint: "AUDIT_TRAIL"
+    default_taint: "INTEGRAL"
   - path: "adapters/"
     default_taint: "EXTERNAL_RAW"
 metadata:

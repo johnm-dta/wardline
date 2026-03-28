@@ -20,8 +20,8 @@ class TestTrustRank:
 
 class TestLeastTrusted:
     def test_least_trusted_returns_less_trusted(self) -> None:
-        """AUDIT_TRAIL vs EXTERNAL_RAW should return EXTERNAL_RAW."""
-        result = least_trusted(TaintState.AUDIT_TRAIL, TaintState.EXTERNAL_RAW)
+        """INTEGRAL vs EXTERNAL_RAW should return EXTERNAL_RAW."""
+        result = least_trusted(TaintState.INTEGRAL, TaintState.EXTERNAL_RAW)
         assert result == TaintState.EXTERNAL_RAW
 
     def test_least_trusted_symmetric(self) -> None:

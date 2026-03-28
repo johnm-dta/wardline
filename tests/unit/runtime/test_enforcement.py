@@ -359,7 +359,7 @@ class TestTierViolationError:
 class TestEnforceConstruction:
     def test_uses_real_attrs(self) -> None:
         """Reads _wardline_tier_source from decorated methods."""
-        from wardline.decorators.authority import external_boundary, tier1_read
+        from wardline.decorators.authority import external_boundary, integral_read
 
         enforcement.enable()
 
@@ -368,7 +368,7 @@ class TestEnforceConstruction:
             def ingest(self) -> None:
                 pass
 
-            @tier1_read
+            @integral_read
             def read(self) -> None:
                 pass
 
@@ -376,7 +376,7 @@ class TestEnforceConstruction:
         enforce_construction(Mixed())
 
     def test_warns_mixed_tiers(self, caplog: pytest.LogCaptureFixture) -> None:
-        from wardline.decorators.authority import external_boundary, tier1_read
+        from wardline.decorators.authority import external_boundary, integral_read
 
         enforcement.enable()
 
@@ -385,7 +385,7 @@ class TestEnforceConstruction:
             def ingest(self) -> None:
                 pass
 
-            @tier1_read
+            @integral_read
             def read(self) -> None:
                 pass
 
@@ -403,11 +403,11 @@ class TestEnforceConstruction:
         """Async decorated function stamps tier metadata on result."""
         import asyncio
 
-        from wardline.decorators.authority import tier1_read
+        from wardline.decorators.authority import integral_read
 
         enforcement.enable()
 
-        @tier1_read
+        @integral_read
         async def fetch_data() -> dict[str, int]:
             return {"key": 42}
 
@@ -499,14 +499,14 @@ class TestCheckSubclassTierConsistency:
     """F8: Direct tests for check_subclass_tier_consistency warnings list."""
 
     def test_consistent_class_returns_empty(self) -> None:
-        from wardline.decorators.authority import tier1_read
+        from wardline.decorators.authority import integral_read
 
         class Consistent:
-            @tier1_read
+            @integral_read
             def read_a(self) -> None:
                 pass
 
-            @tier1_read
+            @integral_read
             def read_b(self) -> None:
                 pass
 
@@ -514,14 +514,14 @@ class TestCheckSubclassTierConsistency:
         assert warnings == []
 
     def test_mixed_tiers_returns_warnings(self) -> None:
-        from wardline.decorators.authority import external_boundary, tier1_read
+        from wardline.decorators.authority import external_boundary, integral_read
 
         class Mixed:
             @external_boundary
             def ingest(self) -> None:
                 pass
 
-            @tier1_read
+            @integral_read
             def read(self) -> None:
                 pass
 

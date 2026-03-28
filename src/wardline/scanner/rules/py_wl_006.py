@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 _BROAD_NAMES = frozenset({"Exception", "BaseException"})
-_AUDIT_DECORATORS = frozenset({"audit_writer", "audit_critical"})
+_INTEGRITY_DECORATORS = frozenset({"integral_writer", "integrity_critical"})
 _AUDIT_ATTR_PREFIXES = ("audit", "record", "emit")
 _AUDIT_FUNC_NAMES = frozenset({"audit", "record", "emit"})
 
@@ -168,7 +168,7 @@ class RulePyWl006(RuleBase):
         local_names: set[str] = set()
         for qualname, func in _iter_defs_with_qualnames(node.body):
             if any(
-                decorator_name(decorator) in _AUDIT_DECORATORS
+                decorator_name(decorator) in _INTEGRITY_DECORATORS
                 for decorator in func.decorator_list
             ):
                 local_names.add(qualname.split(".")[-1])

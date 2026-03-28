@@ -47,13 +47,13 @@ _TIERS = (
 
 
 _DECORATED_SOURCE = """\
-from wardline import external_boundary, audit_critical
+from wardline import external_boundary, integrity_critical
 
 @external_boundary
 def handle_request():
     pass
 
-@audit_critical
+@integrity_critical
 def log_event():
     pass
 
@@ -66,10 +66,10 @@ class TestComputeAnnotationFingerprint:
     def test_annotation_fingerprint_deterministic(self) -> None:
         """Same inputs produce the same hash."""
         fp1 = compute_annotation_fingerprint(
-            "MyClass.handle", ["external_boundary", "audit_critical"]
+            "MyClass.handle", ["external_boundary", "integrity_critical"]
         )
         fp2 = compute_annotation_fingerprint(
-            "MyClass.handle", ["external_boundary", "audit_critical"]
+            "MyClass.handle", ["external_boundary", "integrity_critical"]
         )
         assert fp1 == fp2
         assert len(fp1) == 16
@@ -81,7 +81,7 @@ class TestComputeAnnotationFingerprint:
             "handle", ["external_boundary"]
         )
         fp2 = compute_annotation_fingerprint(
-            "handle", ["external_boundary", "audit_critical"]
+            "handle", ["external_boundary", "integrity_critical"]
         )
         assert fp1 != fp2
 
@@ -102,10 +102,10 @@ class TestComputeAnnotationFingerprint:
     def test_annotation_fingerprint_sorted_decorators(self) -> None:
         """Decorator order does not affect the hash."""
         fp1 = compute_annotation_fingerprint(
-            "handle", ["audit_critical", "external_boundary"]
+            "handle", ["integrity_critical", "external_boundary"]
         )
         fp2 = compute_annotation_fingerprint(
-            "handle", ["external_boundary", "audit_critical"]
+            "handle", ["external_boundary", "integrity_critical"]
         )
         assert fp1 == fp2
 

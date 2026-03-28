@@ -176,7 +176,7 @@ class TestWardlineManifest:
                 TierEntry(id="api", tier=4, description="External API"),
             ),
             module_tiers=(
-                ModuleTierEntry(path="audit/", default_taint="AUDIT_TRAIL"),
+                ModuleTierEntry(path="audit/", default_taint="INTEGRAL"),
             ),
             metadata=ManifestMetadata(
                 organisation="TestOrg",

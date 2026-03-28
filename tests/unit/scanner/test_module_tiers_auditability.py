@@ -37,7 +37,7 @@ class TestBlanketSuppression:
 
         manifest = WardlineManifest(
             module_tiers=(
-                ModuleTierEntry(path=str(tmp_path), default_taint="PIPELINE"),
+                ModuleTierEntry(path=str(tmp_path), default_taint="ASSURED"),
             ),
         )
 
@@ -69,7 +69,7 @@ class TestBlanketSuppression:
 
         manifest = WardlineManifest(
             module_tiers=(
-                ModuleTierEntry(path=str(tmp_path), default_taint="PIPELINE"),
+                ModuleTierEntry(path=str(tmp_path), default_taint="ASSURED"),
             ),
         )
 
@@ -91,7 +91,7 @@ class TestBlanketSuppression:
 
         manifest = WardlineManifest(
             module_tiers=(
-                ModuleTierEntry(path=str(tmp_path), default_taint="PIPELINE"),
+                ModuleTierEntry(path=str(tmp_path), default_taint="ASSURED"),
             ),
         )
 
@@ -120,7 +120,7 @@ class TestUndecoratedHighTrust:
 
         manifest = WardlineManifest(
             module_tiers=(
-                ModuleTierEntry(path=str(tmp_path), default_taint="AUDIT_TRAIL"),
+                ModuleTierEntry(path=str(tmp_path), default_taint="INTEGRAL"),
             ),
         )
 
@@ -132,7 +132,7 @@ class TestUndecoratedHighTrust:
             if f.rule_id == RuleId.GOVERNANCE_MODULE_TIERS_UNDECORATED
         ]
         assert len(undecorated) == 1
-        assert "AUDIT_TRAIL" in undecorated[0].message
+        assert "INTEGRAL" in undecorated[0].message
         assert "zero" in undecorated[0].message
 
     def test_undecorated_fires_for_pipeline(self, tmp_path: Path) -> None:
@@ -143,7 +143,7 @@ class TestUndecoratedHighTrust:
 
         manifest = WardlineManifest(
             module_tiers=(
-                ModuleTierEntry(path=str(tmp_path), default_taint="PIPELINE"),
+                ModuleTierEntry(path=str(tmp_path), default_taint="ASSURED"),
             ),
         )
 
@@ -183,13 +183,13 @@ class TestUndecoratedHighTrust:
 
         py_file = tmp_path / "decorated.py"
         py_file.write_text(
-            "from wardline.decorators import tier1_read\n"
-            "@tier1_read\ndef handler(): pass\n"
+            "from wardline.decorators import integral_read\n"
+            "@integral_read\ndef handler(): pass\n"
         )
 
         manifest = WardlineManifest(
             module_tiers=(
-                ModuleTierEntry(path=str(tmp_path), default_taint="AUDIT_TRAIL"),
+                ModuleTierEntry(path=str(tmp_path), default_taint="INTEGRAL"),
             ),
         )
 

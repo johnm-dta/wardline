@@ -28,7 +28,7 @@ from wardline.core.taints import TaintState
 # Import all decorator modules
 from wardline.decorators import (
     access,
-    audit,
+    integrity,
     authority,
     boundaries,
     concurrency,
@@ -46,7 +46,7 @@ from wardline.decorators import (
 from wardline.decorators._base import get_wardline_attrs, wardline_decorator
 
 # Direct imports used in test bodies
-from wardline.decorators.audit import audit_critical
+from wardline.decorators.integrity import integrity_critical
 from wardline.decorators.authority import external_boundary
 
 # Build _LIBRARY_DECORATORS from all modules — every registered name
@@ -54,7 +54,7 @@ from wardline.decorators.authority import external_boundary
 _LIBRARY_DECORATORS: dict[str, Any] = {}
 
 _DECORATOR_MODULES = [
-    access, audit, authority, boundaries, concurrency, determinism,
+    access, integrity, authority, boundaries, concurrency, determinism,
     lifecycle, operations, plugin, provenance, restoration, safety, schema,
     secrets, sensitivity,
 ]
@@ -239,11 +239,11 @@ class TestRenamedDecorator:
     def test_renamed_attr_fails_registry_contract(self) -> None:
         """Registry contract check: iterate attrs, assert hasattr fails
         for renamed attributes."""
-        @audit_critical
+        @integrity_critical
         def stub() -> None:
             pass
 
-        entry = REGISTRY["audit_critical"]
+        entry = REGISTRY["integrity_critical"]
         # Verify attrs are present initially
         for attr_name in entry.attrs:
             assert hasattr(stub, attr_name)
@@ -321,7 +321,7 @@ class TestWrappedChainValidation:
 
     def test_stacked_decorators_wrapped_chain(self) -> None:
         """Multiple decorators stack correctly via __wrapped__."""
-        @audit_critical
+        @integrity_critical
         @external_boundary
         def stub() -> None:
             pass
@@ -330,13 +330,13 @@ class TestWrappedChainValidation:
         assert attrs is not None
         # Should have attrs from both decorators
         assert "_wardline_tier_source" in attrs
-        assert "_wardline_audit_critical" in attrs
+        assert "_wardline_integrity_critical" in attrs
         assert isinstance(attrs["_wardline_tier_source"], TaintState)
-        assert isinstance(attrs["_wardline_audit_critical"], bool)
+        assert isinstance(attrs["_wardline_integrity_critical"], bool)
 
     def test_groups_accumulate(self) -> None:
         """Stacked decorators accumulate _wardline_groups."""
-        @audit_critical
+        @integrity_critical
         @external_boundary
         def stub() -> None:
             pass
@@ -344,7 +344,7 @@ class TestWrappedChainValidation:
         assert hasattr(stub, "_wardline_groups")
         groups = stub._wardline_groups  # type: ignore[attr-defined]
         assert 1 in groups  # external_boundary group
-        assert 2 in groups  # audit_critical group
+        assert 2 in groups  # integrity_critical group
 
     @pytest.mark.parametrize("name", sorted(REGISTRY.keys()))
     def test_all_decorators_have_wrapped(self, name: str) -> None:

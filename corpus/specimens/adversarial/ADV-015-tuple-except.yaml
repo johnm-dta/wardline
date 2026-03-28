@@ -4,7 +4,7 @@ description: Tuple except with Exception triggers PY-WL-004
 rule: PY-WL-004
 fragment: "def process():\n    try:\n        pass\n    except (ValueError, Exception):\n\
   \        handle()\n"
-taint_state: PIPELINE
+taint_state: ASSURED
 expected_rules:
 - PY-WL-004
 expected_match: true

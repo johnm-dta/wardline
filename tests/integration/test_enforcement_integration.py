@@ -42,7 +42,7 @@ class TestDecoratedFunctionStampsReturn:
 
         result = parse("hello")
 
-        # validates_shape transitions to SHAPE_VALIDATED → tier 3
+        # validates_shape transitions to GUARDED → tier 3
         # Result is a dict (unstampable), so auto-wrapped in TierStamped
         assert isinstance(result, TierStamped)
         assert result._wardline_tier == 3
@@ -123,7 +123,7 @@ class TestWardlineBaseConstructionWithEnforcement:
     ) -> None:
         import logging
 
-        from wardline.decorators.authority import external_boundary, tier1_read
+        from wardline.decorators.authority import external_boundary, integral_read
         from wardline.runtime.base import WardlineBase
 
         enforcement.enable()
@@ -133,7 +133,7 @@ class TestWardlineBaseConstructionWithEnforcement:
             def ingest(self) -> None:
                 pass
 
-            @tier1_read
+            @integral_read
             def read(self) -> None:
                 pass
 

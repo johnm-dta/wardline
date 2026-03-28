@@ -298,7 +298,7 @@ class RuleSup001(RuleBase):
                 for ann in annotations:
                     if ann.canonical_name == "parse_at_init":
                         self._parse_at_init_targets.add(simple)
-                    elif ann.canonical_name in {"audit_writer", "audit_critical"}:
+                    elif ann.canonical_name in {"integral_writer", "integrity_critical"}:
                         self._audit_targets.add(simple)
                     elif ann.canonical_name == "ordered_after":
                         target = ann.attrs.get("name")
@@ -611,7 +611,7 @@ class RuleSup001(RuleBase):
 
         self._emit(
             node,
-            "@requires_identity function does not pass an identity parameter into an @audit_writer/@audit_critical call",
+            "@requires_identity function does not pass an identity parameter into an @integral_writer/@integrity_critical call",
         )
 
     def _check_not_reentrant(

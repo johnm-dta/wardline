@@ -7,8 +7,8 @@
 |----|---------|-----------|----------|-----------------|
 | SE-001 | `audit.emit(event, data)` in broad handler | DETECTED | -- | -- |
 | SE-002 | `db.record_failure(data)` in broad handler | DETECTED | -- | -- |
-| SE-003 | `@audit_writer` decorated function called in broad handler | DETECTED | -- | -- |
-| SE-004 | `@audit_critical` decorated function called in broad handler | DETECTED | -- | -- |
+| SE-003 | `@integral_writer` decorated function called in broad handler | DETECTED | -- | -- |
+| SE-004 | `@integrity_critical` decorated function called in broad handler | DETECTED | -- | -- |
 | SE-005 | Receiver name containing "audit" or "ledger" | DETECTED | -- | -- |
 | SE-006 | Audit call wrapped in undecorated helper function | NOT DETECTED | MEDIUM | MODERATE |
 | SE-007 | Audit via chained method (`structlog.get_logger().bind().msg()`) | NOT DETECTED | LOW | LOW |

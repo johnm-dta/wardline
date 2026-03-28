@@ -24,19 +24,19 @@ def test_taint_state_values_are_uppercase() -> None:
 
 def test_serialisation_round_trip() -> None:
     """str(member) produces the canonical uppercase token."""
-    assert str(TaintState.AUDIT_TRAIL) == "AUDIT_TRAIL"
-    assert str(TaintState.PIPELINE) == "PIPELINE"
-    assert str(TaintState.SHAPE_VALIDATED) == "SHAPE_VALIDATED"
+    assert str(TaintState.INTEGRAL) == "INTEGRAL"
+    assert str(TaintState.ASSURED) == "ASSURED"
+    assert str(TaintState.GUARDED) == "GUARDED"
     assert str(TaintState.EXTERNAL_RAW) == "EXTERNAL_RAW"
     assert str(TaintState.UNKNOWN_RAW) == "UNKNOWN_RAW"
-    assert str(TaintState.UNKNOWN_SHAPE_VALIDATED) == "UNKNOWN_SHAPE_VALIDATED"
-    assert str(TaintState.UNKNOWN_SEM_VALIDATED) == "UNKNOWN_SEM_VALIDATED"
+    assert str(TaintState.UNKNOWN_GUARDED) == "UNKNOWN_GUARDED"
+    assert str(TaintState.UNKNOWN_ASSURED) == "UNKNOWN_ASSURED"
     assert str(TaintState.MIXED_RAW) == "MIXED_RAW"
 
 
 def test_json_serialisation() -> None:
     """StrEnum members serialise as plain strings via json.dumps."""
-    assert json.dumps(TaintState.AUDIT_TRAIL) == '"AUDIT_TRAIL"'
+    assert json.dumps(TaintState.INTEGRAL) == '"INTEGRAL"'
     assert json.dumps(TaintState.MIXED_RAW) == '"MIXED_RAW"'
 
 
@@ -76,11 +76,11 @@ def test_mixed_raw_absorbing() -> None:
 def test_associativity_spot_check() -> None:
     """Associativity: join(a, join(b, c)) == join(join(a, b), c) for representative triples."""
     triples = [
-        (TaintState.AUDIT_TRAIL, TaintState.PIPELINE, TaintState.EXTERNAL_RAW),
-        (TaintState.UNKNOWN_RAW, TaintState.UNKNOWN_SHAPE_VALIDATED, TaintState.UNKNOWN_SEM_VALIDATED),
-        (TaintState.SHAPE_VALIDATED, TaintState.MIXED_RAW, TaintState.AUDIT_TRAIL),
-        (TaintState.EXTERNAL_RAW, TaintState.UNKNOWN_RAW, TaintState.PIPELINE),
-        (TaintState.UNKNOWN_SHAPE_VALIDATED, TaintState.AUDIT_TRAIL, TaintState.UNKNOWN_SEM_VALIDATED),
+        (TaintState.INTEGRAL, TaintState.ASSURED, TaintState.EXTERNAL_RAW),
+        (TaintState.UNKNOWN_RAW, TaintState.UNKNOWN_GUARDED, TaintState.UNKNOWN_ASSURED),
+        (TaintState.GUARDED, TaintState.MIXED_RAW, TaintState.INTEGRAL),
+        (TaintState.EXTERNAL_RAW, TaintState.UNKNOWN_RAW, TaintState.ASSURED),
+        (TaintState.UNKNOWN_GUARDED, TaintState.INTEGRAL, TaintState.UNKNOWN_ASSURED),
     ]
     for a, b, c in triples:
         left = taint_join(a, taint_join(b, c))
@@ -97,24 +97,24 @@ def test_associativity_spot_check() -> None:
     ("a", "b", "expected"),
     [
         # Cross-classification: always MIXED_RAW
-        (TaintState.AUDIT_TRAIL, TaintState.PIPELINE, TaintState.MIXED_RAW),
-        (TaintState.PIPELINE, TaintState.EXTERNAL_RAW, TaintState.MIXED_RAW),
-        (TaintState.SHAPE_VALIDATED, TaintState.PIPELINE, TaintState.MIXED_RAW),
-        (TaintState.AUDIT_TRAIL, TaintState.EXTERNAL_RAW, TaintState.MIXED_RAW),
+        (TaintState.INTEGRAL, TaintState.ASSURED, TaintState.MIXED_RAW),
+        (TaintState.ASSURED, TaintState.EXTERNAL_RAW, TaintState.MIXED_RAW),
+        (TaintState.GUARDED, TaintState.ASSURED, TaintState.MIXED_RAW),
+        (TaintState.INTEGRAL, TaintState.EXTERNAL_RAW, TaintState.MIXED_RAW),
         # Any classified + UNKNOWN_RAW: MIXED_RAW
-        (TaintState.PIPELINE, TaintState.UNKNOWN_RAW, TaintState.MIXED_RAW),
-        (TaintState.AUDIT_TRAIL, TaintState.UNKNOWN_RAW, TaintState.MIXED_RAW),
-        (TaintState.SHAPE_VALIDATED, TaintState.UNKNOWN_RAW, TaintState.MIXED_RAW),
-        # Any classified + UNKNOWN_SHAPE_VALIDATED: MIXED_RAW
-        (TaintState.EXTERNAL_RAW, TaintState.UNKNOWN_SHAPE_VALIDATED, TaintState.MIXED_RAW),
-        (TaintState.PIPELINE, TaintState.UNKNOWN_SHAPE_VALIDATED, TaintState.MIXED_RAW),
-        # Any classified + UNKNOWN_SEM_VALIDATED: MIXED_RAW
-        (TaintState.SHAPE_VALIDATED, TaintState.UNKNOWN_SEM_VALIDATED, TaintState.MIXED_RAW),
-        (TaintState.AUDIT_TRAIL, TaintState.UNKNOWN_SEM_VALIDATED, TaintState.MIXED_RAW),
+        (TaintState.ASSURED, TaintState.UNKNOWN_RAW, TaintState.MIXED_RAW),
+        (TaintState.INTEGRAL, TaintState.UNKNOWN_RAW, TaintState.MIXED_RAW),
+        (TaintState.GUARDED, TaintState.UNKNOWN_RAW, TaintState.MIXED_RAW),
+        # Any classified + UNKNOWN_GUARDED: MIXED_RAW
+        (TaintState.EXTERNAL_RAW, TaintState.UNKNOWN_GUARDED, TaintState.MIXED_RAW),
+        (TaintState.ASSURED, TaintState.UNKNOWN_GUARDED, TaintState.MIXED_RAW),
+        # Any classified + UNKNOWN_ASSURED: MIXED_RAW
+        (TaintState.GUARDED, TaintState.UNKNOWN_ASSURED, TaintState.MIXED_RAW),
+        (TaintState.INTEGRAL, TaintState.UNKNOWN_ASSURED, TaintState.MIXED_RAW),
         # Within UNKNOWN family: demote to weaker validation
-        (TaintState.UNKNOWN_RAW, TaintState.UNKNOWN_SHAPE_VALIDATED, TaintState.UNKNOWN_RAW),
-        (TaintState.UNKNOWN_RAW, TaintState.UNKNOWN_SEM_VALIDATED, TaintState.UNKNOWN_RAW),
-        (TaintState.UNKNOWN_SHAPE_VALIDATED, TaintState.UNKNOWN_SEM_VALIDATED, TaintState.UNKNOWN_SHAPE_VALIDATED),
+        (TaintState.UNKNOWN_RAW, TaintState.UNKNOWN_GUARDED, TaintState.UNKNOWN_RAW),
+        (TaintState.UNKNOWN_RAW, TaintState.UNKNOWN_ASSURED, TaintState.UNKNOWN_RAW),
+        (TaintState.UNKNOWN_GUARDED, TaintState.UNKNOWN_ASSURED, TaintState.UNKNOWN_GUARDED),
     ],
     ids=lambda x: x.value if isinstance(x, TaintState) else str(x),
 )

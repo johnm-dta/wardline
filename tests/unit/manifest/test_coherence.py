@@ -114,7 +114,7 @@ class TestOrphanedAnnotations:
         annotations = {
             ("src/a.py", "func_a"): [_annot("external_boundary")],
             ("src/b.py", "func_b"): [_annot("validates_shape")],
-            ("src/c.py", "func_c"): [_annot("tier1_read")],
+            ("src/c.py", "func_c"): [_annot("integral_read")],
         }
         boundaries = (
             BoundaryEntry(function="func_b", transition="SHAPE_VALIDATE"),
@@ -1216,7 +1216,7 @@ class TestRestorationEvidence:
         issues = check_restoration_evidence(boundaries)
         assert len(issues) == 1
         assert issues[0].kind == "insufficient_restoration_evidence"
-        assert "UNKNOWN_SEM_VALIDATED" in issues[0].detail
+        assert "UNKNOWN_ASSURED" in issues[0].detail
 
     def test_unknown_raw_rejects_tier_claim(self) -> None:
         """No evidence at all → ERROR (UNKNOWN_RAW)."""

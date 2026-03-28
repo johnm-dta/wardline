@@ -35,11 +35,11 @@ def _enforcement_reset():
 
 # ── Helpers: real decorators from semantic_attrs ─────────────
 
-# Decorator with _wardline_transition: EXTERNAL_RAW -> SHAPE_VALIDATED => tier 3
+# Decorator with _wardline_transition: EXTERNAL_RAW -> GUARDED => tier 3
 shape_dec = wardline_decorator(
     1,
     "validates_shape",
-    _wardline_transition=(TaintState.EXTERNAL_RAW, TaintState.SHAPE_VALIDATED),
+    _wardline_transition=(TaintState.EXTERNAL_RAW, TaintState.GUARDED),
 )
 
 # Decorator with _wardline_tier_source: EXTERNAL_RAW => tier 4
@@ -49,11 +49,11 @@ boundary_dec = wardline_decorator(
     _wardline_tier_source=TaintState.EXTERNAL_RAW,
 )
 
-# Supplementary decorator (no tier info) — group 2, audit_critical
+# Supplementary decorator (no tier info) — group 2, integrity_critical
 supplementary_dec = wardline_decorator(
     2,
-    "audit_critical",
-    _wardline_audit_critical=True,
+    "integrity_critical",
+    _wardline_integrity_critical=True,
 )
 
 
@@ -73,7 +73,7 @@ class TestStampsReturnInstance:
 
         result = make_record()
         assert isinstance(result, Record)
-        assert result._wardline_tier == 3  # SHAPE_VALIDATED -> TIER_3
+        assert result._wardline_tier == 3  # GUARDED -> TIER_3
         assert isinstance(result._wardline_groups, tuple)
         assert result._wardline_stamped_by == make_record.__qualname__
 
@@ -208,7 +208,7 @@ class TestOutputTierFromTransition:
             return Obj()
 
         result = make()
-        # SHAPE_VALIDATED maps to TIER_3
+        # GUARDED maps to TIER_3
         assert result._wardline_tier == 3
 
 

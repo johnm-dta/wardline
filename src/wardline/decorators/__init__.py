@@ -1,12 +1,12 @@
 """wardline.decorators — Decorator library for wardline annotations."""
 
 from wardline.decorators.access import privileged_operation, requires_identity
-from wardline.decorators.audit import audit_critical
+from wardline.decorators.integrity import integrity_critical
 from wardline.decorators.authority import (
-    audit_writer,
-    authoritative_construction,
+    integral_writer,
+    integral_construction,
     external_boundary,
-    tier1_read,
+    integral_read,
     validates_external,
     validates_semantic,
     validates_shape,
@@ -41,9 +41,9 @@ from wardline.decorators.sensitivity import (
 __all__ = [
     "all_fields_mapped",
     "atomic",
-    "audit_critical",
-    "audit_writer",
-    "authoritative_construction",
+    "integrity_critical",
+    "integral_writer",
+    "integral_construction",
     "compensatable",
     "declassifies",
     "deprecated_by",
@@ -73,7 +73,7 @@ __all__ = [
     "test_only",
     "thread_safe",
     "time_dependent",
-    "tier1_read",
+    "integral_read",
     "tier_transition",
     "trust_boundary",
     "validates_external",

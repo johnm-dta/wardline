@@ -11,23 +11,23 @@ Each corpus specimen is a self-contained, labelled test case in YAML format. A s
 **Specimen YAML schema** (example shown for Python regime):
 
 ```yaml
-# corpus/WL-001/AUDIT_TRAIL/wl001-audit-get-default.yaml
+# corpus/WL-001/INTEGRAL/wl001-audit-get-default.yaml
 id: "WL-001-AT-001"
 rule: "WL-001"                    # Framework rule identifier
 binding_rule: "PY-WL-001"         # Binding-specific rule (if applicable)
-taint_state: "AUDIT_TRAIL"        # One of the eight effective states (§5.1)
+taint_state: "INTEGRAL"        # One of the eight effective states (§5.1)
 expected_severity: "ERROR"         # ERROR, WARNING, or SUPPRESS
 expected_exceptionability: "UNCONDITIONAL"  # UNCONDITIONAL, STANDARD, or RELAXED
 verdict: "positive"                # "positive" (should fire) or "negative" (should not)
 category: "standard"               # "standard", "adversarial_false_positive",
                                    #   "adversarial_false_negative", or "taint_flow"
 description: >
-  A .get() call with a default value inside a @tier1_read function.
+  A .get() call with a default value inside a @integral_read function.
   This is the canonical Tier 1 fabricated-default pattern.
 fragment: |
-  from wardline import tier1_read
+  from wardline import integral_read
 
-  @tier1_read
+  @integral_read
   def get_audit_record(run_id: str) -> dict:
       record = db.fetch(run_id)
       classification = record.get("security_classification", "OFFICIAL")
@@ -40,7 +40,7 @@ expected_match:
 
 **Required fields:** `id`, `rule`, `taint_state`, `expected_severity`, `expected_exceptionability`, `verdict`, `fragment`, `expected_match`. **Optional fields:** `binding_rule` (required for binding-specific corpus), `category` (defaults to "standard"), `description`.
 
-**Fragment requirements:** Each fragment MUST be a syntactically valid, self-contained compilation unit for the target binding (e.g., a Python module for the Python regime). Fragments MUST include all necessary imports, including wardline decorator imports. Fragments MUST NOT depend on external state, files, or network resources. The fragment's decorator annotations establish the taint context for rule evaluation — a fragment testing WL-001 in AUDIT_TRAIL context MUST include a function decorated with `@tier1_read`, `@audit_writer`, or equivalent Tier 1 decorator.
+**Fragment requirements:** Each fragment MUST be a syntactically valid, self-contained compilation unit for the target binding (e.g., a Python module for the Python regime). Fragments MUST include all necessary imports, including wardline decorator imports. Fragments MUST NOT depend on external state, files, or network resources. The fragment's decorator annotations establish the taint context for rule evaluation — a fragment testing WL-001 in INTEGRAL context MUST include a function decorated with `@integral_read`, `@integral_writer`, or equivalent Tier 1 decorator.
 
 **Expected match format:** The `line` field is 1-indexed within the fragment (not within any external file). The `text` field is the matched source text as it appears in the fragment — not the AST `unparse()` output, but the literal source substring. For multi-line expressions, `line` refers to the first line of the expression and `text` is the full expression with internal whitespace preserved. The `function` field identifies the enclosing function for context. Verification compares these fields against the SARIF result's `locations[0].physicalLocation.region.startLine`, `locations[0].physicalLocation.region.snippet.text`, and the enclosing `logicalLocation`. The `text` field MUST match the SARIF `snippet.text` exactly. Where the tool's snippet range differs from the specimen's expected text, the specimen is treated as a verification failure. Corpus authors SHOULD verify expected text against at least one reference implementation's output.
 
@@ -75,7 +75,7 @@ At DRAFT v0.2.0, the corpus is maintained alongside the specification and is not
 
 **2. Self-hosting gate** *(framework invariant).* Each enforcement tool's own source MUST pass the rules that tool implements. A linter plugin that detects WL-001 MUST NOT violate WL-001 in its own source. A type checker plugin that enforces tier mismatches MUST pass tier-mismatch checks on its own code. The tool is used as part of the CI setup for the project that builds it. A tool that cannot enforce its own wardline on itself lacks credibility. Self-hosting is both a verification property and a development discipline — it surfaces false positives early and ensures the tool's authors experience the governance model they impose on others. Tools that perform no code analysis (e.g., a pure governance orchestrator satisfying Wardline-Governance) are exempt from self-hosting.
 
-**3. Measured precision.** The false positive rate MUST be measured, tracked, and published per cell (rule × taint state), not merely per rule *(framework invariant)*. The recommended calibration point is an 80% precision floor applied to each cell individually: below this threshold, a rule SHOULD NOT earn blocking status in that cell's CI gate context. A rule at 90% precision in AUDIT_TRAIL but 55% in UNKNOWN_SHAPE_VALIDATED SHOULD NOT earn blocking status in the failing cell — the averaged number hides the context where trust is being lost. For MIXED_RAW cells specifically, a lower precision floor of 65% is permitted, acknowledging that the conservative join (§5.1) generates higher false-positive rates in mixed-taint contexts; this lower floor prevents MIXED_RAW noise from forcing premature demotion of rules that perform well in single-tier contexts. Projects MAY adjust thresholds with documented rationale — a greenfield project with limited corpus MAY accept 75% during early development. For systems under the ISM or equivalent high-assurance frameworks, the starting recommendation is 90% precision for UNCONDITIONAL cells, since false positives on invariant findings directly erode assessor confidence. The measurement and publication obligations are non-negotiable regardless of threshold. The golden corpus is already organised by rule and taint state (§10, property 1) — the infrastructure for per-cell measurement is present; this requirement makes the normative expectation match.
+**3. Measured precision.** The false positive rate MUST be measured, tracked, and published per cell (rule × taint state), not merely per rule *(framework invariant)*. The recommended calibration point is an 80% precision floor applied to each cell individually: below this threshold, a rule SHOULD NOT earn blocking status in that cell's CI gate context. A rule at 90% precision in INTEGRAL but 55% in UNKNOWN_GUARDED SHOULD NOT earn blocking status in the failing cell — the averaged number hides the context where trust is being lost. For MIXED_RAW cells specifically, a lower precision floor of 65% is permitted, acknowledging that the conservative join (§5.1) generates higher false-positive rates in mixed-taint contexts; this lower floor prevents MIXED_RAW noise from forcing premature demotion of rules that perform well in single-tier contexts. Projects MAY adjust thresholds with documented rationale — a greenfield project with limited corpus MAY accept 75% during early development. For systems under the ISM or equivalent high-assurance frameworks, the starting recommendation is 90% precision for UNCONDITIONAL cells, since false positives on invariant findings directly erode assessor confidence. The measurement and publication obligations are non-negotiable regardless of threshold. The golden corpus is already organised by rule and taint state (§10, property 1) — the infrastructure for per-cell measurement is present; this requirement makes the normative expectation match.
 
 **Interaction with UNCONDITIONAL exceptionability.** The per-cell precision floor and the exceptionability model interact at a specific pressure point: if an UNCONDITIONAL cell measures below its precision floor, the rule cannot be granted exceptions in that cell (UNCONDITIONAL), cannot be demoted to STANDARD without modifying the specification, and cannot be made non-blocking without undermining the exceptionability model. The resolution: a cell below the precision floor is a *tool defect*, not a governance problem. The rule implementation for that context returns to development — the corpus is not adjusted to make the numbers work, because that would undermine the corpus's role as independent verification evidence. UNCONDITIONAL status is a commitment that the rule is correct when it fires; if it isn't, the rule is broken, not the policy.
 
@@ -152,7 +152,7 @@ Wardline-specific metadata that SARIF does not natively represent is carried in 
         }]
       }],
       "properties": {
-        "wardline.taintState": "AUDIT_TRAIL",
+        "wardline.taintState": "INTEGRAL",
         "wardline.enclosingTier": 1,
         "wardline.annotationGroups": [1, 5],
         "wardline.exceptionability": "UNCONDITIONAL",
@@ -189,7 +189,7 @@ The following wardline-specific properties are required:
 
 **On each `result` (individual finding):**
 
-- `wardline.taintState` — the taint state of the enclosing context (e.g., AUDIT_TRAIL, PIPELINE, EXTERNAL_RAW)
+- `wardline.taintState` — the taint state of the enclosing context (e.g., INTEGRAL, ASSURED, EXTERNAL_RAW)
 - `wardline.enclosingTier` — the authority tier (1, 2, 3, 4) of the enclosing scope
 - `wardline.annotationGroups` — which of the 17 annotation groups are declared on the enclosing function. This is the cross-binding machine-readable identity for annotation context; bindings MUST use the Part I group numbers, not binding-specific annotation names
 - `wardline.exceptionability` — the exceptionability class for this finding (UNCONDITIONAL, STANDARD, RELAXED, TRANSPARENT)
@@ -253,7 +253,7 @@ Determinism (verification property 5) applies to the normative SARIF output. Enf
 
 **Multi-tool SARIF aggregation.** In an enforcement regime (§14.4) comprising multiple tools, each tool produces its own SARIF `run` within the SARIF log. A SARIF log is defined as an array of runs; multi-tool output is a single SARIF log containing one run per tool. Each run identifies its producing tool via the `tool.driver` object and declares which wardline rules it covers in the `tool.driver.rules` array. Regime-level run properties — `wardline.coverageRatio`, `wardline.expeditedExceptionRatio`, `wardline.controlLaw` — are computed by the regime orchestrator (typically a Wardline-Governance tool) and carried on a dedicated aggregation run whose `tool.driver.name` identifies the orchestrator. The aggregation run contains no code-level findings; it exists solely to carry regime-level metrics and to declare the regime composition (constituent tools and their profiles) in a `wardline.regimeComposition` property. This convention ensures that an assessor can distinguish per-tool findings from regime-level reporting and can verify regime coverage completeness from the SARIF log alone.
 
-**`wardline.tierLabel`** — human-readable label *(SHOULD)*. Bindings SHOULD include a `wardline.tierLabel` property on each `result`, providing a plain-language label alongside the canonical `wardline.taintState` token. Examples: `"audit trail"` for AUDIT_TRAIL, `"unknown origin, shape-validated"` for UNKNOWN_SHAPE_VALIDATED, `"external, unvalidated"` for EXTERNAL_RAW. The label is a single short phrase — no sentence case, no terminal punctuation. The canonical token remains the machine-readable key; the label exists for SARIF viewers, IDE hover tooltips, and human readers who encounter raw SARIF output without access to the specification. Bindings MAY localise the label text provided the canonical token is unchanged. Cost: one string field per finding. Benefit: eliminates the need for downstream tools to maintain their own display-name mapping tables.
+**`wardline.tierLabel`** — human-readable label *(SHOULD)*. Bindings SHOULD include a `wardline.tierLabel` property on each `result`, providing a plain-language label alongside the canonical `wardline.taintState` token. Examples: `"audit trail"` for INTEGRAL, `"unknown origin, shape-validated"` for UNKNOWN_GUARDED, `"external, unvalidated"` for EXTERNAL_RAW. The label is a single short phrase — no sentence case, no terminal punctuation. The canonical token remains the machine-readable key; the label exists for SARIF viewers, IDE hover tooltips, and human readers who encounter raw SARIF output without access to the specification. Bindings MAY localise the label text provided the canonical token is unchanged. Cost: one string field per finding. Benefit: eliminates the need for downstream tools to maintain their own display-name mapping tables.
 
 Binding-specific annotation names such as `@validates_shape` or `@ValidatesShape` MAY be carried in additional result properties (for example, `wardline.enclosingAnnotation`) for diagnostic context, but those names are not part of the framework's cross-binding interoperability contract.
 
@@ -283,13 +283,13 @@ error[WL-001]: Fabricated default masks missing field
    note: taint context established here
   --> src/adapters/partner.py:38:1
    |
-38 | @tier1_read
+38 | @integral_read
    | ^^^^^^^^^^^ this annotation declares audit-trail context
    |
    = help: in audit-trail data, member absence is an integrity failure —
            a fabricated default silently replaces missing evidence
    = note: this finding is UNCONDITIONAL and cannot be excepted
-   = see: wardline explain WL-001 AUDIT_TRAIL
+   = see: wardline explain WL-001 INTEGRAL
 ```
 
 **Properties bag** (SARIF): full metadata unchanged. The `wardline.taintState`, `wardline.enclosingTier`, `wardline.exceptionability`, and all other properties defined in §10.1 remain in the SARIF output for assessors, governance tooling, and downstream automation. The presentation layer does not alter, filter, or summarise the SARIF — it renders a human-readable view on top of it.
@@ -302,21 +302,21 @@ For developer-facing output — terminal, IDE, code review — bindings SHOULD c
 
 | Presentation group | Effective states | Plain-language label |
 |---|---|---|
-| **Trusted** | AUDIT_TRAIL, PIPELINE | "trusted data" |
-| **Validated** | SHAPE_VALIDATED, UNKNOWN_SHAPE_VALIDATED, UNKNOWN_SEM_VALIDATED | "validated data" [^validated-collapse] |
+| **Trusted** | INTEGRAL, ASSURED | "trusted data" |
+| **Validated** | GUARDED, UNKNOWN_GUARDED, UNKNOWN_ASSURED | "validated data" [^validated-collapse] |
 | **Untrusted** | EXTERNAL_RAW, UNKNOWN_RAW, MIXED_RAW | "untrusted data" |
 
-[^validated-collapse]: UNKNOWN_SHAPE_VALIDATED and UNKNOWN_SEM_VALIDATED are grouped under "validated" because their enforcement consequences are similar to SHAPE_VALIDATED (the data has passed validation gates). However, these states lack provenance — the data's origin is unknown. The collapsed label "validated data" is correct for describing the developer's coding posture (field access is safe) but does not convey the provenance gap. Bindings MAY append a provenance qualifier in the context line (e.g., "validated data, unknown origin") when the effective state is on the UNKNOWN chain.
+[^validated-collapse]: UNKNOWN_GUARDED and UNKNOWN_ASSURED are grouped under "validated" because their enforcement consequences are similar to GUARDED (the data has passed validation gates). However, these states lack provenance — the data's origin is unknown. The collapsed label "validated data" is correct for describing the developer's coding posture (field access is safe) but does not convey the provenance gap. Bindings MAY append a provenance qualifier in the context line (e.g., "validated data, unknown origin") when the effective state is on the UNKNOWN chain.
 
 Findings display the collapsed group by default. The precise effective state is available on expansion (context line) and is always present in the SARIF output (properties bag). The collapsed groups are a rendering convenience — they do not alter the framework's eight-state model, the severity matrix, or any normative requirement. An assessor evaluating SARIF output sees the canonical tokens; a developer reading terminal output sees the group label unless they expand the finding.
 
-The grouping reflects the developer's decision surface: trusted data requires no guard code, validated data has passed at least one verification gate, untrusted data requires validation before use. Distinctions within groups (e.g., SHAPE_VALIDATED vs. UNKNOWN_SEM_VALIDATED) matter for governance and assessment but rarely change what the developer does in response to a finding.
+The grouping reflects the developer's decision surface: trusted data requires no guard code, validated data has passed at least one verification gate, untrusted data requires validation before use. Distinctions within groups (e.g., GUARDED vs. UNKNOWN_ASSURED) matter for governance and assessment but rarely change what the developer does in response to a finding.
 
 ##### `wardline explain` subcommand
 
 Bindings SHOULD implement a `wardline explain` subcommand that renders the full derivation for a finding, following the `rustc --explain` pattern. Two invocation forms:
 
-- **`wardline explain WL-001 AUDIT_TRAIL`** — renders the full derivation for a specific rule in a specific taint-state context: why the rule exists, why it carries ERROR severity in this context, why it is UNCONDITIONAL, the relevant worked example from the severity matrix rationale (§7.4), and the detection approach. This is the developer's entry point to the matrix without reading a 64-cell table.
+- **`wardline explain WL-001 INTEGRAL`** — renders the full derivation for a specific rule in a specific taint-state context: why the rule exists, why it carries ERROR severity in this context, why it is UNCONDITIONAL, the relevant worked example from the severity matrix rationale (§7.4), and the detection approach. This is the developer's entry point to the matrix without reading a 64-cell table.
 
 - **`wardline explain WL-001`** — renders the full row: the rule's purpose, its severity across all eight taint states, its exceptionability class, known false-positive patterns, and common resolution strategies. Equivalent to the rule's entry in the severity matrix with human-readable commentary.
 
@@ -373,8 +373,8 @@ Example — WL-007 with taint state (discouraged in primary output):
 
 ```
 error[WL-007]: Validation boundary has unreachable rejection path
-  in AUDIT_TRAIL context (Tier 1)
+  in INTEGRAL context (Tier 1)
   ...
 ```
 
-The "in AUDIT_TRAIL context" qualifier adds no information — WL-007 fires identically regardless of context. Omitting it reinforces the correct understanding that structural verification is context-independent.
+The "in INTEGRAL context" qualifier adds no information — WL-007 fires identically regardless of context. Omitting it reinforces the correct understanding that structural verification is context-independent.

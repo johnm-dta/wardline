@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is Wardline
 
-Wardline is a semantic boundary enforcement framework for Python. It defines a four-tier trust hierarchy (Tier 1 AUDIT_TRAIL → Tier 4 EXTERNAL_RAW) and statically verifies that data flows respect those boundaries. The scanner catches trust-boundary violations — untrusted input reaching privileged code, missing validation at tier transitions — via AST analysis with taint propagation.
+Wardline is a semantic boundary enforcement framework for Python. It defines a four-tier trust hierarchy (Tier 1 INTEGRAL → Tier 4 EXTERNAL_RAW) and statically verifies that data flows respect those boundaries. The scanner catches trust-boundary violations — untrusted input reaching privileged code, missing validation at tier transitions — via AST analysis with taint propagation.
 
 ## Build & Development Commands
 

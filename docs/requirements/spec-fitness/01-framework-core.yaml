@@ -3,8 +3,8 @@ requirements:
     title: Canonical taint-state vocabulary
     statement: >
       The implementation MUST use the canonical machine-facing taint-state tokens
-      `AUDIT_TRAIL`, `PIPELINE`, `SHAPE_VALIDATED`, `EXTERNAL_RAW`,
-      `UNKNOWN_RAW`, `UNKNOWN_SHAPE_VALIDATED`, `UNKNOWN_SEM_VALIDATED`,
+      `INTEGRAL`, `ASSURED`, `GUARDED`, `EXTERNAL_RAW`,
+      `UNKNOWN_RAW`, `UNKNOWN_GUARDED`, `UNKNOWN_ASSURED`,
       and `MIXED_RAW` consistently across code, schemas, and SARIF output.
     normative_sources:
       - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
@@ -156,8 +156,8 @@ requirements:
     title: Token interpretation is not narrowed
     statement: >
       Implementations MUST NOT narrow the semantics of canonical taint-state
-      tokens (e.g., AUDIT_TRAIL, PIPELINE) to match the everyday meaning of
-      the token name. AUDIT_TRAIL encompasses all Tier 1 authoritative data,
+      tokens (e.g., INTEGRAL, ASSURED) to match the everyday meaning of
+      the token name. INTEGRAL encompasses all Tier 1 authoritative data,
       not only audit trails.
     normative_sources:
       - file: docs/spec/wardline-01-05-authority-tier-enforcement-spec.md
@@ -189,7 +189,7 @@ requirements:
     notes: >
       The existing join tests (CORE-002) cover algebra properties; this
       requirement specifically tests that cross-chain joins like
-      join(PIPELINE, AUDIT_TRAIL) produce MIXED_RAW, not AUDIT_TRAIL.
+      join(ASSURED, INTEGRAL) produce MIXED_RAW, not INTEGRAL.
 
   - id: WL-FIT-CORE-011
     title: Dependency taint compound call fallback

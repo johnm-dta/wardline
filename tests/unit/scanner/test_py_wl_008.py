@@ -99,7 +99,7 @@ return data
 is_ok = check_business_rules(data)
 process(data)
 """,
-            taint=TaintState.SHAPE_VALIDATED,
+            taint=TaintState.GUARDED,
             boundaries=(_boundary(transition="semantic_validation"),),
         )
 
@@ -320,7 +320,7 @@ class TestTaintMatrix:
     def test_audit_trail_error_unconditional(self) -> None:
         rule = _run_rule(
             "return data\n",
-            taint=TaintState.AUDIT_TRAIL,
+            taint=TaintState.INTEGRAL,
             boundaries=(_boundary(),),
         )
 
@@ -342,7 +342,7 @@ class TestTaintMatrix:
     def test_pipeline_error_unconditional(self) -> None:
         rule = _run_rule(
             "return data\n",
-            taint=TaintState.PIPELINE,
+            taint=TaintState.ASSURED,
             boundaries=(_boundary(),),
         )
 

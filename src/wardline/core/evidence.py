@@ -24,11 +24,11 @@ def max_restorable_tier(
         return TaintState.UNKNOWN_RAW
     if not institutional:
         if semantic:
-            return TaintState.UNKNOWN_SEM_VALIDATED
-        return TaintState.UNKNOWN_SHAPE_VALIDATED
+            return TaintState.UNKNOWN_ASSURED
+        return TaintState.UNKNOWN_GUARDED
     # institutional is True from here
     if semantic and integrity:
-        return TaintState.AUDIT_TRAIL  # Tier 1
+        return TaintState.INTEGRAL  # Tier 1
     if semantic:
-        return TaintState.PIPELINE  # Tier 2
-    return TaintState.SHAPE_VALIDATED  # Tier 3
+        return TaintState.ASSURED  # Tier 2
+    return TaintState.GUARDED  # Tier 3

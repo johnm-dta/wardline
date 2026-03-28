@@ -10,11 +10,11 @@ import ast
 from wardline.core.taints import TaintState
 
 TRUST_RANK: dict[TaintState, int] = {
-    TaintState.AUDIT_TRAIL: 0,
-    TaintState.PIPELINE: 1,
-    TaintState.SHAPE_VALIDATED: 2,
-    TaintState.UNKNOWN_SEM_VALIDATED: 3,
-    TaintState.UNKNOWN_SHAPE_VALIDATED: 4,
+    TaintState.INTEGRAL: 0,
+    TaintState.ASSURED: 1,
+    TaintState.GUARDED: 2,
+    TaintState.UNKNOWN_ASSURED: 3,
+    TaintState.UNKNOWN_GUARDED: 4,
     TaintState.EXTERNAL_RAW: 5,
     TaintState.UNKNOWN_RAW: 6,
     TaintState.MIXED_RAW: 7,

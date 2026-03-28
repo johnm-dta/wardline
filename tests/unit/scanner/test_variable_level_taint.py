@@ -28,7 +28,7 @@ class TestSimpleAssignment:
                 x = 42
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        assert result["x"] == TaintState.AUDIT_TRAIL
+        assert result["x"] == TaintState.INTEGRAL
 
     def test_string_literal_gets_audit_trail(self) -> None:
         func = _parse_func("""
@@ -36,7 +36,7 @@ class TestSimpleAssignment:
                 x = "hello"
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        assert result["x"] == TaintState.AUDIT_TRAIL
+        assert result["x"] == TaintState.INTEGRAL
 
     def test_unknown_expr_gets_function_taint(self) -> None:
         func = _parse_func("""
@@ -53,8 +53,8 @@ class TestSimpleAssignment:
                 y = x
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        assert result["x"] == TaintState.AUDIT_TRAIL
-        assert result["y"] == TaintState.AUDIT_TRAIL
+        assert result["x"] == TaintState.INTEGRAL
+        assert result["y"] == TaintState.INTEGRAL
 
     def test_reassignment_overwrites(self) -> None:
         func = _parse_func("""
@@ -78,9 +78,9 @@ class TestBinaryOps:
                 c = a + b
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        assert result["a"] == TaintState.AUDIT_TRAIL
+        assert result["a"] == TaintState.INTEGRAL
         assert result["b"] == TaintState.UNKNOWN_RAW
-        # AUDIT_TRAIL join UNKNOWN_RAW = MIXED_RAW
+        # INTEGRAL join UNKNOWN_RAW = MIXED_RAW
         assert result["c"] == TaintState.MIXED_RAW
 
 
@@ -93,9 +93,9 @@ class TestFunctionCalls:
             def f():
                 x = validate(data)
         """)
-        taint_map = {"validate": TaintState.SHAPE_VALIDATED}
+        taint_map = {"validate": TaintState.GUARDED}
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, taint_map)
-        assert result["x"] == TaintState.SHAPE_VALIDATED
+        assert result["x"] == TaintState.GUARDED
 
     def test_unknown_callee_gets_function_taint(self) -> None:
         func = _parse_func("""
@@ -112,8 +112,8 @@ class TestFunctionCalls:
             def f():
                 x = obj.method()
         """)
-        result = compute_variable_taints(func, TaintState.PIPELINE, {})
-        assert result["x"] == TaintState.PIPELINE
+        result = compute_variable_taints(func, TaintState.ASSURED, {})
+        assert result["x"] == TaintState.ASSURED
 
 
 # ── Augmented assignment ─────────────────────────────────────────
@@ -127,7 +127,7 @@ class TestAugmentedAssignment:
                 x += unknown_thing
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        # AUDIT_TRAIL join UNKNOWN_RAW = MIXED_RAW
+        # INTEGRAL join UNKNOWN_RAW = MIXED_RAW
         assert result["x"] == TaintState.MIXED_RAW
 
     def test_augassign_new_variable(self) -> None:
@@ -137,7 +137,7 @@ class TestAugmentedAssignment:
                 x += 42
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        # UNKNOWN_RAW join AUDIT_TRAIL = MIXED_RAW
+        # UNKNOWN_RAW join INTEGRAL = MIXED_RAW
         assert result["x"] == TaintState.MIXED_RAW
 
 
@@ -151,8 +151,8 @@ class TestTupleUnpacking:
                 a, b = 1, 2
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        assert result["a"] == TaintState.AUDIT_TRAIL
-        assert result["b"] == TaintState.AUDIT_TRAIL
+        assert result["a"] == TaintState.INTEGRAL
+        assert result["b"] == TaintState.INTEGRAL
 
     def test_tuple_unpack_from_call(self) -> None:
         """When RHS is not a tuple, all targets get the RHS taint."""
@@ -170,7 +170,7 @@ class TestTupleUnpacking:
                 a, b = 42, unknown
         """)
         result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
-        assert result["a"] == TaintState.AUDIT_TRAIL
+        assert result["a"] == TaintState.INTEGRAL
         assert result["b"] == TaintState.EXTERNAL_RAW
 
 
@@ -194,7 +194,7 @@ class TestForLoop:
                     pass
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        assert result["x"] == TaintState.AUDIT_TRAIL
+        assert result["x"] == TaintState.INTEGRAL
 
 
 # ── With-as ──────────────────────────────────────────────────────
@@ -207,9 +207,9 @@ class TestWithAs:
                 with open("file.txt") as handle:
                     pass
         """)
-        taint_map = {"open": TaintState.AUDIT_TRAIL}
+        taint_map = {"open": TaintState.INTEGRAL}
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, taint_map)
-        assert result["handle"] == TaintState.AUDIT_TRAIL
+        assert result["handle"] == TaintState.INTEGRAL
 
     def test_with_as_unknown_call(self) -> None:
         func = _parse_func("""
@@ -249,7 +249,7 @@ class TestWalrus:
                     pass
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        assert result["x"] == TaintState.AUDIT_TRAIL
+        assert result["x"] == TaintState.INTEGRAL
 
     def test_walrus_with_call(self) -> None:
         func = _parse_func("""
@@ -257,9 +257,9 @@ class TestWalrus:
                 if (x := validate(data)):
                     pass
         """)
-        taint_map = {"validate": TaintState.SHAPE_VALIDATED}
+        taint_map = {"validate": TaintState.GUARDED}
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, taint_map)
-        assert result["x"] == TaintState.SHAPE_VALIDATED
+        assert result["x"] == TaintState.GUARDED
 
 
 # ── Control flow merges (if/else) ────────────────────────────────
@@ -275,7 +275,7 @@ class TestControlFlowMerge:
                     x = unknown_thing
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        # AUDIT_TRAIL join UNKNOWN_RAW = MIXED_RAW
+        # INTEGRAL join UNKNOWN_RAW = MIXED_RAW
         assert result["x"] == TaintState.MIXED_RAW
 
     def test_if_only_merges_with_pre_existing(self) -> None:
@@ -287,7 +287,7 @@ class TestControlFlowMerge:
                     x = unknown_thing
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        # AUDIT_TRAIL join UNKNOWN_RAW = MIXED_RAW
+        # INTEGRAL join UNKNOWN_RAW = MIXED_RAW
         assert result["x"] == TaintState.MIXED_RAW
 
 
@@ -317,7 +317,7 @@ class TestAsync:
                 x = 42
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        assert result["x"] == TaintState.AUDIT_TRAIL
+        assert result["x"] == TaintState.INTEGRAL
 
 
 # ── Nested constructs ────────────────────────────────────────────
@@ -342,7 +342,7 @@ class TestNested:
                     x = unknown
         """)
         result = compute_variable_taints(func, TaintState.UNKNOWN_RAW, {})
-        # AUDIT_TRAIL join UNKNOWN_RAW = MIXED_RAW (while body merges with pre-loop)
+        # INTEGRAL join UNKNOWN_RAW = MIXED_RAW (while body merges with pre-loop)
         assert result["x"] == TaintState.MIXED_RAW
 
 
@@ -361,8 +361,8 @@ class TestTryExceptBranchMerge:
                     x = "fallback"
         """)
         result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
-        # Both branches assign AUDIT_TRAIL; join should still be AUDIT_TRAIL
-        assert result["x"] == TaintState.AUDIT_TRAIL
+        # Both branches assign INTEGRAL; join should still be INTEGRAL
+        assert result["x"] == TaintState.INTEGRAL
 
     def test_try_except_divergent_branches(self) -> None:
         """try body and handler with different taints should join."""
@@ -375,7 +375,7 @@ class TestTryExceptBranchMerge:
                     x = "fallback"
         """)
         result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
-        # try branch: EXTERNAL_RAW, except branch: AUDIT_TRAIL → MIXED_RAW
+        # try branch: EXTERNAL_RAW, except branch: INTEGRAL → MIXED_RAW
         assert result["x"] == TaintState.MIXED_RAW
 
     def test_try_except_handler_name_inherits_function_taint(self) -> None:

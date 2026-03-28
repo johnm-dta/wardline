@@ -29,7 +29,7 @@ def _write_minimal_manifest(tmp_path: Path) -> Path:
         "metadata:\n"
         '  organisation: "test"\n'
         "tiers:\n"
-        '  - id: "PIPELINE"\n'
+        '  - id: "ASSURED"\n'
         "    tier: 2\n"
         '    description: "Pipeline"\n'
         "module_tiers: []\n"
@@ -50,7 +50,7 @@ def _write_manifest_with_overlay(tmp_path: Path) -> Path:
         "metadata:\n"
         '  organisation: "test"\n'
         "tiers:\n"
-        '  - id: "PIPELINE"\n'
+        '  - id: "ASSURED"\n'
         "    tier: 2\n"
         '    description: "Pipeline"\n'
         '  - id: "EXTERNAL_RAW"\n'

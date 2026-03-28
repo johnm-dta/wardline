@@ -138,7 +138,7 @@ class TestDiscoverOverlays:
     def manifest(self) -> WardlineManifest:
         return WardlineManifest(
             module_tiers=(
-                ModuleTierEntry(path="audit/", default_taint="AUDIT_TRAIL"),
+                ModuleTierEntry(path="audit/", default_taint="INTEGRAL"),
                 ModuleTierEntry(
                     path="adapters/", default_taint="EXTERNAL_RAW"
                 ),

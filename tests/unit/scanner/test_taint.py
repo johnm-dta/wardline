@@ -63,8 +63,8 @@ class TestDecoratorTaint:
 
         # Body eval uses INPUT tier: validates_shape receives EXTERNAL_RAW data
         assert result["validate"] == TaintState.EXTERNAL_RAW
-        # Return taint uses OUTPUT tier: validated output is SHAPE_VALIDATED
-        assert _return_map["validate"] == TaintState.SHAPE_VALIDATED
+        # Return taint uses OUTPUT tier: validated output is GUARDED
+        assert _return_map["validate"] == TaintState.GUARDED
 
     def test_validates_semantic_body_gets_shape_validated(self) -> None:
         tree = _parse("def check(): pass\n")
@@ -73,43 +73,43 @@ class TestDecoratorTaint:
         }
         result, _return_map, _sources, _conflicts, _overclaims = assign_function_taints(tree, "test.py", annotations)
 
-        # Body eval uses INPUT tier: validates_semantic receives SHAPE_VALIDATED data
-        assert result["check"] == TaintState.SHAPE_VALIDATED
-        # Return taint uses OUTPUT tier: validated output is PIPELINE
-        assert _return_map["check"] == TaintState.PIPELINE
+        # Body eval uses INPUT tier: validates_semantic receives GUARDED data
+        assert result["check"] == TaintState.GUARDED
+        # Return taint uses OUTPUT tier: validated output is ASSURED
+        assert _return_map["check"] == TaintState.ASSURED
 
-    def test_tier1_read_gets_audit_trail(self) -> None:
+    def test_integral_read_gets_audit_trail(self) -> None:
         tree = _parse("def read_data(): pass\n")
         annotations = {
-            ("test.py", "read_data"): [_ann("tier1_read")],
+            ("test.py", "read_data"): [_ann("integral_read")],
         }
         result, _return_map, _sources, _conflicts, _overclaims = assign_function_taints(tree, "test.py", annotations)
 
-        assert result["read_data"] == TaintState.AUDIT_TRAIL
+        assert result["read_data"] == TaintState.INTEGRAL
 
-    def test_audit_writer_gets_audit_trail(self) -> None:
+    def test_integral_writer_gets_audit_trail(self) -> None:
         tree = _parse("def write_log(): pass\n")
         annotations = {
-            ("test.py", "write_log"): [_ann("audit_writer")],
+            ("test.py", "write_log"): [_ann("integral_writer")],
         }
         result, _return_map, _sources, _conflicts, _overclaims = assign_function_taints(tree, "test.py", annotations)
 
-        assert result["write_log"] == TaintState.AUDIT_TRAIL
+        assert result["write_log"] == TaintState.INTEGRAL
 
-    def test_authoritative_construction_gets_audit_trail(self) -> None:
+    def test_integral_construction_gets_audit_trail(self) -> None:
         tree = _parse("def construct(): pass\n")
         annotations = {
-            ("test.py", "construct"): [_ann("authoritative_construction")],
+            ("test.py", "construct"): [_ann("integral_construction")],
         }
         result, _return_map, _sources, _conflicts, _overclaims = assign_function_taints(tree, "test.py", annotations)
 
-        assert result["construct"] == TaintState.AUDIT_TRAIL
+        assert result["construct"] == TaintState.INTEGRAL
 
-    def test_audit_critical_flag_only_gets_fallback(self) -> None:
-        """audit_critical is a flag, not a taint source → falls to default."""
+    def test_integrity_critical_flag_only_gets_fallback(self) -> None:
+        """integrity_critical is a flag, not a taint source → falls to default."""
         tree = _parse("def critical(): pass\n")
         annotations = {
-            ("test.py", "critical"): [_ann("audit_critical", group=2)],
+            ("test.py", "critical"): [_ann("integrity_critical", group=2)],
         }
         result, _return_map, _sources, _conflicts, _overclaims = assign_function_taints(tree, "test.py", annotations)
 
@@ -134,7 +134,7 @@ class TestModuleTiersTaint:
             module_tiers=(
                 ModuleTierEntry(
                     path="src/myapp",
-                    default_taint="SHAPE_VALIDATED",
+                    default_taint="GUARDED",
                 ),
             ),
         )
@@ -142,7 +142,7 @@ class TestModuleTiersTaint:
             tree, "src/myapp/handlers.py", {}, manifest=manifest
         )
 
-        assert result["plain"] == TaintState.SHAPE_VALIDATED
+        assert result["plain"] == TaintState.GUARDED
 
     def test_subdirectory_matches_module_tier(self) -> None:
         tree = _parse("def nested(): pass\n")
@@ -150,7 +150,7 @@ class TestModuleTiersTaint:
             module_tiers=(
                 ModuleTierEntry(
                     path="src/myapp",
-                    default_taint="AUDIT_TRAIL",
+                    default_taint="INTEGRAL",
                 ),
             ),
         )
@@ -158,7 +158,7 @@ class TestModuleTiersTaint:
             tree, "src/myapp/sub/deep.py", {}, manifest=manifest
         )
 
-        assert result["nested"] == TaintState.AUDIT_TRAIL
+        assert result["nested"] == TaintState.INTEGRAL
 
     def test_partial_name_does_not_match(self) -> None:
         """Path 'api' must NOT match 'api_v2/handler.py'."""
@@ -188,7 +188,7 @@ class TestUnknownRawFallback:
         tree = _parse("def orphan(): pass\n")
         manifest = WardlineManifest(
             module_tiers=(
-                ModuleTierEntry(path="src/other", default_taint="AUDIT_TRAIL"),
+                ModuleTierEntry(path="src/other", default_taint="INTEGRAL"),
             ),
         )
         result, _return_map, _sources, _conflicts, _overclaims = assign_function_taints(
@@ -230,7 +230,7 @@ class TestTaintPrecedence:
             module_tiers=(
                 ModuleTierEntry(
                     path="src/myapp",
-                    default_taint="SHAPE_VALIDATED",
+                    default_taint="GUARDED",
                 ),
             ),
         )
@@ -244,21 +244,21 @@ class TestTaintPrecedence:
         # Decorated function: decorator wins over module default
         assert result["decorated"] == TaintState.EXTERNAL_RAW
         # Undecorated function: module default applies
-        assert result["plain"] == TaintState.SHAPE_VALIDATED
+        assert result["plain"] == TaintState.GUARDED
 
     def test_module_default_overrides_unknown_raw(self) -> None:
         """Declared module default beats UNKNOWN_RAW fallback."""
         tree = _parse("def func(): pass\n")
         manifest = WardlineManifest(
             module_tiers=(
-                ModuleTierEntry(path="src/safe", default_taint="PIPELINE"),
+                ModuleTierEntry(path="src/safe", default_taint="ASSURED"),
             ),
         )
         result, _return_map, _sources, _conflicts, _overclaims = assign_function_taints(
             tree, "src/safe/mod.py", {}, manifest=manifest
         )
 
-        assert result["func"] == TaintState.PIPELINE
+        assert result["func"] == TaintState.ASSURED
 
 
 # ── Async functions ──────────────────────────────────────────────
@@ -302,12 +302,12 @@ class TestAsyncFunctions:
             async def async_fn(): pass
         """)
         annotations = {
-            ("test.py", "sync_fn"): [_ann("tier1_read")],
+            ("test.py", "sync_fn"): [_ann("integral_read")],
             ("test.py", "async_fn"): [_ann("external_boundary")],
         }
         result, _return_map, _sources, _conflicts, _overclaims = assign_function_taints(tree, "test.py", annotations)
 
-        assert result["sync_fn"] == TaintState.AUDIT_TRAIL
+        assert result["sync_fn"] == TaintState.INTEGRAL
         assert result["async_fn"] == TaintState.EXTERNAL_RAW
 
 
@@ -388,24 +388,24 @@ class TestMostSpecificModuleTier:
         """When multiple module_tiers match, longest path wins."""
         manifest = WardlineManifest(
             module_tiers=(
-                ModuleTierEntry(path="src/app", default_taint="AUDIT_TRAIL"),
+                ModuleTierEntry(path="src/app", default_taint="INTEGRAL"),
                 ModuleTierEntry(path="src/app/external", default_taint="EXTERNAL_RAW"),
             ),
         )
-        # File under src/app/external should get EXTERNAL_RAW, not AUDIT_TRAIL
+        # File under src/app/external should get EXTERNAL_RAW, not INTEGRAL
         result = resolve_module_default("src/app/external/client.py", manifest)
         assert result == TaintState.EXTERNAL_RAW
 
-        # File under src/app (but not external) should get AUDIT_TRAIL
+        # File under src/app (but not external) should get INTEGRAL
         result2 = resolve_module_default("src/app/core/model.py", manifest)
-        assert result2 == TaintState.AUDIT_TRAIL
+        assert result2 == TaintState.INTEGRAL
 
     def test_most_specific_wins_regardless_of_order(self) -> None:
         """Specificity wins even if broader entry is listed second."""
         manifest = WardlineManifest(
             module_tiers=(
                 ModuleTierEntry(path="src/app/external", default_taint="EXTERNAL_RAW"),
-                ModuleTierEntry(path="src/app", default_taint="AUDIT_TRAIL"),
+                ModuleTierEntry(path="src/app", default_taint="INTEGRAL"),
             ),
         )
         result = resolve_module_default("src/app/external/client.py", manifest)
@@ -432,7 +432,7 @@ class TestTaintConflictDetection:
                     attrs=MappingProxyType({}),
                 ),
                 WardlineAnnotation(
-                    canonical_name="tier1_read", group=1,
+                    canonical_name="integral_read", group=1,
                     attrs=MappingProxyType({}),
                 ),
             ]
@@ -447,7 +447,7 @@ class TestTaintConflictDetection:
         assert len(conflicts) == 1
         assert conflicts[0].qualname == "f"
         assert conflicts[0].used_decorator == "external_boundary"
-        assert conflicts[0].ignored_decorator == "tier1_read"
+        assert conflicts[0].ignored_decorator == "integral_read"
 
     def test_same_taint_decorators_no_conflict(self) -> None:
         """Two decorators mapping to the same taint are not a conflict."""
@@ -483,7 +483,7 @@ class TestTaintConflictDetection:
         """assign_function_taints returns conflicts in its 4th element."""
         source = textwrap.dedent("""\
             @external_boundary
-            @tier1_read
+            @integral_read
             def mixed():
                 pass
         """)
@@ -495,7 +495,7 @@ class TestTaintConflictDetection:
                     attrs=MappingProxyType({}),
                 ),
                 WardlineAnnotation(
-                    canonical_name="tier1_read", group=1,
+                    canonical_name="integral_read", group=1,
                     attrs=MappingProxyType({}),
                 ),
             ]
@@ -523,7 +523,7 @@ class TestRestorationTaintAssignment:
         assert result["restore"] == TaintState.UNKNOWN_RAW
 
     def test_restoration_full_evidence_audit_trail(self) -> None:
-        """@restoration_boundary(full evidence) -> AUDIT_TRAIL."""
+        """@restoration_boundary(full evidence) -> INTEGRAL."""
         tree = _parse("def restore(): pass\n")
         annotations = {
             ("test.py", "restore"): [_ann_with_attrs("restoration_boundary", 17, {
@@ -534,12 +534,12 @@ class TestRestorationTaintAssignment:
             })],
         }
         result, ret, src, _conflicts, _overclaims = assign_function_taints(tree, "test.py", annotations)
-        assert result["restore"] == TaintState.AUDIT_TRAIL
-        assert ret["restore"] == TaintState.AUDIT_TRAIL
+        assert result["restore"] == TaintState.INTEGRAL
+        assert ret["restore"] == TaintState.INTEGRAL
         assert src["restore"] == "decorator"
 
     def test_restoration_structural_only_unknown_shape(self) -> None:
-        """@restoration_boundary(structural only) -> UNKNOWN_SHAPE_VALIDATED."""
+        """@restoration_boundary(structural only) -> UNKNOWN_GUARDED."""
         tree = _parse("def restore(): pass\n")
         annotations = {
             ("test.py", "restore"): [_ann_with_attrs("restoration_boundary", 17, {
@@ -547,7 +547,7 @@ class TestRestorationTaintAssignment:
             })],
         }
         result, _, _, _, _ = assign_function_taints(tree, "test.py", annotations)
-        assert result["restore"] == TaintState.UNKNOWN_SHAPE_VALIDATED
+        assert result["restore"] == TaintState.UNKNOWN_GUARDED
 
     def test_restoration_no_evidence_unknown_raw(self) -> None:
         """@restoration_boundary(no evidence) -> UNKNOWN_RAW."""
@@ -559,7 +559,7 @@ class TestRestorationTaintAssignment:
         assert result["restore"] == TaintState.UNKNOWN_RAW
 
     def test_int_data_plus_restoration_full_audit_trail(self) -> None:
-        """@int_data + @restoration_boundary(full) -> AUDIT_TRAIL."""
+        """@int_data + @restoration_boundary(full) -> INTEGRAL."""
         tree = _parse("def restore(): pass\n")
         annotations = {
             ("test.py", "restore"): [
@@ -573,7 +573,7 @@ class TestRestorationTaintAssignment:
             ],
         }
         result, _, _, _, _ = assign_function_taints(tree, "test.py", annotations)
-        assert result["restore"] == TaintState.AUDIT_TRAIL
+        assert result["restore"] == TaintState.INTEGRAL
 
     def test_restoration_semantic_without_structural_unknown_raw(self) -> None:
         """semantic+institutional but no structural → UNKNOWN_RAW (structural gate)."""
@@ -613,7 +613,7 @@ class TestRestorationTaintAssignment:
         assert ret2["restore"] == body2["restore"]
 
     def test_restoration_no_institutional_unknown_sem(self) -> None:
-        """structural+semantic but no institutional → UNKNOWN_SEM_VALIDATED."""
+        """structural+semantic but no institutional → UNKNOWN_ASSURED."""
         tree = _parse("def restore(): pass\n")
         annotations = {
             ("test.py", "restore"): [_ann_with_attrs("restoration_boundary", 17, {
@@ -622,7 +622,7 @@ class TestRestorationTaintAssignment:
             })],
         }
         result, _, _, _, _ = assign_function_taints(tree, "test.py", annotations)
-        assert result["restore"] == TaintState.UNKNOWN_SEM_VALIDATED
+        assert result["restore"] == TaintState.UNKNOWN_ASSURED
 
 
 # ── Restoration overclaim diagnostics ──────────────────────────────
@@ -643,9 +643,9 @@ class TestRestorationOverclaimDiagnostic:
         _, _, _, _, overclaims = assign_function_taints(tree, "test.py", annotations)
         assert len(overclaims) == 1
         assert overclaims[0].claimed_tier == 1
-        # structural only, no institutional → UNKNOWN_SHAPE_VALIDATED → Tier 3
+        # structural only, no institutional → UNKNOWN_GUARDED → Tier 3
         assert overclaims[0].evidence_ceiling == 3
-        assert overclaims[0].evidence_taint == TaintState.UNKNOWN_SHAPE_VALIDATED
+        assert overclaims[0].evidence_taint == TaintState.UNKNOWN_GUARDED
         assert overclaims[0].qualname == "restore"
         assert overclaims[0].file_path == "test.py"
 
@@ -662,7 +662,7 @@ class TestRestorationOverclaimDiagnostic:
         _, _, _, _, overclaims = assign_function_taints(tree, "test.py", annotations)
         assert len(overclaims) == 1
         assert overclaims[0].claimed_tier == 1
-        # structural+semantic, no institutional → UNKNOWN_SEM_VALIDATED → Tier 3
+        # structural+semantic, no institutional → UNKNOWN_ASSURED → Tier 3
         assert overclaims[0].evidence_ceiling == 3
 
     def test_overclaim_tier_2_with_structural_institutional(self) -> None:
@@ -678,7 +678,7 @@ class TestRestorationOverclaimDiagnostic:
         _, _, _, _, overclaims = assign_function_taints(tree, "test.py", annotations)
         assert len(overclaims) == 1
         assert overclaims[0].claimed_tier == 2
-        # structural+institutional, no semantic → SHAPE_VALIDATED → Tier 3
+        # structural+institutional, no semantic → GUARDED → Tier 3
         assert overclaims[0].evidence_ceiling == 3
 
     def test_no_overclaim_when_evidence_matches(self) -> None:

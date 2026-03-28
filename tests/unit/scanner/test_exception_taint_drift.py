@@ -19,7 +19,7 @@ def _make_exception(
     *,
     id: str = "EXC-001",
     rule: str = "PY-WL-001",
-    taint_state: str = "PIPELINE",
+    taint_state: str = "ASSURED",
     location: str = "src/app.py::my_func",
     exceptionability: str = "STANDARD",
     severity_at_grant: str = "ERROR",
@@ -52,7 +52,7 @@ def _make_finding(
     rule_id: RuleId = RuleId.PY_WL_001,
     file_path: str = "/project/src/app.py",
     qualname: str = "my_func",
-    taint_state: TaintState = TaintState.PIPELINE,
+    taint_state: TaintState = TaintState.ASSURED,
     severity: Severity = Severity.ERROR,
     exceptionability: Exceptionability = Exceptionability.STANDARD,
     analysis_level: int = 1,
@@ -82,9 +82,9 @@ class TestTaintDriftDetected:
     """Exception taint_state doesn't match function's current effective taint."""
 
     def test_taint_drift_detected(self) -> None:
-        """Exception at PIPELINE, function now EXTERNAL_RAW -> drift finding."""
+        """Exception at ASSURED, function now EXTERNAL_RAW -> drift finding."""
         exc = _make_exception(
-            taint_state="PIPELINE",
+            taint_state="ASSURED",
             location="src/app.py::my_func",
         )
         # taint_map says my_func is now EXTERNAL_RAW
@@ -103,7 +103,7 @@ class TestTaintDriftDetected:
             if g.rule_id == RuleId.GOVERNANCE_EXCEPTION_TAINT_DRIFT
         ]
         assert len(drift_findings) == 1
-        assert "PIPELINE" in drift_findings[0].message
+        assert "ASSURED" in drift_findings[0].message
         assert "EXTERNAL_RAW" in drift_findings[0].message
         assert drift_findings[0].exception_id == "EXC-001"
 
@@ -150,7 +150,7 @@ class TestLevelStaleDoesNotSuppress:
         fp = compute_ast_fingerprint(py_file, "my_func", project_root=tmp_path)
 
         exc = _make_exception(
-            taint_state="PIPELINE",
+            taint_state="ASSURED",
             location="src/app.py::my_func",
             analysis_level=1,
             ast_fingerprint=fp or "abcdef1234567890",
@@ -158,7 +158,7 @@ class TestLevelStaleDoesNotSuppress:
 
         finding = _make_finding(
             file_path=str(py_file),
-            taint_state=TaintState.PIPELINE,
+            taint_state=TaintState.ASSURED,
         )
 
         processed, governance = apply_exceptions(
@@ -197,7 +197,7 @@ class TestMatchingExceptionStillWorks:
         assert fp is not None
 
         exc = _make_exception(
-            taint_state="PIPELINE",
+            taint_state="ASSURED",
             location="src/app.py::my_func",
             analysis_level=3,
             ast_fingerprint=fp,
@@ -205,10 +205,10 @@ class TestMatchingExceptionStillWorks:
 
         finding = _make_finding(
             file_path=str(py_file),
-            taint_state=TaintState.PIPELINE,
+            taint_state=TaintState.ASSURED,
         )
 
-        taint_map = {"my_func": TaintState.PIPELINE}
+        taint_map = {"my_func": TaintState.ASSURED}
 
         processed, governance = apply_exceptions(
             [finding],
@@ -242,7 +242,7 @@ class TestDriftFindingIsUnconditional:
     def test_drift_finding_is_unconditional(self) -> None:
         """GOVERNANCE_EXCEPTION_TAINT_DRIFT finding has UNCONDITIONAL exceptionability."""
         exc = _make_exception(
-            taint_state="PIPELINE",
+            taint_state="ASSURED",
             location="src/app.py::my_func",
         )
         taint_map = {"my_func": TaintState.EXTERNAL_RAW}

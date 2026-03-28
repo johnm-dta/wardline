@@ -1,12 +1,12 @@
 ---
 # schema_version: 0.1
 specimen_id: "L3-module-default-not-upgraded"
-description: "L3: module_tiers PIPELINE function calls @tier1_read — stays PIPELINE (floor clamp)"
+description: "L3: module_tiers ASSURED function calls @integral_read — stays ASSURED (floor clamp)"
 rule: "PY-WL-001"
 fragment: |
-  from wardline.decorators import tier1_read
+  from wardline.decorators import integral_read
   
-  @tier1_read
+  @integral_read
   def get_internal():
       return {"key": "internal"}
   
@@ -14,7 +14,7 @@ fragment: |
       data = get_internal()
       return data.get("key", "default")
   
-taint_state: "PIPELINE"
+taint_state: "ASSURED"
 analysis_level_required: 3
 expected_rules: ["PY-WL-001"]
 expected_severity: "ERROR"

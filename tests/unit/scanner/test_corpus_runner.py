@@ -505,7 +505,7 @@ class TestPerCellStats:
         from wardline.cli.corpus_cmds import _CellStats
 
         stats: dict[tuple[str, str], _CellStats] = {}
-        key = ("PY-WL-001", "AUDIT_TRAIL")
+        key = ("PY-WL-001", "INTEGRAL")
         stats[key] = _CellStats()
         stats[key].tp += 1
         assert stats[key].tp == 1
@@ -515,9 +515,9 @@ class TestPerCellStats:
         from wardline.cli.corpus_cmds import _CellStats
 
         stats: dict[tuple[str, str], _CellStats] = {}
-        stats[("PY-WL-001", "AUDIT_TRAIL")] = _CellStats(tp=5)
+        stats[("PY-WL-001", "INTEGRAL")] = _CellStats(tp=5)
         stats[("PY-WL-001", "EXTERNAL_RAW")] = _CellStats(tp=3, fp=1)
-        assert stats[("PY-WL-001", "AUDIT_TRAIL")].tp == 5
+        assert stats[("PY-WL-001", "INTEGRAL")].tp == 5
         assert stats[("PY-WL-001", "EXTERNAL_RAW")].tp == 3
 
 

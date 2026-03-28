@@ -66,8 +66,8 @@ class TestLoadExceptions:
             load_exceptions(tmp_path)
 
     def test_unconditional_cell_raises(self, tmp_path: Path) -> None:
-        # PY-WL-001 with AUDIT_TRAIL is UNCONDITIONAL in the severity matrix
-        entry = _valid_entry(rule="PY-WL-001", taint_state="AUDIT_TRAIL")
+        # PY-WL-001 with INTEGRAL is UNCONDITIONAL in the severity matrix
+        entry = _valid_entry(rule="PY-WL-001", taint_state="INTEGRAL")
         _write_exceptions(tmp_path / "wardline.exceptions.json", [entry])
         with pytest.raises(ManifestLoadError, match="UNCONDITIONAL"):
             load_exceptions(tmp_path)

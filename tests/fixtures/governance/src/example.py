@@ -1,5 +1,5 @@
 # schema_version: 0.1
-from wardline.decorators import external_boundary, tier1_read, validates_shape
+from wardline.decorators import external_boundary, integral_read, validates_shape
 
 
 @external_boundary
@@ -14,6 +14,6 @@ def check_schema(data: dict) -> bool:
     return True
 
 
-@tier1_read
+@integral_read
 def get_config() -> dict:
     return {"key": "value"}

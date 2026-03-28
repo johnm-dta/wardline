@@ -4,7 +4,7 @@ description: Pattern inside a class method
 rule: PY-WL-001
 fragment: "class Handler:\n    def process(self, data):\n        x = data.get(\"key\"\
   , \"default\")\n"
-taint_state: SHAPE_VALIDATED
+taint_state: GUARDED
 expected_rules:
 - PY-WL-001
 expected_match: true

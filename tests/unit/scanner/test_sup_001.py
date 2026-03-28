@@ -165,9 +165,9 @@ class TestIdentityAndPrivilege:
         rule = _run_rule(
             """\
 from wardline.decorators.access import requires_identity
-from wardline.decorators.authority import audit_writer
+from wardline.decorators.authority import integral_writer
 
-@audit_writer
+@integral_writer
 def audit_log(actor):
     return actor
 

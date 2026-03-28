@@ -154,7 +154,7 @@ class TestTaintGating:
     def test_audit_trail_is_error(self) -> None:
         rule = _run_rule_with_taint(
             "isinstance(x, dict)\n",
-            TaintState.AUDIT_TRAIL,
+            TaintState.INTEGRAL,
         )
 
         assert len(rule.findings) == 1
@@ -181,7 +181,7 @@ class TestTaintGating:
     def test_pipeline_is_warning(self) -> None:
         rule = _run_rule_with_taint(
             "isinstance(x, dict)\n",
-            TaintState.PIPELINE,
+            TaintState.ASSURED,
         )
 
         assert len(rule.findings) == 1
@@ -383,7 +383,7 @@ def _run_rule_with_boundary(
     boundary = BoundaryEntry(function=qualname, transition=transition)
     ctx = ScanContext(
         file_path="test.py",
-        function_level_taint_map={qualname: TaintState.SHAPE_VALIDATED},
+        function_level_taint_map={qualname: TaintState.GUARDED},
         boundaries=(boundary,),
     )
     rule = RulePyWl007(file_path="test.py")

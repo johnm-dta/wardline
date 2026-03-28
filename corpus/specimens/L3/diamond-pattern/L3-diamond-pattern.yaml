@@ -4,9 +4,9 @@ specimen_id: "L3-diamond-pattern"
 description: "L3: A→B,C; B,C→D — A gets max_rank(B_taint, C_taint)"
 rule: "PY-WL-001"
 fragment: |
-  from wardline.decorators import external_boundary, tier1_read
+  from wardline.decorators import external_boundary, integral_read
   
-  @tier1_read
+  @integral_read
   def safe_source():
       return {"key": "value"}
   

@@ -3,7 +3,7 @@
 The engine builds a callee-resolution map where decorator-anchored
 functions use RETURN_TAINT (OUTPUT tier) instead of BODY_EVAL_TAINT
 (INPUT tier). This ensures that `x = validates_shape(data)` assigns
-SHAPE_VALIDATED to x, not EXTERNAL_RAW.
+GUARDED to x, not EXTERNAL_RAW.
 """
 
 from __future__ import annotations
@@ -23,13 +23,13 @@ class TestCalleeReturnTaintResolution:
         "callee_taint,expected_var_taint",
         [
             # Anchored validators: engine passes RETURN taint (OUTPUT tier)
-            (TaintState.SHAPE_VALIDATED, TaintState.SHAPE_VALIDATED),
-            (TaintState.PIPELINE, TaintState.PIPELINE),
+            (TaintState.GUARDED, TaintState.GUARDED),
+            (TaintState.ASSURED, TaintState.ASSURED),
             # Non-validators: body == return, so callee map has same value
-            (TaintState.AUDIT_TRAIL, TaintState.AUDIT_TRAIL),
+            (TaintState.INTEGRAL, TaintState.INTEGRAL),
             (TaintState.EXTERNAL_RAW, TaintState.EXTERNAL_RAW),
         ],
-        ids=["validates_shape", "validates_semantic", "tier1_read", "external_boundary"],
+        ids=["validates_shape", "validates_semantic", "integral_read", "external_boundary"],
     )
     def test_variable_gets_callee_return_taint(
         self,
@@ -94,17 +94,17 @@ def caller(data):
         assert isinstance(func_node, ast.FunctionDef)
 
         # If the engine correctly builds the callee map, 'validate' has
-        # SHAPE_VALIDATED (return taint). If it incorrectly passes body
+        # GUARDED (return taint). If it incorrectly passes body
         # taint, it would be EXTERNAL_RAW.
         callee_taint_map = {
             "caller": TaintState.UNKNOWN_RAW,
-            "validate": TaintState.SHAPE_VALIDATED,  # return taint, NOT body taint
+            "validate": TaintState.GUARDED,  # return taint, NOT body taint
         }
 
         var_taints = compute_variable_taints(
             func_node, TaintState.UNKNOWN_RAW, callee_taint_map
         )
 
-        assert var_taints["validated"] == TaintState.SHAPE_VALIDATED
+        assert var_taints["validated"] == TaintState.GUARDED
         # Would be EXTERNAL_RAW if body taint were used — that's the bug
         assert var_taints["validated"] != TaintState.EXTERNAL_RAW

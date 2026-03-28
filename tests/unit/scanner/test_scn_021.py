@@ -129,16 +129,16 @@ def target():
 
 
 class TestAliasPairDedup:
-    def test_fail_open_audit_critical_produces_one_finding(self) -> None:
+    def test_fail_open_integrity_critical_produces_one_finding(self) -> None:
         """Entry #5 and #19 are the same pair — must produce exactly 1 finding."""
         rule = _run_rule(
             """\
 @fail_open
-@audit_critical
+@integrity_critical
 def target():
     return 1
 """,
-            annotations=("fail_open", "audit_critical"),
+            annotations=("fail_open", "integrity_critical"),
         )
         assert len(rule.findings) == 1
         assert rule.findings[0].severity == Severity.ERROR
@@ -175,7 +175,7 @@ class TestNegativeCombinations:
         [
             ("fail_closed", "deterministic"),
             ("atomic", "fail_closed"),
-            ("handles_pii", "tier1_read"),
+            ("handles_pii", "integral_read"),
             ("thread_safe", "atomic"),
             ("test_only", "deprecated_by"),
             ("handles_secrets", "thread_safe"),
@@ -183,7 +183,7 @@ class TestNegativeCombinations:
         ids=[f"{left}+{right}" for left, right in [
             ("fail_closed", "deterministic"),
             ("atomic", "fail_closed"),
-            ("handles_pii", "tier1_read"),
+            ("handles_pii", "integral_read"),
             ("thread_safe", "atomic"),
             ("test_only", "deprecated_by"),
             ("handles_secrets", "thread_safe"),

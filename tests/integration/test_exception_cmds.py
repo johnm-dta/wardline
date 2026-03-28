@@ -54,7 +54,7 @@ class TestExceptionAdd:
                 "exception", "add",
                 "--rule", "PY-WL-001",
                 "--location", location,
-                "--taint-state", "PIPELINE",
+                "--taint-state", "ASSURED",
                 "--rationale", "Test rationale",
                 "--reviewer", "tester",
                 "--governance-path", "standard",
@@ -72,7 +72,7 @@ class TestExceptionAdd:
         assert len(data["exceptions"]) == 1
         entry = data["exceptions"][0]
         assert entry["rule"] == "PY-WL-001"
-        assert entry["taint_state"] == "PIPELINE"
+        assert entry["taint_state"] == "ASSURED"
         assert entry["ast_fingerprint"] is not None
         assert len(entry["ast_fingerprint"]) == 16
         assert entry["recurrence_count"] == 0
@@ -85,14 +85,14 @@ class TestExceptionAdd:
         monkeypatch.chdir(tmp_path)
 
         runner = CliRunner()
-        # PY-WL-001 + AUDIT_TRAIL is UNCONDITIONAL per matrix
+        # PY-WL-001 + INTEGRAL is UNCONDITIONAL per matrix
         result = runner.invoke(
             cli,
             [
                 "exception", "add",
                 "--rule", "PY-WL-001",
                 "--location", f"{py_file}::process_data",
-                "--taint-state", "AUDIT_TRAIL",
+                "--taint-state", "INTEGRAL",
                 "--rationale", "Test",
                 "--reviewer", "tester",
             ],
@@ -113,7 +113,7 @@ class TestExceptionAdd:
                 "exception", "add",
                 "--rule", "INVALID-RULE",
                 "--location", f"{py_file}::process_data",
-                "--taint-state", "PIPELINE",
+                "--taint-state", "ASSURED",
                 "--rationale", "Test",
                 "--reviewer", "tester",
             ],
@@ -134,7 +134,7 @@ class TestExceptionAdd:
                 "exception", "add",
                 "--rule", "PY-WL-001",
                 "--location", "no_separator",
-                "--taint-state", "PIPELINE",
+                "--taint-state", "ASSURED",
                 "--rationale", "Test",
                 "--reviewer", "tester",
             ],
@@ -223,7 +223,7 @@ class TestExceptionExpire:
                 "exception", "add",
                 "--rule", "PY-WL-001",
                 "--location", location,
-                "--taint-state", "PIPELINE",
+                "--taint-state", "ASSURED",
                 "--rationale", "Test",
                 "--reviewer", "tester",
             ],
@@ -313,7 +313,7 @@ def _add_exception(
     py_file: Path,
     *,
     rule: str = "PY-WL-001",
-    taint: str = "PIPELINE",
+    taint: str = "ASSURED",
     expires: str | None = None,
 ) -> str:
     """Add an exception and return the exception ID."""
@@ -496,7 +496,7 @@ class TestMultiFindingPartition:
                 message="get with default",
                 severity=Severity.ERROR,
                 exceptionability=Exceptionability.STANDARD,
-                taint_state=TaintState.PIPELINE,
+                taint_state=TaintState.ASSURED,
                 analysis_level=1,
                 source_snippet=None,
                 qualname="func_a",
@@ -508,7 +508,7 @@ class TestMultiFindingPartition:
                 message="get with default",
                 severity=Severity.ERROR,
                 exceptionability=Exceptionability.STANDARD,
-                taint_state=TaintState.PIPELINE,
+                taint_state=TaintState.ASSURED,
                 analysis_level=1,
                 source_snippet=None,
                 qualname="func_b",
@@ -519,7 +519,7 @@ class TestMultiFindingPartition:
             ExceptionEntry(
                 id="EXC-AAAA0001",
                 rule="PY-WL-001",
-                taint_state="PIPELINE",
+                taint_state="ASSURED",
                 location=f"{rel}::func_a",
                 exceptionability="STANDARD",
                 severity_at_grant="ERROR",
@@ -534,7 +534,7 @@ class TestMultiFindingPartition:
             ExceptionEntry(
                 id="EXC-BBBB0002",
                 rule="PY-WL-001",
-                taint_state="PIPELINE",
+                taint_state="ASSURED",
                 location=f"{rel}::func_b",
                 exceptionability="STANDARD",
                 severity_at_grant="ERROR",

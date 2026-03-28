@@ -27,7 +27,7 @@ The 35-agent conformance audit found 4 critical findings, 12 high-priority conce
 - What taint state should rules evaluate at inside the function body (input tier)
 - What taint state should the return value carry for propagation (output tier)
 
-Currently `@validates_shape` body evaluates at SHAPE_VALIDATED (output). Per spec, it should evaluate at EXTERNAL_RAW (input). `@validates_external` similarly evaluates at PIPELINE (output) instead of EXTERNAL_RAW (input). This produces systematic false negatives for pattern rules inside validator bodies.
+Currently `@validates_shape` body evaluates at GUARDED (output). Per spec, it should evaluate at EXTERNAL_RAW (input). `@validates_external` similarly evaluates at ASSURED (output) instead of EXTERNAL_RAW (input). This produces systematic false negatives for pattern rules inside validator bodies.
 
 **Fix:** Split the existing 7-entry `DECORATOR_TAINT_MAP` into two maps in `function_level.py`:
 
@@ -35,24 +35,24 @@ Currently `@validates_shape` body evaluates at SHAPE_VALIDATED (output). Per spe
 
 | Decorator | Current Taint | Corrected Body Taint | Change |
 |-----------|--------------|---------------------|--------|
-| `validates_shape` | SHAPE_VALIDATED | **EXTERNAL_RAW** | Bug fix |
-| `validates_external` | PIPELINE | **EXTERNAL_RAW** | Bug fix |
-| `validates_semantic` | PIPELINE | **SHAPE_VALIDATED** | Bug fix |
-| `tier1_read` | AUDIT_TRAIL | AUDIT_TRAIL | No change |
-| `audit_writer` | AUDIT_TRAIL | AUDIT_TRAIL | No change |
-| `authoritative_construction` | AUDIT_TRAIL | AUDIT_TRAIL | No change |
+| `validates_shape` | GUARDED | **EXTERNAL_RAW** | Bug fix |
+| `validates_external` | ASSURED | **EXTERNAL_RAW** | Bug fix |
+| `validates_semantic` | ASSURED | **GUARDED** | Bug fix |
+| `integral_read` | INTEGRAL | INTEGRAL | No change |
+| `integral_writer` | INTEGRAL | INTEGRAL | No change |
+| `integral_construction` | INTEGRAL | INTEGRAL | No change |
 | `external_boundary` | EXTERNAL_RAW | EXTERNAL_RAW | No change |
 
 **RETURN_TAINT** — used by the taint propagation engine when computing callee return taints:
 
 | Decorator | Return Value Taint |
 |-----------|-------------------|
-| `validates_shape` | SHAPE_VALIDATED |
-| `validates_external` | PIPELINE |
-| `validates_semantic` | PIPELINE |
-| `tier1_read` | AUDIT_TRAIL |
-| `audit_writer` | AUDIT_TRAIL |
-| `authoritative_construction` | AUDIT_TRAIL |
+| `validates_shape` | GUARDED |
+| `validates_external` | ASSURED |
+| `validates_semantic` | ASSURED |
+| `integral_read` | INTEGRAL |
+| `integral_writer` | INTEGRAL |
+| `integral_construction` | INTEGRAL |
 | `external_boundary` | EXTERNAL_RAW |
 
 Both maps contain exactly the 7 decorators currently in `DECORATOR_TAINT_MAP`. No new decorators are added in this phase — `int_data`, `system_plugin`, and `fail_closed` are out of scope (they aren't in the current map and adding them is a behavioral expansion, not a bug fix).
@@ -60,21 +60,21 @@ Both maps contain exactly the 7 decorators currently in `DECORATOR_TAINT_MAP`. N
 **Implementation detail — `taint_from_annotations`:** The current function (`taint_from_annotations`) iterates decorator names and returns the first match from `DECORATOR_TAINT_MAP`. After the split, it needs to accept a parameter or return both body and return taints. The simplest approach: rename `taint_from_annotations` to return a `(body_taint, return_taint)` tuple, or add a `purpose: Literal["body", "return"]` parameter. The call sites in `assign_function_taints` and the L2/L3 propagation code each use the appropriate map.
 
 **Expected test impact:** The following test files are likely to need updates because they contain tests with code inside `@validates_shape`, `@validates_semantic`, or `@validates_external` bodies:
-- `tests/unit/scanner/test_py_wl_003.py` — boundary suppression tests (existence checks inside validators will now evaluate at EXTERNAL_RAW instead of SHAPE_VALIDATED/PIPELINE, changing the severity lookup)
+- `tests/unit/scanner/test_py_wl_003.py` — boundary suppression tests (existence checks inside validators will now evaluate at EXTERNAL_RAW instead of GUARDED/ASSURED, changing the severity lookup)
 - `tests/unit/scanner/test_py_wl_007.py` — declared boundary suppression tests
 - `tests/unit/scanner/test_py_wl_008.py` — boundary rejection path tests (taint context changes)
 - `tests/unit/scanner/test_py_wl_009.py` — validation ordering tests
 - `tests/integration/test_scan_cmd.py` — integration tests that scan files with validation boundaries
 
-The direction of change: tests asserting findings inside validator bodies at SHAPE_VALIDATED or PIPELINE severity will need to assert EXTERNAL_RAW or SHAPE_VALIDATED severity instead (one tier lower in each case). Tests asserting return value taint should be unchanged.
+The direction of change: tests asserting findings inside validator bodies at GUARDED or ASSURED severity will need to assert EXTERNAL_RAW or GUARDED severity instead (one tier lower in each case). Tests asserting return value taint should be unchanged.
 
 **Consequences for per-rule suppressions:** After the fix, PY-WL-003's `_is_structural_validation_boundary` suppression and PY-WL-007's declared-boundary suppression may become partially redundant — with correct body taint, existence checking inside `@validates_shape` evaluates at EXTERNAL_RAW where PY-WL-003 is already E/St (governable), not E/U. Review whether these suppressions should be simplified or retained as defence-in-depth. Do not remove them in this phase — assess after matrix cell tests confirm the new behavior is correct.
 
 **Verification:** After the fix, add tests that:
 - `@validates_shape` body evaluates at EXTERNAL_RAW
-- `@validates_semantic` body evaluates at SHAPE_VALIDATED
+- `@validates_semantic` body evaluates at GUARDED
 - `@validates_external` body evaluates at EXTERNAL_RAW
-- Return values carry the correct output taint for propagation (SHAPE_VALIDATED, PIPELINE, PIPELINE respectively)
+- Return values carry the correct output taint for propagation (GUARDED, ASSURED, ASSURED respectively)
 
 ### 2. CF-2: SCN-021 test coverage to all combinations
 
@@ -89,7 +89,7 @@ The direction of change: tests asserting findings inside validator bodies at SHA
    - Correct exceptionability: UNCONDITIONAL for all
    - Correct rule_id: SCN_021
 
-2. Add at least 5 negative test cases for valid decorator combinations that must NOT fire. Examples: `@fail_closed + @deterministic`, `@atomic + @fail_closed`, `@handles_pii + @tier1_read`, `@thread_safe + @atomic`, `@test_only + @deprecated_by`.
+2. Add at least 5 negative test cases for valid decorator combinations that must NOT fire. Examples: `@fail_closed + @deterministic`, `@atomic + @fail_closed`, `@handles_pii + @integral_read`, `@thread_safe + @atomic`, `@test_only + @deprecated_by`.
 
 3. Add test for alias pair behavior — verify that after HC-5 dedup fix, each semantic contradiction produces exactly 1 finding.
 
@@ -98,9 +98,9 @@ The direction of change: tests asserting findings inside validator bodies at SHA
 **Audit source:** D-SA, D-PE, D-SAS, D-SecA (4 independent agents)
 **File:** `src/wardline/scanner/rules/scn_021.py`
 
-**Problem:** Entry #5 (`fail_open + audit_critical`) and entry #19 (`audit_critical + fail_open`) are the same decorator pair reversed. The matching at line ~132 checks `spec.left in names and spec.right in names` — since both left and right are checked independently against the decorator name set, order is irrelevant and both entries fire, producing 2 findings for 1 violation.
+**Problem:** Entry #5 (`fail_open + integrity_critical`) and entry #19 (`integrity_critical + fail_open`) are the same decorator pair reversed. The matching at line ~132 checks `spec.left in names and spec.right in names` — since both left and right are checked independently against the decorator name set, order is irrelevant and both entries fire, producing 2 findings for 1 violation.
 
-**Fix:** Remove entry #19 from `_COMBINATIONS`. Add a comment: `# Spec entry #19 (audit_critical + fail_open) is an alias of #5 — removed to prevent duplicate findings.`
+**Fix:** Remove entry #19 from `_COMBINATIONS`. Add a comment: `# Spec entry #19 (integrity_critical + fail_open) is an alias of #5 — removed to prevent duplicate findings.`
 
 **Verification:** Confirm no other true duplicates exist. Entry #23 (`preserve_cause + exception_boundary`) appears to alias #12 (`exception_boundary + must_propagate`) per the spec's note, but these are NOT the same pair — they involve different decorator names (`preserve_cause` vs `must_propagate`) and both should remain.
 
@@ -176,10 +176,10 @@ Add a test with an `except*` handler containing an audit call to verify exactly 
 
 ## Success Criteria
 
-- `@validates_shape` body evaluates at EXTERNAL_RAW, not SHAPE_VALIDATED
-- `@validates_semantic` body evaluates at SHAPE_VALIDATED, not PIPELINE
-- `@validates_external` body evaluates at EXTERNAL_RAW, not PIPELINE
-- Return value taints are unchanged (SHAPE_VALIDATED, PIPELINE, PIPELINE)
+- `@validates_shape` body evaluates at EXTERNAL_RAW, not GUARDED
+- `@validates_semantic` body evaluates at GUARDED, not ASSURED
+- `@validates_external` body evaluates at EXTERNAL_RAW, not ASSURED
+- Return value taints are unchanged (GUARDED, ASSURED, ASSURED)
 - SCN-021 has tests for all 28 combinations (after #19 removal) + 5+ negative cases
 - SCN-021 tests assert exceptionability (UNCONDITIONAL) on every finding
 - Every severity matrix cell (72 total) has a test asserting correct (severity, exceptionability)

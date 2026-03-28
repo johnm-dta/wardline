@@ -88,10 +88,10 @@ except Exception:
 class TestDecoratedAuditTargets:
     """Locally declared audit writers and critical paths count as audit-critical."""
 
-    def test_local_audit_writer_call_fires(self) -> None:
+    def test_local_integral_writer_call_fires(self) -> None:
         rule = _run_rule_module(
             """\
-@audit_writer
+@integral_writer
 def write_audit(data):
     return None
 
@@ -105,10 +105,10 @@ def target():
 
         assert len(rule.findings) == 1
 
-    def test_local_audit_critical_call_fires(self) -> None:
+    def test_local_integrity_critical_call_fires(self) -> None:
         rule = _run_rule_module(
             """\
-@audit_critical
+@integrity_critical
 def emit_legal_record(data):
     return None
 
@@ -210,10 +210,10 @@ return result
         assert len(rule.findings) == 1
         assert "bypass audit" in rule.findings[0].message
 
-    def test_local_audit_writer_must_dominate_success_paths(self) -> None:
+    def test_local_integral_writer_must_dominate_success_paths(self) -> None:
         rule = _run_rule_module(
             """\
-@audit_writer
+@integral_writer
 def write_audit(data):
     return None
 
@@ -323,13 +323,13 @@ class TestTaintGating:
     """PY-WL-006 severity/exceptionability varies by taint state."""
 
     def test_audit_trail_is_error_unconditional(self) -> None:
-        rule = _run_rule_with_taint(_AUDIT_SOURCE, TaintState.AUDIT_TRAIL)
+        rule = _run_rule_with_taint(_AUDIT_SOURCE, TaintState.INTEGRAL)
         assert len(rule.findings) >= 1
         assert rule.findings[0].severity == Severity.ERROR
         assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
 
     def test_pipeline_is_error_unconditional(self) -> None:
-        rule = _run_rule_with_taint(_AUDIT_SOURCE, TaintState.PIPELINE)
+        rule = _run_rule_with_taint(_AUDIT_SOURCE, TaintState.ASSURED)
         assert len(rule.findings) >= 1
         assert rule.findings[0].severity == Severity.ERROR
         assert rule.findings[0].exceptionability == Exceptionability.UNCONDITIONAL
@@ -341,7 +341,7 @@ class TestTaintGating:
         assert rule.findings[0].exceptionability == Exceptionability.STANDARD
 
     def test_shape_validated_is_error_standard(self) -> None:
-        rule = _run_rule_with_taint(_AUDIT_SOURCE, TaintState.SHAPE_VALIDATED)
+        rule = _run_rule_with_taint(_AUDIT_SOURCE, TaintState.GUARDED)
         assert len(rule.findings) >= 1
         assert rule.findings[0].severity == Severity.ERROR
         assert rule.findings[0].exceptionability == Exceptionability.STANDARD

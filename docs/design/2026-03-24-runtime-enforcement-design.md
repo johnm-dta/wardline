@@ -40,11 +40,11 @@ Codify the `TaintState → AuthorityTier` mapping as a frozen dict:
 
 ```python
 TAINT_TO_TIER: MappingProxyType[TaintState, AuthorityTier] = MappingProxyType({
-    TaintState.AUDIT_TRAIL: AuthorityTier.TIER_1,
-    TaintState.PIPELINE: AuthorityTier.TIER_2,
-    TaintState.SHAPE_VALIDATED: AuthorityTier.TIER_3,
-    TaintState.UNKNOWN_SEM_VALIDATED: AuthorityTier.TIER_3,
-    TaintState.UNKNOWN_SHAPE_VALIDATED: AuthorityTier.TIER_3,
+    TaintState.INTEGRAL: AuthorityTier.TIER_1,
+    TaintState.ASSURED: AuthorityTier.TIER_2,
+    TaintState.GUARDED: AuthorityTier.TIER_3,
+    TaintState.UNKNOWN_ASSURED: AuthorityTier.TIER_3,
+    TaintState.UNKNOWN_GUARDED: AuthorityTier.TIER_3,
     TaintState.EXTERNAL_RAW: AuthorityTier.TIER_4,
     TaintState.UNKNOWN_RAW: AuthorityTier.TIER_4,
     TaintState.MIXED_RAW: AuthorityTier.TIER_4,
@@ -60,7 +60,7 @@ if len(TAINT_TO_TIER) != len(TaintState):
 **Output tier derivation from decorators:**
 - `_wardline_transition` decorators (e.g., `@validates_shape`): output tier = `TAINT_TO_TIER[transition[1]]` (the "to" state)
 - `_wardline_tier_source` decorators (e.g., `@external_boundary`): output tier = `TAINT_TO_TIER[tier_source]`
-- Supplementary decorators (e.g., `@audit_critical`): no tier — not a trust boundary
+- Supplementary decorators (e.g., `@integrity_critical`): no tier — not a trust boundary
 
 ### 2. Automatic Stamping (Decorator Path)
 
@@ -228,7 +228,7 @@ Or: `WARDLINE_ENFORCE=1` (checked at import time).
 - `test_decorator_skips_slots_object` — catches AttributeError silently
 - `test_decorator_no_stamp_when_disabled` — enforcement off, no stamping
 - `test_stamped_by_records_qualname` — captures function's `__qualname__`
-- `test_supplementary_decorator_no_stamp` — `@audit_critical` doesn't stamp
+- `test_supplementary_decorator_no_stamp` — `@integrity_critical` doesn't stamp
 - `test_groups_normalized_to_sorted_tuple` — set input → tuple output
 
 **Explicit API:**

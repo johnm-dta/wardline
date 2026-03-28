@@ -70,29 +70,29 @@ REGISTRY: MappingProxyType[str, RegistryEntry] = MappingProxyType({
         group=1,
         attrs={"_wardline_transition": tuple},  # type: ignore[arg-type]  # __post_init__ converts
     ),
-    "tier1_read": RegistryEntry(
-        canonical_name="tier1_read",
+    "integral_read": RegistryEntry(
+        canonical_name="integral_read",
         group=1,
         attrs={"_wardline_tier_source": TaintState},  # type: ignore[arg-type]  # __post_init__ converts
     ),
-    "audit_writer": RegistryEntry(
-        canonical_name="audit_writer",
+    "integral_writer": RegistryEntry(
+        canonical_name="integral_writer",
         group=1,
         attrs={  # type: ignore[arg-type]  # __post_init__ converts
             "_wardline_tier_source": TaintState,
-            "_wardline_audit_writer": bool,
+            "_wardline_integral_writer": bool,
         },
     ),
-    "authoritative_construction": RegistryEntry(
-        canonical_name="authoritative_construction",
+    "integral_construction": RegistryEntry(
+        canonical_name="integral_construction",
         group=1,
         attrs={"_wardline_transition": tuple},  # type: ignore[arg-type]  # __post_init__ converts
     ),
     # --- Group 2: Audit ---
-    "audit_critical": RegistryEntry(
-        canonical_name="audit_critical",
+    "integrity_critical": RegistryEntry(
+        canonical_name="integrity_critical",
         group=2,
-        attrs={"_wardline_audit_critical": bool},  # type: ignore[arg-type]  # __post_init__ converts
+        attrs={"_wardline_integrity_critical": bool},  # type: ignore[arg-type]  # __post_init__ converts
     ),
     # --- Group 3: Plugin ---
     "system_plugin": _bool_entry("system_plugin", 3),

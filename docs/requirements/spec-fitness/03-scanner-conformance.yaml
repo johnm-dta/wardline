@@ -311,7 +311,7 @@ requirements:
         - tests/unit/scanner
     fitness_dimensions: [correctness, conformance]
     notes: >
-      Group 2 specifies that audit_writer calls must dominate telemetry
+      Group 2 specifies that integral_writer calls must dominate telemetry
       on shared execution paths. Path-sensitive analysis means all code
       paths are considered, not just the happy path.
 

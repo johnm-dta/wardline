@@ -1,12 +1,12 @@
 ---
 # schema_version: 0.1
 specimen_id: "L3-floating-refinement"
-description: "L3: undecorated A calls only @tier1_read — refined from UNKNOWN_RAW to AUDIT_TRAIL"
+description: "L3: undecorated A calls only @integral_read — refined from UNKNOWN_RAW to INTEGRAL"
 rule: "PY-WL-001"
 fragment: |
-  from wardline.decorators import tier1_read
+  from wardline.decorators import integral_read
   
-  @tier1_read
+  @integral_read
   def load_config():
       return {"key": "value"}
   
@@ -14,7 +14,7 @@ fragment: |
       cfg = load_config()
       return cfg.get(name, "default")
   
-taint_state: "AUDIT_TRAIL"
+taint_state: "INTEGRAL"
 analysis_level_required: 3
 expected_rules: []
 expected_severity: null

@@ -173,14 +173,14 @@ def _resolve_boundary_transition(
     """Resolve boundary transition from annotations.
 
     Looks for decorators that set boundary transitions (validates_shape,
-    validates_semantic, validates_external, authoritative_construction,
+    validates_semantic, validates_external, integral_construction,
     external_boundary).
     """
     _TRANSITION_MAP: dict[str, str] = {
         "validates_shape": "shape_validation",
         "validates_semantic": "semantic_validation",
         "validates_external": "external_validation",
-        "authoritative_construction": "construction",
+        "integral_construction": "construction",
         "external_boundary": "ingress",
     }
     for ann in annotations:

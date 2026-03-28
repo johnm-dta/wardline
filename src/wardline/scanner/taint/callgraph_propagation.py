@@ -241,7 +241,7 @@ def propagate_callgraph_taints(
                     callee_ranks.append(TRUST_RANK[c_return_taint])
                 else:
                     callee_ranks.append(TRUST_RANK[current[c]])
-            max_callee_rank = max(callee_ranks, default=TRUST_RANK[TaintState.AUDIT_TRAIL])
+            max_callee_rank = max(callee_ranks, default=TRUST_RANK[TaintState.INTEGRAL])
 
             # Floor clamp for module_default: result >= L1 rank
             if func in floating_down:

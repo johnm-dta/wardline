@@ -127,7 +127,7 @@ tiers:
     description: "test tier"
 module_tiers:
   - path: "src/"
-    default_taint: "PIPELINE"
+    default_taint: "ASSURED"
 delegation:
   default_authority: "RELAXED"
 rules:

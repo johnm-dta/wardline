@@ -184,7 +184,7 @@ requirements:
     statement: >
       The scanner MUST detect mutually exclusive decorator combinations as
       ERROR findings (SCN-021). The Python binding defines 29 specific
-      contradictory pairs including tier conflicts (e.g., @tier1_read with
+      contradictory pairs including tier conflicts (e.g., @integral_read with
       @validates_shape), semantic conflicts (e.g., @fail_closed with
       @fail_open), and scope conflicts (e.g., @deterministic with
       @not_reentrant).

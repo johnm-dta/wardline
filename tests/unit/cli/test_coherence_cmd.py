@@ -39,7 +39,7 @@ def _invoke(
 def _write_minimal_manifest(
     tmp_path: Path,
     *,
-    taint: str = "PIPELINE",
+    taint: str = "ASSURED",
     with_overlay: bool = False,
     overlay_function: str = "do_thing",
     tier_ids: list[tuple[str, int]] | None = None,
@@ -53,7 +53,7 @@ def _write_minimal_manifest(
     current manifest.
     """
     if tier_ids is None:
-        tier_ids = [("PIPELINE", 1), ("EXTERNAL_RAW", 4)]
+        tier_ids = [("ASSURED", 1), ("EXTERNAL_RAW", 4)]
 
     manifest_yaml = tmp_path / "wardline.yaml"
     tiers_block = "\n".join(
@@ -94,23 +94,23 @@ def _write_tier_downgrade_fixture(tmp_path: Path) -> Path:
     default_taint, because check_tier_downgrades looks up default_taint
     in `{t.id: t.tier for t in tiers}`.
 
-    Baseline: src/ had default_taint="PIPELINE", tier map PIPELINE->1.
+    Baseline: src/ had default_taint="ASSURED", tier map ASSURED->1.
     Current:  src/ has default_taint="EXTERNAL_RAW", tier map EXTERNAL_RAW->4.
     Downgrade: tier 1 -> tier 4.
     """
     manifest_yaml = _write_minimal_manifest(
         tmp_path,
         taint="EXTERNAL_RAW",
-        tier_ids=[("PIPELINE", 1), ("EXTERNAL_RAW", 4)],
+        tier_ids=[("ASSURED", 1), ("EXTERNAL_RAW", 4)],
     )
     (tmp_path / "wardline.manifest.baseline.json").write_text(
         json.dumps({
             "tiers": [
-                {"id": "PIPELINE", "tier": 1, "description": "strict"},
+                {"id": "ASSURED", "tier": 1, "description": "strict"},
                 {"id": "EXTERNAL_RAW", "tier": 4, "description": "lax"},
             ],
             "module_tiers": [
-                {"path": "src/", "default_taint": "PIPELINE"},
+                {"path": "src/", "default_taint": "ASSURED"},
             ],
         })
     )

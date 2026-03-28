@@ -30,7 +30,7 @@ def _write_manifest(tmp_path: Path) -> Path:
         "metadata:\n"
         "  organisation: test\n"
         "tiers:\n"
-        '  - id: "PIPELINE"\n'
+        '  - id: "ASSURED"\n'
         "    tier: 1\n"
         '    description: "tier 1"\n'
         '  - id: "EXTERNAL_RAW"\n'
@@ -38,7 +38,7 @@ def _write_manifest(tmp_path: Path) -> Path:
         '    description: "tier 4"\n'
         "module_tiers:\n"
         '  - path: "src/"\n'
-        '    default_taint: "PIPELINE"\n'
+        '    default_taint: "ASSURED"\n'
         "delegation:\n"
         '  default_authority: "RELAXED"\n'
         "rules:\n"
@@ -54,14 +54,14 @@ def _write_source(tmp_path: Path, *, with_functions: bool = True) -> Path:
     example = src_dir / "example.py"
     if with_functions:
         example.write_text(
-            "from wardline.decorators import external_boundary, validates_shape, tier1_read\n\n"
+            "from wardline.decorators import external_boundary, validates_shape, integral_read\n\n"
             "@external_boundary\n"
             "def fetch_data(url: str) -> dict:\n"
             "    return {}\n\n"
             "@validates_shape\n"
             "def check_schema(data: dict) -> bool:\n"
             "    return True\n\n"
-            "@tier1_read\n"
+            "@integral_read\n"
             "def get_config() -> dict:\n"
             "    return {}\n"
         )
@@ -297,7 +297,7 @@ def test_fingerprint_diff_detects_removed(
         {
             "qualified_name": "get_config",
             "module": str(src_dir / "example.py"),
-            "decorators": ["tier1_read"],
+            "decorators": ["integral_read"],
             "annotation_hash": real_hashes["get_config"],
             "tier_context": 1,
             "boundary_transition": None,
@@ -307,7 +307,7 @@ def test_fingerprint_diff_detects_removed(
         {
             "qualified_name": "deleted_function",
             "module": str(src_dir / "example.py"),
-            "decorators": ["tier1_read"],
+            "decorators": ["integral_read"],
             "annotation_hash": "deadbeefdeadbeef",
             "tier_context": 1,
             "boundary_transition": None,
@@ -360,7 +360,7 @@ def test_fingerprint_diff_detects_modified(
         {
             "qualified_name": "get_config",
             "module": str(src_dir / "example.py"),
-            "decorators": ["tier1_read"],
+            "decorators": ["integral_read"],
             "annotation_hash": real_hashes["get_config"],
             "tier_context": 1,
             "boundary_transition": None,
@@ -450,7 +450,7 @@ def test_fingerprint_diff_gate_on_tier1_removal(
         {
             "qualified_name": "get_config",
             "module": str(src_dir / "example.py"),
-            "decorators": ["tier1_read"],
+            "decorators": ["integral_read"],
             "annotation_hash": real_hashes["get_config"],
             "tier_context": 1,
             "boundary_transition": None,
@@ -460,7 +460,7 @@ def test_fingerprint_diff_gate_on_tier1_removal(
         {
             "qualified_name": "deleted_tier1_func",
             "module": str(src_dir / "example.py"),
-            "decorators": ["tier1_read"],
+            "decorators": ["integral_read"],
             "annotation_hash": "deadbeefdeadbeef",
             "tier_context": 1,
             "boundary_transition": None,
@@ -511,7 +511,7 @@ def test_fingerprint_diff_gate_passes_on_tier2_removal(
         {
             "qualified_name": "get_config",
             "module": str(src_dir / "example.py"),
-            "decorators": ["tier1_read"],
+            "decorators": ["integral_read"],
             "annotation_hash": real_hashes["get_config"],
             "tier_context": 1,
             "boundary_transition": None,
@@ -572,7 +572,7 @@ def test_fingerprint_diff_gate_passes_on_modification(
         {
             "qualified_name": "get_config",
             "module": str(src_dir / "example.py"),
-            "decorators": ["tier1_read"],
+            "decorators": ["integral_read"],
             "annotation_hash": "cafebabecafebabecafebabecafebabe",
             "tier_context": 1,
             "boundary_transition": None,
@@ -625,7 +625,7 @@ def test_fingerprint_diff_python_version_mismatch(
             {
                 "qualified_name": "get_config",
                 "module": str(src_dir / "example.py"),
-                "decorators": ["tier1_read"],
+                "decorators": ["integral_read"],
                 "annotation_hash": real_hashes["get_config"],
                 "tier_context": 1,
                 "boundary_transition": None,
@@ -717,7 +717,7 @@ def test_fingerprint_diff_old_baseline_missing_fields(
             {
                 "qualified_name": "get_config",
                 "module": str(src_dir / "example.py"),
-                "decorators": ["tier1_read"],
+                "decorators": ["integral_read"],
                 "annotation_hash": real_hashes["get_config"],
                 "tier_context": 1,
                 "boundary_transition": None,

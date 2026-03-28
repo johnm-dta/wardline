@@ -49,7 +49,7 @@ class TestL1Provenance:
             module_tiers=(
                 ModuleTierEntry(
                     path="src/myapp",
-                    default_taint="SHAPE_VALIDATED",
+                    default_taint="GUARDED",
                 ),
             ),
         )
@@ -57,7 +57,7 @@ class TestL1Provenance:
             tree, "src/myapp/handlers.py", {}, manifest=manifest
         )
 
-        assert taint_map["plain"] == TaintState.SHAPE_VALIDATED
+        assert taint_map["plain"] == TaintState.GUARDED
         assert taint_sources["plain"] == "module_default"
 
     def test_provenance_fallback(self) -> None:
@@ -80,7 +80,7 @@ class TestL1Provenance:
             module_tiers=(
                 ModuleTierEntry(
                     path="src/myapp",
-                    default_taint="SHAPE_VALIDATED",
+                    default_taint="GUARDED",
                 ),
             ),
         )
@@ -95,5 +95,5 @@ class TestL1Provenance:
         assert taint_map["decorated"] == TaintState.EXTERNAL_RAW
         assert taint_sources["decorated"] == "decorator"
         # Undecorated function: module default applies, source is "module_default"
-        assert taint_map["plain"] == TaintState.SHAPE_VALIDATED
+        assert taint_map["plain"] == TaintState.GUARDED
         assert taint_sources["plain"] == "module_default"

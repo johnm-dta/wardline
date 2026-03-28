@@ -138,13 +138,13 @@ The following table maps each of the 17 abstract annotation groups (Part I §6) 
 | | | `@ValidatesShape` | `@Target(METHOD)` | T4 → T3 transition. Body MUST contain rejection path (JV-WL-007) |
 | | | `@ValidatesSemantic` | `@Target(METHOD)` | T3 → T2 transition. Body MUST contain rejection path. Scanner verifies validation ordering (JV-WL-008) |
 | | | `@ValidatesExternal` | `@Target(METHOD)` | Combined T4 → T2. Body MUST satisfy both shape and semantic validation requirements |
-| | | `@Tier1Read` | `@Target(METHOD)` | Returns T1 (AUDIT_TRAIL) data. Body rules at AUDIT_TRAIL severity |
+| | | `@Tier1Read` | `@Target(METHOD)` | Returns T1 (INTEGRAL) data. Body rules at INTEGRAL severity |
 | | | `@AuthoritativeConstruction` | `@Target(METHOD)` | T2 → T1 transition. All return type fields MUST be explicitly supplied |
-| | | `@AuditWriter` | `@Target(METHOD)` | Audit-sensitive write. AUDIT_TRAIL severity. MUST precede `@EmitsTelemetry`. Fallback paths that bypass the audit call produce a finding |
+| | | `@AuditWriter` | `@Target(METHOD)` | Audit-sensitive write. INTEGRAL severity. MUST precede `@EmitsTelemetry`. Fallback paths that bypass the audit call produce a finding |
 | **2** | Audit primacy | `@AuditCritical` | `@Target(METHOD)` | All `@AuditWriter` rules plus implicit `@MustPropagate` on exception paths |
 | | | `@EmitsTelemetry` | `@Target(METHOD)` | Telemetry emission. MUST NOT precede `@AuditWriter` on shared code paths |
 | **3** | Plugin/component contract | `@SystemComponent` | `@Target(METHOD)` | System-owned contract. Crash-not-catch semantics; exceptions MUST propagate |
-| **4** | Internal data provenance | `@IntData` | `@Target(METHOD)` | Declares internal provenance. AUDIT_TRAIL body restrictions. Return tagged UNKNOWN_RAW without `@RestorationBoundary` |
+| **4** | Internal data provenance | `@IntData` | `@Target(METHOD)` | Declares internal provenance. INTEGRAL body restrictions. Return tagged UNKNOWN_RAW without `@RestorationBoundary` |
 | **5** | Schema contracts | `@AllFieldsMapped` | `@Target(METHOD)` | Every field of return type MUST be explicitly supplied or wrapped in `SchemaDefault.of()` |
 | | | `@OutputSchema(fields = {...})` | `@Target(METHOD)`, `String[] fields` | Returned object MUST contain all declared fields |
 | **6** | Layer boundaries | `@Layer(value)` | `@Target(TYPE)`, `String value` | Enforces import direction constraints between architectural layers |
@@ -206,8 +206,8 @@ The scanner recognises `SchemaDefault.of(...)` syntactically and suppresses JV-W
 
 | Cell | Parent Spec | Java Binding | Rationale |
 |---|---|---|---|
-| JV-WL-002 × SHAPE_VALIDATED | E/U | S/T | Records guarantee complete construction — `Map.containsKey()` patterns do not arise on record types |
-| JV-WL-006 × SHAPE_VALIDATED | W/R | S/T | Sealed interfaces with pattern matching provide compile-time exhaustive type dispatch, making runtime `instanceof` redundant |
+| JV-WL-002 × GUARDED | E/U | S/T | Records guarantee complete construction — `Map.containsKey()` patterns do not arise on record types |
+| JV-WL-006 × GUARDED | W/R | S/T | Sealed interfaces with pattern matching provide compile-time exhaustive type dispatch, making runtime `instanceof` redundant |
 
 The Java matrix has 4 SUPPRESS cells (vs. the framework's 2), 25 UNCONDITIONAL cells (vs. 26), and a corpus minimum of 120 effective specimens (60 active cells × 2).
 
@@ -565,7 +565,7 @@ Each line is a tier transition. Each method has one annotation declaring one tra
       "ruleId": "JV-WL-001",
       "level": "error",
       "message": {
-        "text": "Map.getOrDefault() provides fabricated default on AUDIT_TRAIL path"
+        "text": "Map.getOrDefault() provides fabricated default on INTEGRAL path"
       },
       "locations": [{
         "physicalLocation": {
@@ -580,7 +580,7 @@ Each line is a tier transition. Each method has one annotation declaring one tra
       }],
       "properties": {
         "wardline.rule": "JV-WL-001",
-        "wardline.taintState": "AUDIT_TRAIL",
+        "wardline.taintState": "INTEGRAL",
         "wardline.enclosingTier": 1,
         "wardline.severity": "ERROR",
         "wardline.exceptionability": "UNCONDITIONAL",

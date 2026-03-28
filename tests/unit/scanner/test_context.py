@@ -70,7 +70,7 @@ class TestFinding:
             message="test",
             severity=Severity.ERROR,
             exceptionability=Exceptionability.UNCONDITIONAL,
-            taint_state=TaintState.AUDIT_TRAIL,
+            taint_state=TaintState.INTEGRAL,
             analysis_level=1,
             source_snippet=None,
         )
@@ -91,7 +91,7 @@ class TestScanContext:
             file_path="src/example.py",
             function_level_taint_map={
                 "example.handler": TaintState.EXTERNAL_RAW,
-                "example.process": TaintState.PIPELINE,
+                "example.process": TaintState.ASSURED,
             },
         )
 
@@ -132,7 +132,7 @@ class TestScanContext:
         assert len(ctx.function_level_taint_map) == 0
 
     def test_accepts_mapping_proxy_directly(self) -> None:
-        mp = MappingProxyType({"f": TaintState.PIPELINE})
+        mp = MappingProxyType({"f": TaintState.ASSURED})
         ctx = ScanContext(file_path="test.py", function_level_taint_map=mp)
         assert ctx.function_level_taint_map is mp
 
@@ -178,9 +178,9 @@ class TestWardlineAnnotation:
 
     def test_attrs_deeply_frozen(self) -> None:
         ann = WardlineAnnotation(
-            canonical_name="audit_critical",
+            canonical_name="integrity_critical",
             group=2,
-            attrs={"_wardline_audit_critical": True},
+            attrs={"_wardline_integrity_critical": True},
         )
         with pytest.raises(TypeError):
             ann.attrs["new"] = "val"  # type: ignore[index]
@@ -195,9 +195,9 @@ class TestWardlineAnnotation:
             ann.canonical_name = "other"  # type: ignore[misc]
 
     def test_accepts_mapping_proxy_directly(self) -> None:
-        mp = MappingProxyType({"_wardline_tier_source": TaintState.PIPELINE})
+        mp = MappingProxyType({"_wardline_tier_source": TaintState.ASSURED})
         ann = WardlineAnnotation(
-            canonical_name="tier1_read", group=1, attrs=mp
+            canonical_name="integral_read", group=1, attrs=mp
         )
         assert ann.attrs is mp
 

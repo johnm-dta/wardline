@@ -164,13 +164,13 @@ class TestImportTable:
             import typing
             if typing.TYPE_CHECKING:
                 from wardline import external_boundary
-            from wardline import audit_critical
+            from wardline import integrity_critical
         """)
         tc_lines = _collect_type_checking_lines(tree)
         table = _build_import_table(tree, tc_lines)
 
         assert "external_boundary" not in table
-        assert table["audit_critical"] == "audit_critical"
+        assert table["integrity_critical"] == "integrity_critical"
 
     def test_tc_lines_argument_does_not_affect_top_level_imports(self) -> None:
         """Top-level import scanning does not depend on tc_lines filtering."""
@@ -308,9 +308,9 @@ class TestDiscoverAnnotations:
     def test_multiple_decorators_on_one_function(self) -> None:
         """Function with two wardline decorators gets both annotations."""
         tree = _parse("""\
-            from wardline import external_boundary, audit_critical
+            from wardline import external_boundary, integrity_critical
             @external_boundary
-            @audit_critical
+            @integrity_critical
             def critical_handler(): pass
         """)
         result = discover_annotations(tree, "test.py")
@@ -318,7 +318,7 @@ class TestDiscoverAnnotations:
         key = ("test.py", "critical_handler")
         assert key in result
         names = {a.canonical_name for a in result[key]}  # noqa: C401
-        assert names == {"external_boundary", "audit_critical"}
+        assert names == {"external_boundary", "integrity_critical"}
 
     def test_non_wardline_decorator_ignored(self) -> None:
         """Non-wardline decorators don't pollute the annotation map."""

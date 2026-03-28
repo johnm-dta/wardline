@@ -32,7 +32,7 @@
     {
       "qualified_name": "src.example.get_config",
       "module": "src/example.py",
-      "decorators": ["tier1_read"],
+      "decorators": ["integral_read"],
       "annotation_hash": "c3d4e5f6a7b8c9d0",
       "tier_context": 1,
       "boundary_transition": null,

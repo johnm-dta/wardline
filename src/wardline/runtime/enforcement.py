@@ -235,7 +235,7 @@ def check_tier_boundary(
 ) -> None:
     """Verify *obj* has a tier at least as trusted as *expected_min_tier*.
 
-    A tier of 1 (AUDIT_TRAIL) is the most trusted; 4 (EXTERNAL_RAW) is
+    A tier of 1 (INTEGRAL) is the most trusted; 4 (EXTERNAL_RAW) is
     least trusted. ``expected_min_tier=2`` means tier 1 or 2 are acceptable.
 
     Raises TierViolationError if the tier is insufficiently trusted.

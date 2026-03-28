@@ -51,7 +51,7 @@ Runs all 8 coherence checks from `manifest/coherence.py` in sequence. Each check
 Coherence: 3 issues found (1 error, 2 warnings)
 
   ERROR  COHERENCE-TIER-DOWNGRADE  adapters/client.py::fetch_data
-         Tier downgrade from PIPELINE to EXTERNAL_RAW without boundary declaration
+         Tier downgrade from ASSURED to EXTERNAL_RAW without boundary declaration
 
   WARN   COHERENCE-ORPHAN          utils/helpers.py::parse_config
          Decorator @validates_shape has no manifest boundary declaration
@@ -188,7 +188,7 @@ Enforcement changes:
   MODIFIED core/engine.py::scan_file
            Hash changed: a1b2 → c3d4 (decorator set changed)
   ADDED    core/engine.py::_scan_tree
-           Decorators: tier1_read
+           Decorators: integral_read
 
 Coverage: 48/84 functions (57.1%) [was 47/83 (56.6%)]
   Tier 1: 12/15 (80.0%) [unchanged]
@@ -358,7 +358,7 @@ Returns complete explain result as structured object:
     "source": "decorator",
     "decorators": ["external_boundary"]
   },
-  "module_default": "PIPELINE",
+  "module_default": "ASSURED",
   "unresolved_decorators": [],
   "rules": [
     {

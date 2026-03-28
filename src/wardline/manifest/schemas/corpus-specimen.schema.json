@@ -24,9 +24,9 @@
     "taint_state": {
       "type": "string",
       "enum": [
-        "AUDIT_TRAIL", "PIPELINE", "SHAPE_VALIDATED",
+        "INTEGRAL", "ASSURED", "GUARDED",
         "EXTERNAL_RAW", "UNKNOWN_RAW",
-        "UNKNOWN_SHAPE_VALIDATED", "UNKNOWN_SEM_VALIDATED",
+        "UNKNOWN_GUARDED", "UNKNOWN_ASSURED",
         "MIXED_RAW"
       ],
       "description": "Taint state context for this specimen."

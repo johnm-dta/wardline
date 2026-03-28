@@ -72,7 +72,7 @@ Wardline Lite requirements:
 | CODEOWNERS protection for governance artefacts | MUST | Policy artefact changes require designated reviewer approval |
 | Exception tracking | MUST | Exception register with reviewer identity, rationale, and expiry. The register exists and is maintained — exceptions are not granted informally |
 | Temporal separation | SHOULD | Separate change, different actor, approved before dependent code merges. Teams that cannot sustain temporal separation MUST document their alternative: same-actor approval is permitted for *enforcement artefact* changes (§9.3.1) with mandatory retrospective review within a defined window (recommended: next sprint boundary or 10 business days, whichever is shorter). However, *policy artefact* changes (tier definitions, delegation policy, validation-scope declarations) MUST require different-actor approval even under the Lite profile — the governance risk of same-actor policy changes is categorically higher, since a poisoned policy artefact corrupts all downstream enforcement (§9.3.2). The documented alternative is recorded in the root manifest and is an assessable governance decision, not a silent omission |
-| Bootstrap golden corpus | SHOULD | A minimum of 20–30 specimens covering UNCONDITIONAL cells and Tier 1 taint states (AUDIT_TRAIL, PIPELINE). The bootstrap corpus demonstrates that the enforcement tools detect the highest-consequence violations. The full 126+ specimen requirement (§10) is deferred to the Assurance governance profile |
+| Bootstrap golden corpus | SHOULD | A minimum of 20–30 specimens covering UNCONDITIONAL cells and Tier 1 taint states (INTEGRAL, ASSURED). The bootstrap corpus demonstrates that the enforcement tools detect the highest-consequence violations. The full 126+ specimen requirement (§10) is deferred to the Assurance governance profile |
 | Annotation change tracking | MUST | Changes to the annotation surface (annotations added, modified, or removed) are flagged for human review. This MAY be implemented through VCS diff review of annotation-bearing files rather than a full fingerprint baseline — the requirement is visibility of annotation changes, not a specific tracking mechanism |
 | Expedited governance ratio | RECOMMENDED | The ratio metric (§9.4) SHOULD be computed and reported. Projects that do not yet compute the ratio MUST instead document their expedited exception approval process and review it at each manifest ratification |
 
@@ -243,7 +243,7 @@ partner-landscape/
 │   ├── wardline.overlay.yaml        # Module overlay — T1 construction + restoration
 │   └── src/main/java/...
 └── corpus/                          # Golden corpus
-    ├── WL-001/AUDIT_TRAIL/...
+    ├── WL-001/INTEGRAL/...
     ├── WL-001/EXTERNAL_RAW/...
     └── ...
 ```
@@ -281,9 +281,9 @@ module_tiers:
   - path: "adapters/"
     default_taint: "EXTERNAL_RAW"
   - path: "domain/"
-    default_taint: "PIPELINE"
+    default_taint: "ASSURED"
   - path: "audit/"
-    default_taint: "AUDIT_TRAIL"
+    default_taint: "INTEGRAL"
 ```
 
 **CI pipeline (relevant steps from `.github/workflows/ci.yml`):**
@@ -399,9 +399,9 @@ health-notifications/
 │   ├── wardline.overlay.yaml        # Module overlay — internal DB writes
 │   └── src/...
 └── corpus/                          # Bootstrap corpus (24 specimens)
-    ├── WL-001/AUDIT_TRAIL/...
+    ├── WL-001/INTEGRAL/...
     ├── WL-001/EXTERNAL_RAW/...
-    ├── WL-003/AUDIT_TRAIL/...
+    ├── WL-003/INTEGRAL/...
     └── ...
 ```
 
@@ -457,14 +457,14 @@ The team maintains 24 specimens covering UNCONDITIONAL cells and Tier 1 taint st
 
 | Rule | Taint states covered | Specimen count |
 |------|---------------------|----------------|
-| WL-001 | AUDIT_TRAIL, EXTERNAL_RAW, PIPELINE | 6 (2 per state: 1 true positive, 1 true negative) |
-| WL-002 | AUDIT_TRAIL, EXTERNAL_RAW | 4 |
-| WL-003 | AUDIT_TRAIL, PIPELINE | 4 |
-| WL-004 | AUDIT_TRAIL, EXTERNAL_RAW | 4 |
-| WL-005 | AUDIT_TRAIL | 2 |
-| WL-006 | AUDIT_TRAIL, EXTERNAL_RAW | 4 |
-| WL-007 | AUDIT_TRAIL | 2 |
-| WL-008 | SHAPE_VALIDATED | 2 |
+| WL-001 | INTEGRAL, EXTERNAL_RAW, ASSURED | 6 (2 per state: 1 true positive, 1 true negative) |
+| WL-002 | INTEGRAL, EXTERNAL_RAW | 4 |
+| WL-003 | INTEGRAL, ASSURED | 4 |
+| WL-004 | INTEGRAL, EXTERNAL_RAW | 4 |
+| WL-005 | INTEGRAL | 2 |
+| WL-006 | INTEGRAL, EXTERNAL_RAW | 4 |
+| WL-007 | INTEGRAL | 2 |
+| WL-008 | GUARDED | 2 |
 
 The bootstrap corpus focuses on the cells where findings are UNCONDITIONAL or ERROR at Tier 1, and includes at least one structural-verification specimen for WL-007 and WL-008 so the invariant rules are not absent from early assessment. Full coverage of all 126+ cells is deferred to governance graduation.
 

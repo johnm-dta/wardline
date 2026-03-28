@@ -110,7 +110,7 @@ Each `check_wlNNN` function walks the AST via `ast.walk(tree)` (module root, not
 ### Known Limitations
 
 1. **More false positives than `wardline scan`** — no taint context, no exception register. By design.
-2. **Contradicts scanner** for taint-suppressed findings (e.g., `key in config` at AUDIT_TRAIL). The `[advisory]` message tag makes this visible.
+2. **Contradicts scanner** for taint-suppressed findings (e.g., `key in config` at INTEGRAL). The `[advisory]` message tag makes this visible.
 3. **WL001 fires on `schema_default()` call sites** that `wardline scan` suppresses as governed defaults. The plugin has no overlay boundary context.
 4. **WL003 fires on ALL `in` operators** — no type resolution to distinguish dict/list/set/string.
 5. **No exception register awareness** — teams with legitimately excepted findings must use `# noqa: WL001` or similar.

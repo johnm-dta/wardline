@@ -69,7 +69,7 @@ The root `wardline.yaml` contains five sections:
 
 **Delegation policy.** Which overlays may grant which exception classes. The root manifest declares a default delegation authority (RECOMMENDED: RELAXED) and per-path grants that raise or lower the authority for specific module paths. An overlay at a path with `authority: NONE` cannot self-grant any exceptions — all exceptions for that module MUST be registered in the root exception register. UNCONDITIONAL findings can never be excepted regardless of delegation — that constraint is structural, not delegable.
 
-**Module-tier mappings.** Default taint state for unannotated code within each module. When a function in a module has no wardline annotations, the enforcement tool assigns the module's default taint state. This provides baseline enforcement even before full annotation investment — a module declared as AUDIT_TRAIL context has its unannotated functions treated as Tier 1, activating the full pattern-rule suite at the strictest severity.
+**Module-tier mappings.** Default taint state for unannotated code within each module. When a function in a module has no wardline annotations, the enforcement tool assigns the module's default taint state. This provides baseline enforcement even before full annotation investment — a module declared as INTEGRAL context has its unannotated functions treated as Tier 1, activating the full pattern-rule suite at the strictest severity.
 
 Module-tier mappings are a coarse baseline, not a substitute for explicit boundary declarations or data-source classifications. They are most appropriate for modules with a strong dominant trust posture; mixed-trust modules SHOULD prefer finer-grained annotations and boundaries rather than relying on a single module default to carry semantic meaning.
 
@@ -104,7 +104,7 @@ delegation:
 
 module_tiers:
   - path: "audit/"
-    default_taint: "AUDIT_TRAIL"
+    default_taint: "INTEGRAL"
   - path: "adapters/"
     default_taint: "EXTERNAL_RAW"
 ```
@@ -237,7 +237,7 @@ The `provenance` object fields (with decorator parameter name equivalents from t
 - `integrity` (`integrity_evidence`) — string or null: integrity verification mechanism (`"checksum"`, `"signature"`, `"hmac"`, or null)
 - `institutional` (`institutional_provenance`) — string or null: institutional provenance attestation
 
-Without institutional evidence, the restored tier cannot exceed UNKNOWN_SHAPE_VALIDATED or UNKNOWN_SEM_VALIDATED regardless of other evidence (§5.3). Enforcement tools MUST map between manifest field names and decorator parameter names — a mismatch between the overlay declaration and the decorator arguments is a finding.
+Without institutional evidence, the restored tier cannot exceed UNKNOWN_GUARDED or UNKNOWN_ASSURED regardless of other evidence (§5.3). Enforcement tools MUST map between manifest field names and decorator parameter names — a mismatch between the overlay declaration and the decorator arguments is a finding.
 
 The enforcement tool validates restoration boundaries against the evidence matrix in §5.3: if the evidence declared in the manifest is insufficient for the `restored_tier` claim (e.g., `restored_tier: 1` but `integrity` is null), the tool produces a finding. The `restored_tier` is a *claim*, not a guarantee — the evidence MUST support it.
 
@@ -280,7 +280,7 @@ dependency_taint:
       - function: "my_library.process"
         returns_taint: "UNKNOWN_RAW"
       - function: "my_library.validate_record"
-        returns_taint: "SHAPE_VALIDATED"
+        returns_taint: "GUARDED"
     rationale: "Source review of v2.3.1 validate_record (full function); structural checks confirmed, no semantic validation. process() unreviewed — conservative default."
     reviewed: "2026-02-15"
     elimination_path: "Wrap validate_record() return in @validates_shape at app/boundaries.py:intake_boundary"
@@ -289,7 +289,7 @@ dependency_taint:
 Each entry declares:
 
 - `package` — the third-party package name and version constraint. Version pinning is REQUIRED — a taint declaration that applies to an unpinned dependency is a governance risk, because a library update may change the function's validation behaviour without the wardline detecting it.
-- `functions` — list of function paths and their declared return taint states. Taint states use the canonical tokens from §5.1 (e.g., `UNKNOWN_RAW`, `SHAPE_VALIDATED`, `EXTERNAL_RAW`). Declaring a return taint that implies completed validation (e.g., `SHAPE_VALIDATED`, `SEM_VALIDATED`) requires documented rationale justifying the trust claim — the same governance scrutiny as a trust-escalation declaration (§9.2).
+- `functions` — list of function paths and their declared return taint states. Taint states use the canonical tokens from §5.1 (e.g., `UNKNOWN_RAW`, `GUARDED`, `EXTERNAL_RAW`). Declaring a return taint that implies completed validation (e.g., `GUARDED`, `SEM_VALIDATED`) requires documented rationale justifying the trust claim — the same governance scrutiny as a trust-escalation declaration (§9.2).
 - `rationale` — documented justification for the taint assignment. For entries declaring `returns_taint` above UNKNOWN_RAW, the rationale SHOULD identify: (a) the evidence basis (source code review, upstream advisory, documentation review, test-verified behaviour, or prior-version inference), (b) the scope of review (full function implementation, API surface and documentation only, or inferred from usage patterns), and (c) whether the review was against the specific pinned version or inferred from a prior version. Under the Assurance governance profile, bindings SHOULD require these rationale elements as separately identifiable structured fields or an equivalent schema-validated representation rather than relying on undifferentiated free text. This structure does not eliminate the epistemic asymmetry inherent in assessing code outside the governance perimeter (§12, risk 14), but it makes the governance quality auditable — an assessor can distinguish "reviewed the source of v2.3.1" from "assumed based on documentation."
 - `reviewed` — date of last review. The enforcement tool SHOULD flag dependency taint declarations whose review date exceeds the manifest's declared review interval.
 - `elimination_path` (OPTIONAL) — a brief description of the application-side validation boundary that would eliminate the need for this taint declaration (e.g., "wrap `my_library.process()` return in `@validates_shape` at `app/boundaries.py:intake_boundary`"). This field makes visible the gap between the current state (trusting the library's claims via governance declaration) and the target state (independent verification at the application boundary). Where present, the enforcement tool SHOULD surface this field when the `dependency_taint` entry is reviewed, as a reminder that the declaration is a governance expedient, not a structural guarantee.
@@ -318,7 +318,7 @@ Each exception record contains:
 - **Temporal bounds** — grant date, expiry date, and review interval. Every exception has an expiry — no permanent exceptions. The governance model's temporal separation is enforced structurally in the schema
 - **Provenance** — governance path (standard or expedited) and whether the exception was agent-originated (§9.3). The `expedited` field enables the expedited governance ratio metric (§9.4). The `agent_originated` field flags exceptions that were authored by an AI agent and require human review as a distinct governance step
 - **Architectural consequence** *(optional but recommended)* — two fields that convert the exception register from a finding-suppression mechanism into an architectural debt ledger:
-    - `elimination_path` — what architectural change would eliminate the need for this exception? Free-text description of the code or design change that would make the violation structurally impossible rather than governance-excepted. Examples: "Restructure `process_partner()` to receive validated `PartnerRecord` instead of raw `dict`"; "Move audit record construction into a dedicated factory with `@authoritative_construction`"
+    - `elimination_path` — what architectural change would eliminate the need for this exception? Free-text description of the code or design change that would make the violation structurally impossible rather than governance-excepted. Examples: "Restructure `process_partner()` to receive validated `PartnerRecord` instead of raw `dict`"; "Move audit record construction into a dedicated factory with `@integral_construction`"
     - `elimination_cost` — estimated effort to implement the elimination path (e.g., "2 story points", "1 sprint", "requires API contract change with partner team"). This field is deliberately imprecise — its value is in making the cost visible and aggregatable, not in producing accurate estimates
 
     When populated, these fields enable a governance metric that the finding-suppression model alone cannot provide: the ratio of exceptions that represent *deferred architectural fixes* (elimination path exists and is feasible) versus *genuine domain variance* (no structural alternative — the exception reflects a real policy decision). In a healthy wardline deployment, this ratio shifts toward domain variance over time as architectural fixes are implemented. If the ratio remains dominated by deferred fixes, the wardline is functioning as a compliance layer over unresolved architectural debt — a "shifting the burden" dynamic where governance exceptions absorb the symptoms while the structural causes persist. This ratio SHOULD be surfaced as a SARIF run-level property (`wardline.deferredFixRatio`) alongside the expedited governance ratio (§9.4, `wardline.expeditedExceptionRatio`), so that assessors can see both governance health indicators — exception quality and exception process — in the same output.
@@ -339,16 +339,16 @@ The fingerprint baseline interchange format is defined in §9.2. It is co-locate
       "module": "myproject/adapters.py",
       "decorators": ["@validates_semantic"],
       "annotation_hash": "a3f8c2d1e9b74a06",
-      "tier_context": "SHAPE_VALIDATED",
+      "tier_context": "GUARDED",
       "boundary_transition": { "from_tier": 3, "to_tier": 2 },
       "last_changed": "2026-01-15T09:12:00Z"
     },
     {
       "qualified_name": "myproject.engine.create_risk_assessment",
       "module": "myproject/engine.py",
-      "decorators": ["@authoritative_construction"],
+      "decorators": ["@integral_construction"],
       "annotation_hash": "e7b4a9f052c3d816",
-      "tier_context": "AUDIT_TRAIL",
+      "tier_context": "INTEGRAL",
       "boundary_transition": { "from_tier": 2, "to_tier": 1 },
       "last_changed": "2026-01-15T09:12:00Z"
     },

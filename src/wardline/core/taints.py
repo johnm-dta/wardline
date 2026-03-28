@@ -13,13 +13,13 @@ class TaintState(StrEnum):
     lookups, and corpus matching.
     """
 
-    AUDIT_TRAIL = "AUDIT_TRAIL"
-    PIPELINE = "PIPELINE"
-    SHAPE_VALIDATED = "SHAPE_VALIDATED"
+    INTEGRAL = "INTEGRAL"
+    ASSURED = "ASSURED"
+    GUARDED = "GUARDED"
     EXTERNAL_RAW = "EXTERNAL_RAW"
     UNKNOWN_RAW = "UNKNOWN_RAW"
-    UNKNOWN_SHAPE_VALIDATED = "UNKNOWN_SHAPE_VALIDATED"
-    UNKNOWN_SEM_VALIDATED = "UNKNOWN_SEM_VALIDATED"
+    UNKNOWN_GUARDED = "UNKNOWN_GUARDED"
+    UNKNOWN_ASSURED = "UNKNOWN_ASSURED"
     MIXED_RAW = "MIXED_RAW"
 
 
@@ -28,15 +28,15 @@ class TaintState(StrEnum):
 # Operand order is normalised for lookup: min(a, b), max(a, b) by value.
 # All pairs not listed here produce MIXED_RAW.
 _UR = TaintState.UNKNOWN_RAW
-_USH = TaintState.UNKNOWN_SHAPE_VALIDATED
-_USE = TaintState.UNKNOWN_SEM_VALIDATED
+_USH = TaintState.UNKNOWN_GUARDED
+_USE = TaintState.UNKNOWN_ASSURED
 
 _JOIN_TABLE: dict[tuple[TaintState, TaintState], TaintState] = {
     # Within UNKNOWN family: demote to weaker validation.
     # Keys MUST be in normalized order (sorted by .value string) to match
     # the lookup normalization in taint_join().
-    (_UR, _USE): _UR,
-    (_UR, _USH): _UR,
+    (_USE, _UR): _UR,
+    (_USH, _UR): _UR,
     (_USE, _USH): _USH,
 }
 

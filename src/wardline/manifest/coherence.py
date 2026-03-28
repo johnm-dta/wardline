@@ -704,8 +704,8 @@ def check_validation_scope_presence(
 
 
 _UNKNOWN_FAMILY = frozenset({
-    TaintState.UNKNOWN_SEM_VALIDATED,
-    TaintState.UNKNOWN_SHAPE_VALIDATED,
+    TaintState.UNKNOWN_ASSURED,
+    TaintState.UNKNOWN_GUARDED,
     TaintState.UNKNOWN_RAW,
 })
 

@@ -86,10 +86,10 @@ class TestGetFunctionTaint:
         rule = _StubRule()
         ctx = ScanContext(
             file_path="a.py",
-            function_level_taint_map={"MyClass.my_method": TaintState.PIPELINE},
+            function_level_taint_map={"MyClass.my_method": TaintState.ASSURED},
         )
         rule.set_context(ctx)
-        assert rule._get_function_taint("MyClass.my_method") == TaintState.PIPELINE
+        assert rule._get_function_taint("MyClass.my_method") == TaintState.ASSURED
 
 
 class TestScopeTracking:

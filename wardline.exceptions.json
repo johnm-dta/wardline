@@ -4,7 +4,7 @@
     {
       "id": "EXC-DC658B46",
       "rule": "PY-WL-004",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._scan_file",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -26,7 +26,7 @@
     {
       "id": "EXC-2FAEA819",
       "rule": "PY-WL-004",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._build_project_indexes",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -45,7 +45,7 @@
     {
       "id": "EXC-1844C974",
       "rule": "PY-WL-004",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._run_variable_taint",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -64,7 +64,7 @@
     {
       "id": "EXC-71EFE0FE",
       "rule": "PY-WL-004",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._run_callgraph_taint",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -83,7 +83,7 @@
     {
       "id": "EXC-91694583",
       "rule": "PY-WL-004",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._run_rule",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -215,7 +215,7 @@
     {
       "id": "EXC-23437169",
       "rule": "PY-WL-005",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._is_excluded",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -251,7 +251,7 @@
     {
       "id": "EXC-90D89A20",
       "rule": "PY-WL-005",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/scanner/sarif.py::_normalize_artifact_uri",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -270,7 +270,7 @@
     {
       "id": "EXC-371D2D2C",
       "rule": "PY-WL-005",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/scanner/taint/function_level.py::resolve_module_default",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -426,7 +426,7 @@
     {
       "id": "EXC-56139FD5",
       "rule": "PY-WL-005",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._build_project_indexes",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -502,7 +502,7 @@
     {
       "id": "EXC-476408CD",
       "rule": "PY-WL-007",
-      "taint_state": "AUDIT_TRAIL",
+      "taint_state": "INTEGRAL",
       "location": "src/wardline/decorators/_base.py::wardline_decorator.decorator",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -522,7 +522,7 @@
     {
       "id": "EXC-F5846AED",
       "rule": "PY-WL-007",
-      "taint_state": "AUDIT_TRAIL",
+      "taint_state": "INTEGRAL",
       "location": "src/wardline/decorators/_base.py::wardline_decorator.decorator",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -542,7 +542,7 @@
     {
       "id": "EXC-E4BBA3AE",
       "rule": "PY-WL-007",
-      "taint_state": "AUDIT_TRAIL",
+      "taint_state": "INTEGRAL",
       "location": "src/wardline/runtime/enforcement.py::TierStamped.__post_init__",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -559,7 +559,7 @@
     {
       "id": "EXC-65F0BEBC",
       "rule": "PY-WL-007",
-      "taint_state": "AUDIT_TRAIL",
+      "taint_state": "INTEGRAL",
       "location": "src/wardline/runtime/enforcement.py::stamp_tier",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -579,7 +579,7 @@
     {
       "id": "EXC-50E4238A",
       "rule": "PY-WL-007",
-      "taint_state": "AUDIT_TRAIL",
+      "taint_state": "INTEGRAL",
       "location": "src/wardline/runtime/enforcement.py::unstamp",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -596,7 +596,7 @@
     {
       "id": "EXC-ED5E6192",
       "rule": "PY-WL-007",
-      "taint_state": "AUDIT_TRAIL",
+      "taint_state": "INTEGRAL",
       "location": "src/wardline/runtime/enforcement.py::check_tier_boundary",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -616,7 +616,7 @@
     {
       "id": "EXC-8DC74334",
       "rule": "PY-WL-007",
-      "taint_state": "AUDIT_TRAIL",
+      "taint_state": "INTEGRAL",
       "location": "src/wardline/runtime/enforcement.py::check_validated_record",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -633,7 +633,7 @@
     {
       "id": "EXC-DFF0B31A",
       "rule": "PY-WL-007",
-      "taint_state": "AUDIT_TRAIL",
+      "taint_state": "INTEGRAL",
       "location": "src/wardline/runtime/enforcement.py::check_validated_record",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -650,7 +650,7 @@
     {
       "id": "EXC-33CDD88E",
       "rule": "PY-WL-007",
-      "taint_state": "AUDIT_TRAIL",
+      "taint_state": "INTEGRAL",
       "location": "src/wardline/runtime/enforcement.py::check_validated_record",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -667,7 +667,7 @@
     {
       "id": "EXC-4463EC24",
       "rule": "PY-WL-007",
-      "taint_state": "AUDIT_TRAIL",
+      "taint_state": "INTEGRAL",
       "location": "src/wardline/runtime/enforcement.py::check_validated_record",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -684,7 +684,7 @@
     {
       "id": "EXC-E71B8540",
       "rule": "PY-WL-007",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/coherence.py::check_unmatched_contracts",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -704,7 +704,7 @@
     {
       "id": "EXC-2B896CF4",
       "rule": "PY-WL-007",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/coherence.py::check_restoration_evidence_consistency",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -721,7 +721,7 @@
     {
       "id": "EXC-50A12F50",
       "rule": "PY-WL-007",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/coherence.py::check_restoration_evidence_consistency",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -738,7 +738,7 @@
     {
       "id": "EXC-E1A6FA5B",
       "rule": "PY-WL-007",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/merge.py::merge",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -755,7 +755,7 @@
     {
       "id": "EXC-12D2F1CC",
       "rule": "PY-WL-007",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/merge.py::merge",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -772,7 +772,7 @@
     {
       "id": "EXC-EE549E84",
       "rule": "PY-WL-007",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/models.py::ScannerConfig.from_toml",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -792,7 +792,7 @@
     {
       "id": "EXC-90F1ADFA",
       "rule": "PY-WL-007",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/models.py::ScannerConfig.from_toml",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -812,7 +812,7 @@
     {
       "id": "EXC-12E98608",
       "rule": "PY-WL-007",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/models.py::ScannerConfig.from_toml",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -832,7 +832,7 @@
     {
       "id": "EXC-0BC26565",
       "rule": "PY-WL-007",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/models.py::ScannerConfig.from_toml",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -852,7 +852,7 @@
     {
       "id": "EXC-BE7E8AA9",
       "rule": "PY-WL-007",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/models.py::ScannerConfig.from_toml",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -872,7 +872,7 @@
     {
       "id": "EXC-A6147E8B",
       "rule": "PY-WL-007",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/scanner/taint/function_level.py::_restoration_taint_from_annotations",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -889,7 +889,7 @@
     {
       "id": "EXC-AF3C0CC2",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/discovery.py::_detect_dynamic_imports",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -906,7 +906,7 @@
     {
       "id": "EXC-C921ACBC",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/discovery.py::_detect_dynamic_imports",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -923,7 +923,7 @@
     {
       "id": "EXC-6179A9CD",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/discovery.py::_literalish_value",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -940,7 +940,7 @@
     {
       "id": "EXC-94330B09",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/engine.py::ScanEngine._build_project_indexes",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -957,7 +957,7 @@
     {
       "id": "EXC-48258F72",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/py_wl_001.py::RulePyWl001._extract_field_name",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -974,7 +974,7 @@
     {
       "id": "EXC-40290EAC",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/py_wl_003.py::RulePyWl003._is_obvious_value_membership",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -991,7 +991,7 @@
     {
       "id": "EXC-141295C1",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/py_wl_005.py::_silent_message",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -1008,7 +1008,7 @@
     {
       "id": "EXC-613D9A76",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/sup_001.py::_keyword_or_arg_name",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -1025,7 +1025,7 @@
     {
       "id": "EXC-DA3FD98B",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/sup_001.py::_contains_sensitive_reference._walk",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -1042,7 +1042,7 @@
     {
       "id": "EXC-55953144",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/sup_001.py::_contains_sensitive_reference._walk",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -1059,7 +1059,7 @@
     {
       "id": "EXC-AC0B3504",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/sup_001.py::_classification_rank",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -1076,7 +1076,7 @@
     {
       "id": "EXC-73D5A95A",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/sup_001.py::RuleSup001.visit_Module",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -1093,7 +1093,7 @@
     {
       "id": "EXC-2D49F581",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/sup_001.py::RuleSup001._check_compensatable",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -1110,7 +1110,7 @@
     {
       "id": "EXC-307CACAF",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/sup_001.py::RuleSup001._check_deprecated_by",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -1127,7 +1127,7 @@
     {
       "id": "EXC-AEC08C6B",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/sup_001.py::RuleSup001._check_deprecated_by",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -1144,7 +1144,7 @@
     {
       "id": "EXC-2A412111",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/sup_001.py::RuleSup001._check_feature_gated",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -1161,7 +1161,7 @@
     {
       "id": "EXC-555E2353",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/sup_001.py::RuleSup001._check_handles_pii",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -1178,7 +1178,7 @@
     {
       "id": "EXC-878BD358",
       "rule": "PY-WL-007",
-      "taint_state": "SHAPE_VALIDATED",
+      "taint_state": "GUARDED",
       "location": "src/wardline/scanner/rules/sup_001.py::RuleSup001._check_handles_pii",
       "exceptionability": "RELAXED",
       "severity_at_grant": "WARNING",
@@ -1195,7 +1195,7 @@
     {
       "id": "EXC-10B70161",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/coherence.py::check_tier_downgrades",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -1212,7 +1212,7 @@
     {
       "id": "EXC-643D67D2",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/coherence.py::check_tier_downgrades",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -1229,7 +1229,7 @@
     {
       "id": "EXC-A9C4ACF3",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/coherence.py::check_tier_upgrade_without_evidence",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -1246,7 +1246,7 @@
     {
       "id": "EXC-1DB4836F",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/coherence.py::check_tier_upgrade_without_evidence",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -1263,7 +1263,7 @@
     {
       "id": "EXC-B5F19EFD",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/manifest/merge.py::_severity_rank",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -1280,7 +1280,7 @@
     {
       "id": "EXC-4C7FA8A2",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/scanner/sarif.py::_severity_rank",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -1297,7 +1297,7 @@
     {
       "id": "EXC-7898807C",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/scanner/sarif.py::_make_result",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -1314,7 +1314,7 @@
     {
       "id": "EXC-B478E46C",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/scanner/sarif.py::_make_rule_descriptor",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -1331,7 +1331,7 @@
     {
       "id": "EXC-2B4C521F",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/scanner/sarif.py::_make_rule_descriptor",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -1348,7 +1348,7 @@
     {
       "id": "EXC-BD485B76",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/scanner/taint/function_level.py::_restoration_taint_from_annotations",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -1365,7 +1365,7 @@
     {
       "id": "EXC-4DC98643",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/scanner/taint/function_level.py::_restoration_taint_from_annotations",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -1382,7 +1382,7 @@
     {
       "id": "EXC-73B83253",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/scanner/taint/variable_level.py::_resolve_expr",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",
@@ -1399,7 +1399,7 @@
     {
       "id": "EXC-53957A32",
       "rule": "PY-WL-001",
-      "taint_state": "PIPELINE",
+      "taint_state": "ASSURED",
       "location": "src/wardline/scanner/taint/variable_level.py::_handle_augassign",
       "exceptionability": "STANDARD",
       "severity_at_grant": "ERROR",

@@ -4,9 +4,9 @@ specimen_id: "L3-anchored-immutable"
 description: "L3: adversarial — decorated function in crafted call chain stays unchanged"
 rule: "PY-WL-001"
 fragment: |
-  from wardline.decorators import external_boundary, tier1_read
+  from wardline.decorators import external_boundary, integral_read
   
-  @tier1_read
+  @integral_read
   def trusted_source():
       return {"key": "safe"}
   

@@ -21,9 +21,9 @@ The tier model combines two orthogonal dimensions — trust classification (what
 
 These eight states determine finding severity when pattern rules are evaluated: the same pattern may be an error in one state and suppressed in another (§7).
 
-**Canonical tokens.** The following identifiers are normative and MUST be used consistently in manifest schemas, SARIF output, configuration files, and implementation code: `AUDIT_TRAIL`, `PIPELINE`, `SHAPE_VALIDATED`, `EXTERNAL_RAW`, `UNKNOWN_RAW`, `UNKNOWN_SHAPE_VALIDATED`, `UNKNOWN_SEM_VALIDATED`, `MIXED_RAW`. Prose may use the human-readable labels from the table above; machine-facing artefacts MUST use these tokens.
+**Canonical tokens.** The following identifiers are normative and MUST be used consistently in manifest schemas, SARIF output, configuration files, and implementation code: `INTEGRAL`, `ASSURED`, `GUARDED`, `EXTERNAL_RAW`, `UNKNOWN_RAW`, `UNKNOWN_GUARDED`, `UNKNOWN_ASSURED`, `MIXED_RAW`. Prose may use the human-readable labels from the table above; machine-facing artefacts MUST use these tokens.
 
-> **NOTE — Token names are canonical labels, not scope restrictions.** `AUDIT_TRAIL` encompasses all Tier 1 authoritative internal data (audit records, internal state, configuration), not only audit trails specifically. `PIPELINE` encompasses all Tier 2 semantically validated data, not only pipeline-processed data. These names are historical; implementations MUST NOT narrow their semantics to match the everyday meaning of the token name.
+> **NOTE — Token names are canonical labels, not scope restrictions.** `INTEGRAL` encompasses all Tier 1 authoritative internal data (audit records, internal state, configuration), not only audit trails specifically. `ASSURED` encompasses all Tier 2 semantically validated data, not only pipeline-processed data. These names are historical; implementations MUST NOT narrow their semantics to match the everyday meaning of the token name.
 
 **Join operation.** When data from two different taint states merges at a program point (assignment, function parameter, container construction), the resulting state is determined by the join. The general rule: any merge of values from different trust classifications produces MIXED_RAW. The validation status of the result is RAW regardless of the inputs' validation status — mixing data resets the validation dimension because the composite's structural guarantees are weaker than those of its strongest input.
 
@@ -39,18 +39,18 @@ Specific join rules (the join is commutative, associative, and idempotent; MIXED
 
 | Operand A | Operand B | Result | Examples |
 |-----------|-----------|--------|----------|
-| Any state in {AUDIT_TRAIL, PIPELINE, SHAPE_VALIDATED, EXTERNAL_RAW} | Different state in {AUDIT_TRAIL, PIPELINE, SHAPE_VALIDATED, EXTERNAL_RAW} | MIXED_RAW | join(AUDIT_TRAIL, PIPELINE), join(PIPELINE, EXTERNAL_RAW), join(SHAPE_VALIDATED, PIPELINE) |
-| Any state in {AUDIT_TRAIL, PIPELINE, SHAPE_VALIDATED, EXTERNAL_RAW} | UNKNOWN_RAW | MIXED_RAW | join(PIPELINE, UNKNOWN_RAW), join(AUDIT_TRAIL, UNKNOWN_RAW), join(SHAPE_VALIDATED, UNKNOWN_RAW) |
-| Any state in {AUDIT_TRAIL, PIPELINE, SHAPE_VALIDATED, EXTERNAL_RAW} | UNKNOWN_SHAPE_VALIDATED | MIXED_RAW | join(EXTERNAL_RAW, UNKNOWN_SHAPE_VALIDATED), join(PIPELINE, UNKNOWN_SHAPE_VALIDATED) |
-| Any state in {AUDIT_TRAIL, PIPELINE, SHAPE_VALIDATED, EXTERNAL_RAW} | UNKNOWN_SEM_VALIDATED | MIXED_RAW | join(SHAPE_VALIDATED, UNKNOWN_SEM_VALIDATED), join(AUDIT_TRAIL, UNKNOWN_SEM_VALIDATED) |
+| Any state in {INTEGRAL, ASSURED, GUARDED, EXTERNAL_RAW} | Different state in {INTEGRAL, ASSURED, GUARDED, EXTERNAL_RAW} | MIXED_RAW | join(INTEGRAL, ASSURED), join(ASSURED, EXTERNAL_RAW), join(GUARDED, ASSURED) |
+| Any state in {INTEGRAL, ASSURED, GUARDED, EXTERNAL_RAW} | UNKNOWN_RAW | MIXED_RAW | join(ASSURED, UNKNOWN_RAW), join(INTEGRAL, UNKNOWN_RAW), join(GUARDED, UNKNOWN_RAW) |
+| Any state in {INTEGRAL, ASSURED, GUARDED, EXTERNAL_RAW} | UNKNOWN_GUARDED | MIXED_RAW | join(EXTERNAL_RAW, UNKNOWN_GUARDED), join(ASSURED, UNKNOWN_GUARDED) |
+| Any state in {INTEGRAL, ASSURED, GUARDED, EXTERNAL_RAW} | UNKNOWN_ASSURED | MIXED_RAW | join(GUARDED, UNKNOWN_ASSURED), join(INTEGRAL, UNKNOWN_ASSURED) |
 | UNKNOWN_RAW | UNKNOWN_RAW | UNKNOWN_RAW | join(UNKNOWN_RAW, UNKNOWN_RAW) — provenance equally unknown |
-| UNKNOWN_RAW | UNKNOWN_SHAPE_VALIDATED | UNKNOWN_RAW | join(UNKNOWN_RAW, UNKNOWN_SHAPE_VALIDATED) — validated status lost |
-| UNKNOWN_RAW | UNKNOWN_SEM_VALIDATED | UNKNOWN_RAW | join(UNKNOWN_RAW, UNKNOWN_SEM_VALIDATED) — validated status lost |
-| UNKNOWN_SHAPE_VALIDATED | UNKNOWN_SHAPE_VALIDATED | UNKNOWN_SHAPE_VALIDATED | Identity — provenance equally unknown, same validation level |
-| UNKNOWN_SHAPE_VALIDATED | UNKNOWN_SEM_VALIDATED | UNKNOWN_SHAPE_VALIDATED | Semantic status lost to the weaker validation |
-| UNKNOWN_SEM_VALIDATED | UNKNOWN_SEM_VALIDATED | UNKNOWN_SEM_VALIDATED | Identity — provenance equally unknown, same validation level |
+| UNKNOWN_RAW | UNKNOWN_GUARDED | UNKNOWN_RAW | join(UNKNOWN_RAW, UNKNOWN_GUARDED) — validated status lost |
+| UNKNOWN_RAW | UNKNOWN_ASSURED | UNKNOWN_RAW | join(UNKNOWN_RAW, UNKNOWN_ASSURED) — validated status lost |
+| UNKNOWN_GUARDED | UNKNOWN_GUARDED | UNKNOWN_GUARDED | Identity — provenance equally unknown, same validation level |
+| UNKNOWN_GUARDED | UNKNOWN_ASSURED | UNKNOWN_GUARDED | Semantic status lost to the weaker validation |
+| UNKNOWN_ASSURED | UNKNOWN_ASSURED | UNKNOWN_ASSURED | Identity — provenance equally unknown, same validation level |
 | Any state | MIXED_RAW | MIXED_RAW | MIXED absorbs further merges |
-| X | X | X | join(PIPELINE, PIPELINE) = PIPELINE |
+| X | X | X | join(ASSURED, ASSURED) = ASSURED |
 
 **Design rationale for UNKNOWN joins.** The separation of UNKNOWN from classified states in the join table prevents UNKNOWN from silently inheriting a classification it has not earned. Implementations MUST use this join definition for consistent taint propagation.
 
@@ -80,20 +80,20 @@ Bindings that do not implement field sensitivity treat `join_product` as `join_f
 
 **Trust ordering diagram.** The eight effective states have a natural trust-authority ordering: higher states represent greater institutional trust. The diagram below depicts this ordering — states connected by an upward path have increasing trust authority; states on separate branches are incomparable in the trust hierarchy.
 
-**Relationship between the trust ordering and the join table.** The trust ordering and the join operation are distinct. The trust-ordering diagram is a Hasse diagram of the authority partial order, not the join semilattice used for dataflow. The trust ordering describes which states represent greater institutional authority (AUDIT_TRAIL is the most authoritative; MIXED_RAW is the least). The join table (above) defines what happens when data from different taint states merges — this is a taint-merge algebra, not the lattice join of the trust ordering. In particular, the join of two states that are comparable in the trust ordering does NOT necessarily produce the higher state: join(PIPELINE, AUDIT_TRAIL) = MIXED_RAW, because they have different trust classifications (Tier 2 vs Tier 1), even though AUDIT_TRAIL is higher in the trust ordering. **The join table is normative.** Where the join table and the trust ordering could be read as contradictory, the join table governs. Implementations MUST derive the join function from the normative join table, not from the diagram, and MUST NOT use the trust ordering to short-circuit join computation (e.g., by assuming join(a, b) = b when a is below b in this diagram).
+**Relationship between the trust ordering and the join table.** The trust ordering and the join operation are distinct. The trust-ordering diagram is a Hasse diagram of the authority partial order, not the join semilattice used for dataflow. The trust ordering describes which states represent greater institutional authority (INTEGRAL is the most authoritative; MIXED_RAW is the least). The join table (above) defines what happens when data from different taint states merges — this is a taint-merge algebra, not the lattice join of the trust ordering. In particular, the join of two states that are comparable in the trust ordering does NOT necessarily produce the higher state: join(ASSURED, INTEGRAL) = MIXED_RAW, because they have different trust classifications (Tier 2 vs Tier 1), even though INTEGRAL is higher in the trust ordering. **The join table is normative.** Where the join table and the trust ordering could be read as contradictory, the join table governs. Implementations MUST derive the join function from the normative join table, not from the diagram, and MUST NOT use the trust ordering to short-circuit join computation (e.g., by assuming join(a, b) = b when a is below b in this diagram).
 
-The key non-obvious property: UNKNOWN_SEM_VALIDATED and PIPELINE are on parallel chains — neither dominates the other in the trust ordering. Their join produces MIXED_RAW, not either operand.
+The key non-obvious property: UNKNOWN_ASSURED and ASSURED are on parallel chains — neither dominates the other in the trust ordering. Their join produces MIXED_RAW, not either operand.
 
 ```mermaid
 graph BT
     MR["<b>MIXED_RAW</b><br/><i>(least trusted)</i>"]
     ER["<b>EXTERNAL_RAW</b>"]
     UR["<b>UNKNOWN_RAW</b>"]
-    SV["<b>SHAPE_VALIDATED</b>"]
-    USV["<b>UNKNOWN_SHAPE_VALIDATED</b>"]
-    USemV["<b>UNKNOWN_SEM_VALIDATED</b>"]
-    PL["<b>PIPELINE</b>"]
-    AT["<b>AUDIT_TRAIL</b><br/><i>(most trusted)</i>"]
+    SV["<b>GUARDED</b>"]
+    USV["<b>UNKNOWN_GUARDED</b>"]
+    USemV["<b>UNKNOWN_ASSURED</b>"]
+    PL["<b>ASSURED</b>"]
+    AT["<b>INTEGRAL</b><br/><i>(most trusted)</i>"]
 
     MR --> ER
     MR --> UR
@@ -114,15 +114,15 @@ graph BT
     style AT fill:#1565C0,color:#fff,stroke:#0D47A1
 ```
 
-Three properties to note: (1) MIXED_RAW is the absorbing element of the join — any cross-classification merge reaches it, and further merges stay there. (2) The UNKNOWN chain (UNKNOWN_RAW → UNKNOWN_SHAPE_VALIDATED → UNKNOWN_SEM_VALIDATED) and the classified chain (EXTERNAL_RAW → SHAPE_VALIDATED → PIPELINE) are parallel — validation can advance within either chain but cannot cross between them without a trust classification decision (which is a governance act, not a validation act). (3) EXTERNAL_RAW and UNKNOWN_RAW are incomparable in the trust ordering — neither dominates the other. Both sit above MIXED_RAW but on separate branches: EXTERNAL_RAW has a known classification (Tier 4) but no validation; UNKNOWN_RAW has no classification and no validation. The same incomparability holds between corresponding validated states on each chain. AUDIT_TRAIL is the highest-authority state, reachable only through the Tier 2 → Tier 1 construction transition.
+Three properties to note: (1) MIXED_RAW is the absorbing element of the join — any cross-classification merge reaches it, and further merges stay there. (2) The UNKNOWN chain (UNKNOWN_RAW → UNKNOWN_GUARDED → UNKNOWN_ASSURED) and the classified chain (EXTERNAL_RAW → GUARDED → ASSURED) are parallel — validation can advance within either chain but cannot cross between them without a trust classification decision (which is a governance act, not a validation act). (3) EXTERNAL_RAW and UNKNOWN_RAW are incomparable in the trust ordering — neither dominates the other. Both sit above MIXED_RAW but on separate branches: EXTERNAL_RAW has a known classification (Tier 4) but no validation; UNKNOWN_RAW has no classification and no validation. The same incomparability holds between corresponding validated states on each chain. INTEGRAL is the highest-authority state, reachable only through the Tier 2 → Tier 1 construction transition.
 
-**UNKNOWN** is data whose trust classification cannot be determined from available annotations. Entry conditions: the data enters a scope with no wardline annotation declaring its trust classification, or it is produced by an unannotated function whose inputs are themselves unannotated (no tier information available to the analysis). Invariants: UNKNOWN data receives conservative enforcement (equivalent to or stricter than EXTERNAL_RAW for most rules); UNKNOWN data that passes shape validation transitions to UNKNOWN_SHAPE_VALIDATED; UNKNOWN data that passes semantic validation transitions to UNKNOWN_SEM_VALIDATED. Neither transition grants a trust classification — the data remains unknown-origin.
+**UNKNOWN** is data whose trust classification cannot be determined from available annotations. Entry conditions: the data enters a scope with no wardline annotation declaring its trust classification, or it is produced by an unannotated function whose inputs are themselves unannotated (no tier information available to the analysis). Invariants: UNKNOWN data receives conservative enforcement (equivalent to or stricter than EXTERNAL_RAW for most rules); UNKNOWN data that passes shape validation transitions to UNKNOWN_GUARDED; UNKNOWN data that passes semantic validation transitions to UNKNOWN_ASSURED. Neither transition grants a trust classification — the data remains unknown-origin.
 
 **MIXED** is data derived from inputs spanning multiple authority tiers. Entry conditions: a function or expression combines inputs from two or more distinct trust classifications (e.g., Tier 1 audit data merged with Tier 4 external input). Invariants: MIXED data activates the pattern rules of every contributing tier — the enforcement burden is the union of all contributing tiers' restrictions. MIXED data cannot transition to a single-tier classification through ordinary validation, because validation establishes structural and semantic properties but does not decompose provenance. A declared normalisation boundary may collapse mixed inputs into a new Tier 2 artefact — the normalisation step is semantically a new construction (like the T2-to-T1 transition), not a passthrough of the original mixed data.
 
 **The distinction between UNKNOWN and MIXED:** MIXED means the analysis *can show* that a real cross-tier combination occurred — the contributing tiers are known but heterogeneous. UNKNOWN means the analysis *cannot determine* the provenance at all — the tier is absent, not mixed. An unannotated function that combines Tier 1 and Tier 4 inputs produces MIXED (the analysis sees both tiers). An unannotated function whose inputs are themselves unannotated produces UNKNOWN (the analysis has no tier information to combine).
 
-**Cross-product analysis.** The following table shows which of the 24 theoretical state combinations are reachable and which are impossible or collapsed. The full cross-product of six trust classifications (TIER_1, TIER_2, TIER_3, TIER_4, UNKNOWN, MIXED) and four validation statuses (NOT_APPLICABLE, RAW, SHAPE_VALIDATED, SEMANTICALLY_VALIDATED) yields 24 theoretical combinations. Eight are reachable as effective states; sixteen are impossible or collapsed:
+**Cross-product analysis.** The following table shows which of the 24 theoretical state combinations are reachable and which are impossible or collapsed. The full cross-product of six trust classifications (TIER_1, TIER_2, TIER_3, TIER_4, UNKNOWN, MIXED) and four validation statuses (NOT_APPLICABLE, RAW, GUARDED, SEMANTICALLY_VALIDATED) yields 24 theoretical combinations. Eight are reachable as effective states; sixteen are impossible or collapsed:
 
 | Classification | Not Applicable | Raw | Shape-Validated | Sem. Validated | Rationale |
 |----------------|----------------|-----|-----------------|----------------|-----------|
@@ -152,8 +152,8 @@ graph LR
     T2 -->|"Trusted construction<br/>(institutional rules)"| T1
     T1 -->|"Serialisation<br/>(sheds direct authority)"| RAW
     RAW -->|"Trusted restoration<br/>(§5.3 evidence categories)"| T1
-    RAW -.->|"Shape validation only<br/>(no provenance claim)"| USV["UNKNOWN_SHAPE_VALIDATED"]
-    USV -.->|"Semantic validation<br/>(no provenance claim)"| USEV["UNKNOWN_SEM_VALIDATED"]
+    RAW -.->|"Shape validation only<br/>(no provenance claim)"| USV["UNKNOWN_GUARDED"]
+    USV -.->|"Semantic validation<br/>(no provenance claim)"| USEV["UNKNOWN_ASSURED"]
 
     style T1 fill:#2C3E5D,color:#fff,stroke:#2C3E5D
     style T2 fill:#4A6FA5,color:#fff,stroke:#4A6FA5
@@ -204,8 +204,8 @@ The four evidence categories determine the restored tier:
 | Yes | Yes | Yes | Yes | **Tier 1** — full restoration. All four categories present; the restoration produces an artefact with the same authority as the original. |
 | Yes | Yes | — | Yes | **Tier 2 maximum.** Structure and domain validity verified, provenance institutionally attested, but integrity since serialisation is not established. |
 | Yes | — | — | Yes | **Tier 3 maximum.** Structure verified and provenance institutionally attested, but domain constraints have not been re-verified since serialisation. Appropriate when semantic validity may have been invalidated by time — business rules that have changed, domain constraints that depend on external state. |
-| Yes | Yes | — | — | **UNKNOWN_SEM_VALIDATED.** Structure and domain constraints verified, but no institutional attestation of provenance. The data passes all technical checks but its origin is unverified. |
-| Yes | — | — | — | **UNKNOWN_SHAPE_VALIDATED.** Structure verified but no provenance claim and no semantic re-verification. Shape-validated data of indeterminate origin. |
+| Yes | Yes | — | — | **UNKNOWN_ASSURED.** Structure and domain constraints verified, but no institutional attestation of provenance. The data passes all technical checks but its origin is unverified. |
+| Yes | — | — | — | **UNKNOWN_GUARDED.** Structure verified but no provenance claim and no semantic re-verification. Shape-validated data of indeterminate origin. |
 | — | — | — | — | **UNKNOWN_RAW.** No evidence present. The data is treated as fully untrusted. **NOTE: this is not Tier 4 (EXTERNAL_RAW).** Tier 4 denotes data positively classified as external. A raw representation with no evidence is of indeterminate origin, not necessarily external — the UNKNOWN/EXTERNAL distinction matters because their severity matrix columns differ. |
 
 The key distinction: institutional evidence is the gate between known-provenance tiers (T1–T3) and unknown-provenance states (UNKNOWN_*). A mere assertion of internal provenance — without institutional attestation — does not elevate data above unknown-origin status. This prevents trust-classification uplift on assertion rather than evidence: an agent or developer claiming "this is internal data" without institutional backing receives no tier benefit from the claim.

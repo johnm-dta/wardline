@@ -20,7 +20,7 @@ VALID_MANIFEST_YAML = (
     '    description: "core tier"\n'
     "module_tiers:\n"
     '  - path: "src/app"\n'
-    '    default_taint: "PIPELINE"\n'
+    '    default_taint: "ASSURED"\n'
     "metadata:\n"
     '  organisation: "TestOrg"\n'
 )

@@ -184,11 +184,11 @@ def caller():
             analysis_level=3,
         )
 
-        # Mock L1 to return known taints: callee=EXTERNAL_RAW (decorator), caller=PIPELINE (fallback)
-        # With floor clamp, caller (PIPELINE=rank 1) can be degraded to EXTERNAL_RAW (rank 5)
+        # Mock L1 to return known taints: callee=EXTERNAL_RAW (decorator), caller=ASSURED (fallback)
+        # With floor clamp, caller (ASSURED=rank 1) can be degraded to EXTERNAL_RAW (rank 5)
         l1_taint_map = {
             "callee": TaintState.EXTERNAL_RAW,
-            "caller": TaintState.PIPELINE,
+            "caller": TaintState.ASSURED,
         }
         l1_sources = {
             "callee": "decorator",
@@ -205,7 +205,7 @@ def caller():
         assert result.errors == []
 
         # Check the context: caller should have been refined by L3
-        # (fallback PIPELINE calling EXTERNAL_RAW callee -> degraded to EXTERNAL_RAW)
+        # (fallback ASSURED calling EXTERNAL_RAW callee -> degraded to EXTERNAL_RAW)
         assert len(rule.captured_contexts) >= 1
         ctx = rule.captured_contexts[0]
         assert ctx is not None

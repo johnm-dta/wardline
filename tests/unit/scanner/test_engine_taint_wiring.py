@@ -295,7 +295,7 @@ class TestVariableTaintGating:
         assert ctx is not None
         assert ctx.variable_taint_map is not None
         assert "fn" in ctx.variable_taint_map
-        assert ctx.variable_taint_map["fn"]["x"] == TaintState.AUDIT_TRAIL
+        assert ctx.variable_taint_map["fn"]["x"] == TaintState.INTEGRAL
 
     def test_l2_variable_taint_failure_is_fault_tolerant(
         self, tmp_path: Path

@@ -24,13 +24,13 @@ metadata:
 
 # ── Tier definitions ──────────────────────────────────────────
 tiers:
-  - id: "AUDIT_TRAIL"
+  - id: "INTEGRAL"
     tier: 1
     description: "Authoritative internal data — enums, registries, base classes"
-  - id: "PIPELINE"
+  - id: "ASSURED"
     tier: 2
     description: "Validated data flowing through processing pipeline"
-  - id: "SHAPE_VALIDATED"
+  - id: "GUARDED"
     tier: 3
     description: "Partially validated — shape-checked but not semantically verified"
   - id: "EXTERNAL_RAW"
@@ -44,15 +44,15 @@ module_tiers:
   # ─── Tier 1: Core definitions (pure internal) ──────────────
 
   - path: "src/wardline/__init__.py"
-    default_taint: "AUDIT_TRAIL"
+    default_taint: "INTEGRAL"
     # Rationale: Package root, re-exports public API. Pure internal.
 
   - path: "src/wardline/_version.py"
-    default_taint: "AUDIT_TRAIL"
+    default_taint: "INTEGRAL"
     # Rationale: Static version constant. No external data.
 
   - path: "src/wardline/core"
-    default_taint: "AUDIT_TRAIL"
+    default_taint: "INTEGRAL"
     # Rationale: Enums (AuthorityTier, TaintState, Severity, RuleId),
     # constants, severity matrix, and the canonical decorator registry.
     # These ARE the trust model — no external data processing.
@@ -60,27 +60,27 @@ module_tiers:
     #           taints.py, tiers.py
 
   - path: "src/wardline/runtime"
-    default_taint: "AUDIT_TRAIL"
+    default_taint: "INTEGRAL"
     # Rationale: WardlineBase cooperative base class and descriptors.
     # Framework infrastructure that enforces invariants on user code.
     # No external input processing.
     # Includes: __init__.py, base.py, types.py, descriptors.py
 
   - path: "src/wardline/decorators"
-    default_taint: "AUDIT_TRAIL"
+    default_taint: "INTEGRAL"
     # Rationale: wardline_decorator() factory + all decorator definitions
     # (authority.py Group 1, audit.py Group 2, schema.py marker).
     # These define boundary markers; they don't process external data.
     # Includes: __init__.py, _base.py, authority.py, audit.py, schema.py
 
   - path: "src/wardline/manifest/schemas"
-    default_taint: "AUDIT_TRAIL"
+    default_taint: "INTEGRAL"
     # Rationale: Static JSON Schema files — pure declarative definitions.
     # wardline.schema.json, overlay.schema.json, exceptions.schema.json,
     # fingerprint.schema.json, corpus-specimen.schema.json
 
   - path: "src/wardline/scanner/context.py"
-    default_taint: "AUDIT_TRAIL"
+    default_taint: "INTEGRAL"
     # Rationale: Finding, ScanContext, WardlineAnnotation — frozen
     # dataclasses that carry validated scan results. Pure data structures
     # with no I/O or external data ingestion.
@@ -88,30 +88,30 @@ module_tiers:
   # ─── Tier 2: Validated pipeline data ────────────────────────
 
   - path: "src/wardline/manifest/models.py"
-    default_taint: "PIPELINE"
+    default_taint: "ASSURED"
     # Rationale: Frozen dataclasses constructed from validated manifest
     # data. By the time data reaches these models, the loader has already
     # parsed and schema-validated the YAML. Post-validation structures.
 
   - path: "src/wardline/manifest/merge.py"
-    default_taint: "PIPELINE"
+    default_taint: "ASSURED"
     # Rationale: Merges overlay manifests into base manifests with the
     # narrow-only invariant. Operates exclusively on already-validated
     # ManifestModel instances — no raw external input.
 
   - path: "src/wardline/manifest/coherence.py"
-    default_taint: "PIPELINE"
+    default_taint: "ASSURED"
     # Rationale: Cross-references code annotations against manifest data
     # to detect orphaned annotations and governance gaps. Both inputs
     # (annotations and manifests) are validated before reaching this module.
 
   - path: "src/wardline/scanner/sarif.py"
-    default_taint: "PIPELINE"
+    default_taint: "ASSURED"
     # Rationale: Serialises validated Finding objects to SARIF v2.1.0 JSON.
     # Pure output transformation on already-validated internal data.
 
   - path: "src/wardline/scanner/taint"
-    default_taint: "PIPELINE"
+    default_taint: "ASSURED"
     # Rationale: Level 1 taint assignment from decorators + manifest data.
     # Operates on validated registry entries and loaded manifest models.
     # Includes: __init__.py, function_level.py
@@ -119,35 +119,35 @@ module_tiers:
   # ─── Tier 3: Partially validated (AST / filesystem coordination) ──
 
   - path: "src/wardline/scanner/engine.py"
-    default_taint: "SHAPE_VALIDATED"
+    default_taint: "GUARDED"
     # Rationale: Orchestrates the full scan pipeline including os.walk()
     # over target directories. While it validates paths and delegates
     # actual file parsing to the AST layer, it still handles filesystem
     # input directly. Semi-trusted coordinator.
 
   - path: "src/wardline/scanner/discovery.py"
-    default_taint: "SHAPE_VALIDATED"
+    default_taint: "GUARDED"
     # Rationale: Parses Python AST to locate wardline decorators and
     # build annotation maps. Input is parsed AST (partially trusted —
     # syntactically valid but semantically unchecked). Produces
     # intermediate WardlineAnnotation structures for downstream rules.
 
   - path: "src/wardline/scanner/rules"
-    default_taint: "SHAPE_VALIDATED"
+    default_taint: "GUARDED"
     # Rationale: AST visitor rules that walk parsed syntax trees to detect
     # patterns. Input is parsed AST nodes — shape-validated by the Python
     # parser but not semantically verified by wardline until findings are
     # produced.
 
   - path: "src/wardline/scanner"
-    default_taint: "SHAPE_VALIDATED"
+    default_taint: "GUARDED"
     # Rationale: Catch-all for scanner modules not listed above
     # (import_resolver.py, fingerprint.py, exceptions.py, _qualnames.py,
     # _scope.py, rejection_path.py). All operate on parsed AST or
     # validated Finding objects — partially trusted analysis infrastructure.
 
   - path: "src/wardline/manifest"
-    default_taint: "PIPELINE"
+    default_taint: "ASSURED"
     # Rationale: Catch-all for manifest modules not listed above
     # (scope.py, exceptions.py, resolve.py, regime.py). These operate
     # on already-loaded and schema-validated manifest data — post-
@@ -173,7 +173,7 @@ module_tiers:
 
 # ── Distribution sketch ───────────────────────────────────────
 #
-# Tier 1 (AUDIT_TRAIL):
+# Tier 1 (INTEGRAL):
 #   core/*            = 5 modules (matrix, registry, severity, taints, tiers)
 #   runtime/*         = 3 modules (base, types, descriptors)
 #   decorators/*      = 4 modules (_base, authority, audit, schema)
@@ -182,7 +182,7 @@ module_tiers:
 #   __init__, _version = 2 modules
 #   Subtotal:         ~16 modules
 #
-# Tier 2 (PIPELINE):
+# Tier 2 (ASSURED):
 #   manifest/models   = 1 module
 #   manifest/merge    = 1 module
 #   manifest/coherence = 1 module
@@ -190,7 +190,7 @@ module_tiers:
 #   scanner/taint/*   = 1 module  (function_level)
 #   Subtotal:         ~5 modules
 #
-# Tier 3 (SHAPE_VALIDATED):
+# Tier 3 (GUARDED):
 #   scanner/engine    = 1 module
 #   scanner/discovery = 1 module
 #   scanner/rules/*   = 6 modules (base + 5 PY-WL rules)

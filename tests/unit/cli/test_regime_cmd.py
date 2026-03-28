@@ -75,7 +75,7 @@ def _write_minimal_manifest(tmp_path: Path) -> Path:
         '  ratification_date: "2026-03-01"\n'
         "  review_interval_days: 180\n"
         "tiers:\n"
-        '  - id: "PIPELINE"\n'
+        '  - id: "ASSURED"\n'
         "    tier: 1\n"
         '    description: "strict"\n'
         '  - id: "EXTERNAL_RAW"\n'
@@ -83,7 +83,7 @@ def _write_minimal_manifest(tmp_path: Path) -> Path:
         '    description: "lax"\n'
         "module_tiers:\n"
         '  - path: "src/"\n'
-        '    default_taint: "PIPELINE"\n'
+        '    default_taint: "ASSURED"\n'
         "delegation:\n"
         '  default_authority: "RELAXED"\n'
         "rules:\n"
@@ -95,7 +95,7 @@ def _write_minimal_manifest(tmp_path: Path) -> Path:
 def _write_tier_downgrade_fixture(tmp_path: Path) -> Path:
     """Write manifest + baseline that triggers tier_downgrade coherence error.
 
-    Baseline: src/ had default_taint="PIPELINE" (tier 1).
+    Baseline: src/ had default_taint="ASSURED" (tier 1).
     Current:  src/ has default_taint="EXTERNAL_RAW" (tier 4).
     """
     manifest_yaml = tmp_path / "wardline.yaml"
@@ -109,7 +109,7 @@ def _write_tier_downgrade_fixture(tmp_path: Path) -> Path:
         '  ratification_date: "2026-03-01"\n'
         "  review_interval_days: 180\n"
         "tiers:\n"
-        '  - id: "PIPELINE"\n'
+        '  - id: "ASSURED"\n'
         "    tier: 1\n"
         '    description: "strict"\n'
         '  - id: "EXTERNAL_RAW"\n'
@@ -126,11 +126,11 @@ def _write_tier_downgrade_fixture(tmp_path: Path) -> Path:
     (tmp_path / "wardline.manifest.baseline.json").write_text(
         json.dumps({
             "tiers": [
-                {"id": "PIPELINE", "tier": 1, "description": "strict"},
+                {"id": "ASSURED", "tier": 1, "description": "strict"},
                 {"id": "EXTERNAL_RAW", "tier": 4, "description": "lax"},
             ],
             "module_tiers": [
-                {"path": "src/", "default_taint": "PIPELINE"},
+                {"path": "src/", "default_taint": "ASSURED"},
             ],
         })
     )

@@ -11,9 +11,9 @@ import pytest
 from wardline.core.taints import TaintState
 from wardline.decorators._base import get_wardline_attrs, wardline_decorator
 from wardline.decorators.authority import (
-    audit_writer,
-    authoritative_construction,
-    tier1_read,
+    integral_writer,
+    integral_construction,
+    integral_read,
     validates_external,
     validates_semantic,
     validates_shape,
@@ -32,10 +32,10 @@ external_boundary = wardline_decorator(
     _wardline_tier_source=TaintState.EXTERNAL_RAW,
 )
 
-audit_critical = wardline_decorator(
+integrity_critical = wardline_decorator(
     2,
-    "audit_critical",
-    _wardline_audit_critical=True,
+    "integrity_critical",
+    _wardline_integrity_critical=True,
 )
 
 
@@ -136,7 +136,7 @@ class TestStacking:
     """Multiple wardline decorators on the same function."""
 
     def test_stacking_groups_accumulate(self) -> None:
-        @audit_critical
+        @integrity_critical
         @external_boundary
         def my_func() -> int:
             return 1
@@ -146,7 +146,7 @@ class TestStacking:
         assert 2 in groups
 
     def test_stacking_attrs_merge(self) -> None:
-        @audit_critical
+        @integrity_critical
         @external_boundary
         def my_func() -> int:
             return 1
@@ -155,7 +155,7 @@ class TestStacking:
             my_func._wardline_tier_source  # type: ignore[attr-defined]
             is TaintState.EXTERNAL_RAW
         )
-        assert my_func._wardline_audit_critical is True  # type: ignore[attr-defined]
+        assert my_func._wardline_integrity_critical is True  # type: ignore[attr-defined]
 
     def test_copy_on_accumulate(self) -> None:
         """Inner decorator's _wardline_groups set is NOT mutated by outer."""
@@ -167,7 +167,7 @@ class TestStacking:
         inner_groups = inner_func._wardline_groups  # type: ignore[attr-defined]
         inner_groups_copy = set(inner_groups)
 
-        @audit_critical
+        @integrity_critical
         @external_boundary
         def stacked_func() -> int:
             return 1
@@ -335,7 +335,7 @@ class TestGroup1Decorators:
         def f() -> int:
             return 1
 
-        assert f._wardline_transition == (TaintState.EXTERNAL_RAW, TaintState.SHAPE_VALIDATED)  # type: ignore[attr-defined]
+        assert f._wardline_transition == (TaintState.EXTERNAL_RAW, TaintState.GUARDED)  # type: ignore[attr-defined]
 
     def test_validates_shape_callable(self) -> None:
         @validates_shape
@@ -356,7 +356,7 @@ class TestGroup1Decorators:
         def f() -> int:
             return 1
 
-        assert f._wardline_transition == (TaintState.SHAPE_VALIDATED, TaintState.PIPELINE)  # type: ignore[attr-defined]
+        assert f._wardline_transition == (TaintState.GUARDED, TaintState.ASSURED)  # type: ignore[attr-defined]
 
     def test_validates_semantic_callable(self) -> None:
         @validates_semantic
@@ -377,7 +377,7 @@ class TestGroup1Decorators:
         def f() -> int:
             return 1
 
-        assert f._wardline_transition == (TaintState.EXTERNAL_RAW, TaintState.PIPELINE)  # type: ignore[attr-defined]
+        assert f._wardline_transition == (TaintState.EXTERNAL_RAW, TaintState.ASSURED)  # type: ignore[attr-defined]
 
     def test_validates_external_callable(self) -> None:
         @validates_external
@@ -386,65 +386,65 @@ class TestGroup1Decorators:
 
         assert f() == 42
 
-    def test_tier1_read_group(self) -> None:
-        @tier1_read
+    def test_integral_read_group(self) -> None:
+        @integral_read
         def f() -> int:
             return 1
 
         assert 1 in f._wardline_groups  # type: ignore[attr-defined]
 
-    def test_tier1_read_attrs(self) -> None:
-        @tier1_read
+    def test_integral_read_attrs(self) -> None:
+        @integral_read
         def f() -> int:
             return 1
 
-        assert f._wardline_tier_source is TaintState.AUDIT_TRAIL  # type: ignore[attr-defined]
+        assert f._wardline_tier_source is TaintState.INTEGRAL  # type: ignore[attr-defined]
 
-    def test_tier1_read_callable(self) -> None:
-        @tier1_read
+    def test_integral_read_callable(self) -> None:
+        @integral_read
         def f() -> int:
             return 42
 
         assert f() == 42
 
-    def test_audit_writer_group(self) -> None:
-        @audit_writer
+    def test_integral_writer_group(self) -> None:
+        @integral_writer
         def f() -> int:
             return 1
 
         assert 1 in f._wardline_groups  # type: ignore[attr-defined]
 
-    def test_audit_writer_attrs(self) -> None:
-        @audit_writer
+    def test_integral_writer_attrs(self) -> None:
+        @integral_writer
         def f() -> int:
             return 1
 
-        assert f._wardline_tier_source is TaintState.AUDIT_TRAIL  # type: ignore[attr-defined]
-        assert f._wardline_audit_writer is True  # type: ignore[attr-defined]
+        assert f._wardline_tier_source is TaintState.INTEGRAL  # type: ignore[attr-defined]
+        assert f._wardline_integral_writer is True  # type: ignore[attr-defined]
 
-    def test_audit_writer_callable(self) -> None:
-        @audit_writer
+    def test_integral_writer_callable(self) -> None:
+        @integral_writer
         def f() -> int:
             return 42
 
         assert f() == 42
 
-    def test_authoritative_construction_group(self) -> None:
-        @authoritative_construction
+    def test_integral_construction_group(self) -> None:
+        @integral_construction
         def f() -> int:
             return 1
 
         assert 1 in f._wardline_groups  # type: ignore[attr-defined]
 
-    def test_authoritative_construction_attrs(self) -> None:
-        @authoritative_construction
+    def test_integral_construction_attrs(self) -> None:
+        @integral_construction
         def f() -> int:
             return 1
 
-        assert f._wardline_transition == (TaintState.PIPELINE, TaintState.AUDIT_TRAIL)  # type: ignore[attr-defined]
+        assert f._wardline_transition == (TaintState.ASSURED, TaintState.INTEGRAL)  # type: ignore[attr-defined]
 
-    def test_authoritative_construction_callable(self) -> None:
-        @authoritative_construction
+    def test_integral_construction_callable(self) -> None:
+        @integral_construction
         def f() -> int:
             return 42
 
@@ -504,7 +504,7 @@ class TestAsyncSupport:
     def test_async_stacking(self) -> None:
         """Stacked decorators on async preserve coroutine status."""
 
-        @audit_critical
+        @integrity_critical
         @external_boundary
         async def my_async_func() -> int:
             return 1

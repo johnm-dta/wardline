@@ -34,28 +34,28 @@ Additional panel findings incorporated: Solution Architect C1 (L3 consumes and r
 
 ### Problem
 
-The existing `taint_join()` in `core/taints.py` is designed for L2 variable-level merges within a function body. It uses a partial order where cross-family joins (e.g., `PIPELINE + EXTERNAL_RAW`) collapse to `MIXED_RAW`. This is correct for data-flow merges — if a variable holds data from both a pipeline and an external source, it genuinely has mixed provenance.
+The existing `taint_join()` in `core/taints.py` is designed for L2 variable-level merges within a function body. It uses a partial order where cross-family joins (e.g., `ASSURED + EXTERNAL_RAW`) collapse to `MIXED_RAW`. This is correct for data-flow merges — if a variable holds data from both a pipeline and an external source, it genuinely has mixed provenance.
 
-For call-graph propagation, the question is different: "what is the least-trusted data this function transitively touches?" A `PIPELINE` function that calls an `EXTERNAL_RAW` function doesn't have mixed data — it has a dependency on untrusted data. The effective trust should be `EXTERNAL_RAW`, not `MIXED_RAW`.
+For call-graph propagation, the question is different: "what is the least-trusted data this function transitively touches?" A `ASSURED` function that calls an `EXTERNAL_RAW` function doesn't have mixed data — it has a dependency on untrusted data. The effective trust should be `EXTERNAL_RAW`, not `MIXED_RAW`.
 
 ### Solution: Total Trust Order
 
 Define a total ordering over `TaintState` for L3 purposes (most trusted → least trusted):
 
 ```
-AUDIT_TRAIL > PIPELINE > SHAPE_VALIDATED > UNKNOWN_SEM_VALIDATED >
-UNKNOWN_SHAPE_VALIDATED > EXTERNAL_RAW > UNKNOWN_RAW > MIXED_RAW
+INTEGRAL > ASSURED > GUARDED > UNKNOWN_ASSURED >
+UNKNOWN_GUARDED > EXTERNAL_RAW > UNKNOWN_RAW > MIXED_RAW
 ```
 
 Represented as an integer rank (lower = more trusted):
 
 | TaintState | Rank |
 |---|---|
-| `AUDIT_TRAIL` | 0 |
-| `PIPELINE` | 1 |
-| `SHAPE_VALIDATED` | 2 |
-| `UNKNOWN_SEM_VALIDATED` | 3 |
-| `UNKNOWN_SHAPE_VALIDATED` | 4 |
+| `INTEGRAL` | 0 |
+| `ASSURED` | 1 |
+| `GUARDED` | 2 |
+| `UNKNOWN_ASSURED` | 3 |
+| `UNKNOWN_GUARDED` | 4 |
 | `EXTERNAL_RAW` | 5 |
 | `UNKNOWN_RAW` | 6 |
 | `MIXED_RAW` | 7 |
@@ -83,10 +83,10 @@ The classification is based on **how the taint was assigned** (provenance), not 
 **Classification:**
 
 - **Anchored (decorator):** Functions whose taint was assigned by a decorator (`TaintSource == "decorator"`). Their taint is an explicit developer assertion. Immutable — they are read-only seeds in the call graph. Their own taint never changes.
-- **Floating (module_default):** Functions whose taint came from a `module_tiers` path match (`TaintSource == "module_default"`). Their taint is a blanket organizational classification, not a per-function assertion. L3 can refine them — downward only (toward less trust). A `PIPELINE` function in a module_tiers module that calls `@external_boundary` functions should be refined to `EXTERNAL_RAW`.
-- **Floating (fallback):** Functions that defaulted to `UNKNOWN_RAW` (`TaintSource == "fallback"`). L3 can refine them in either direction — if they only call trusted functions, they can be refined upward toward `AUDIT_TRAIL`; if they call untrusted functions, they stay at or move below `UNKNOWN_RAW`.
+- **Floating (module_default):** Functions whose taint came from a `module_tiers` path match (`TaintSource == "module_default"`). Their taint is a blanket organizational classification, not a per-function assertion. L3 can refine them — downward only (toward less trust). A `ASSURED` function in a module_tiers module that calls `@external_boundary` functions should be refined to `EXTERNAL_RAW`.
+- **Floating (fallback):** Functions that defaulted to `UNKNOWN_RAW` (`TaintSource == "fallback"`). L3 can refine them in either direction — if they only call trusted functions, they can be refined upward toward `INTEGRAL`; if they call untrusted functions, they stay at or move below `UNKNOWN_RAW`.
 
-**Rationale for allowing upward refinement of fallback functions:** A function with no decorator and no module_tiers match has `UNKNOWN_RAW` purely because the tool has no information. If L3 discovers it only calls `@tier1_read` functions, the actual trust context is `AUDIT_TRAIL`. Preventing this refinement would make L3 useless for its primary purpose — inferring trust for unannotated code. The security boundary is anchored immutability: decorated functions (explicit developer assertions) can never be overridden by inference.
+**Rationale for allowing upward refinement of fallback functions:** A function with no decorator and no module_tiers match has `UNKNOWN_RAW` purely because the tool has no information. If L3 discovers it only calls `@integral_read` functions, the actual trust context is `INTEGRAL`. Preventing this refinement would make L3 useless for its primary purpose — inferring trust for unannotated code. The security boundary is anchored immutability: decorated functions (explicit developer assertions) can never be overridden by inference.
 
 **Propagation formula for floating functions:**
 
@@ -265,7 +265,7 @@ def _run_callgraph_taint(
 
 ## 7. Taint Provenance Tracking (Mandatory)
 
-Provenance is assessment evidence, not a convenience feature. An assessor reviewing a function refined to `AUDIT_TRAIL` by L3 needs to know which callee dominated the assignment and how many call edges were excluded. Provenance ships with L3 core, not deferred.
+Provenance is assessment evidence, not a convenience feature. An assessor reviewing a function refined to `INTEGRAL` by L3 needs to know which callee dominated the assignment and how many call edges were excluded. Provenance ships with L3 core, not deferred.
 
 ```python
 @dataclass(frozen=True)
@@ -334,12 +334,12 @@ Minimum specimen set for L3 validation:
 | Direct recursion | A calls A (self-recursive) | Taint stable (no infinite loop) |
 | Mutual recursion | A↔B cycle | Both converge to least-trusted callee taint |
 | Mixed resolved/unresolved | A calls B (resolved) and `json.loads` (unresolved) | A refined by B only; `json.loads` transparent |
-| Anchored not demoted | `@external_boundary` A calls `@tier1_read` B | A stays `EXTERNAL_RAW` (anchored) |
-| Floating refinement | Undecorated A calls only `@tier1_read` functions | A refined from `UNKNOWN_RAW` to `AUDIT_TRAIL` |
+| Anchored not demoted | `@external_boundary` A calls `@integral_read` B | A stays `EXTERNAL_RAW` (anchored) |
+| Floating refinement | Undecorated A calls only `@integral_read` functions | A refined from `UNKNOWN_RAW` to `INTEGRAL` |
 | Diamond pattern | A calls B and C; B and C both call D | A gets `max_rank(B_taint, C_taint)` |
 | No resolved callees | A calls only imported functions | A stays `UNKNOWN_RAW` |
-| Module_default not upgraded | `module_tiers: PIPELINE` function calls only `@tier1_read` | Stays `PIPELINE` (module_default is downward-only) |
-| Module_default demoted | `module_tiers: PIPELINE` function calls `@external_boundary` | Refined to `EXTERNAL_RAW` (downward allowed) |
+| Module_default not upgraded | `module_tiers: ASSURED` function calls only `@integral_read` | Stays `ASSURED` (module_default is downward-only) |
+| Module_default demoted | `module_tiers: ASSURED` function calls `@external_boundary` | Refined to `EXTERNAL_RAW` (downward allowed) |
 | Anchored immutable | Adversarial: decorator-anchored function in crafted call chain | Taint unchanged; assertion verifies |
 
 Set `analysis_level_required: 3` on all L3 specimens. Existing KFN specimens (PY-WL-001-KFN-01, PY-WL-004-KFN-01) should flip to TP at L3 — update their metadata.

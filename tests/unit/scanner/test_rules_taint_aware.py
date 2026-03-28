@@ -51,10 +51,10 @@ class TestQualnameLookup:
     """Verify qualname tracking produces the correct taint for class methods."""
 
     def test_class_method_gets_correct_taint(self) -> None:
-        """A method MyService.handle with AUDIT_TRAIL context should
-        get AUDIT_TRAIL taint, not UNKNOWN_RAW."""
+        """A method MyService.handle with INTEGRAL context should
+        get INTEGRAL taint, not UNKNOWN_RAW."""
         rule = RulePyWl001()
-        ctx = _make_context("MyService.handle", TaintState.AUDIT_TRAIL)
+        ctx = _make_context("MyService.handle", TaintState.INTEGRAL)
         rule.set_context(ctx)
 
         source = (
@@ -66,7 +66,7 @@ class TestQualnameLookup:
         _parse_and_visit(rule, source)
 
         assert len(rule.findings) == 1
-        assert rule.findings[0].taint_state == TaintState.AUDIT_TRAIL
+        assert rule.findings[0].taint_state == TaintState.INTEGRAL
 
 
 # ── PY-WL-001 ──────────────────────────────────────────────────
@@ -77,7 +77,7 @@ class TestRule001TaintAware:
 
     def test_audit_trail_produces_error_unconditional(self) -> None:
         rule = RulePyWl001()
-        ctx = _make_context("target", TaintState.AUDIT_TRAIL)
+        ctx = _make_context("target", TaintState.INTEGRAL)
         rule.set_context(ctx)
 
         source = 'def target():\n    d = {}\n    d.get("k", "default")\n'
@@ -85,8 +85,8 @@ class TestRule001TaintAware:
 
         assert len(rule.findings) == 1
         f = rule.findings[0]
-        cell = lookup(RuleId.PY_WL_001, TaintState.AUDIT_TRAIL)
-        assert f.taint_state == TaintState.AUDIT_TRAIL
+        cell = lookup(RuleId.PY_WL_001, TaintState.INTEGRAL)
+        assert f.taint_state == TaintState.INTEGRAL
         assert f.severity == cell.severity
         assert f.severity == Severity.ERROR
 
@@ -113,7 +113,7 @@ class TestRule002TaintAware:
 
     def test_pipeline_produces_matrix_severity(self) -> None:
         rule = RulePyWl002()
-        ctx = _make_context("target", TaintState.PIPELINE)
+        ctx = _make_context("target", TaintState.ASSURED)
         rule.set_context(ctx)
 
         source = 'def target():\n    getattr(obj, "x", None)\n'
@@ -121,8 +121,8 @@ class TestRule002TaintAware:
 
         assert len(rule.findings) == 1
         f = rule.findings[0]
-        cell = lookup(RuleId.PY_WL_002, TaintState.PIPELINE)
-        assert f.taint_state == TaintState.PIPELINE
+        cell = lookup(RuleId.PY_WL_002, TaintState.ASSURED)
+        assert f.taint_state == TaintState.ASSURED
         assert f.severity == cell.severity
 
 
@@ -134,7 +134,7 @@ class TestRule004TaintAware:
 
     def test_shape_validated_may_produce_warning(self) -> None:
         rule = RulePyWl004()
-        ctx = _make_context("target", TaintState.SHAPE_VALIDATED)
+        ctx = _make_context("target", TaintState.GUARDED)
         rule.set_context(ctx)
 
         source = (
@@ -148,8 +148,8 @@ class TestRule004TaintAware:
 
         assert len(rule.findings) >= 1
         f = rule.findings[0]
-        cell = lookup(RuleId.PY_WL_004, TaintState.SHAPE_VALIDATED)
-        assert f.taint_state == TaintState.SHAPE_VALIDATED
+        cell = lookup(RuleId.PY_WL_004, TaintState.GUARDED)
+        assert f.taint_state == TaintState.GUARDED
         assert f.severity == cell.severity
         assert f.severity == Severity.WARNING
 
@@ -162,7 +162,7 @@ class TestRule005TaintAware:
 
     def test_audit_trail_produces_matrix_severity(self) -> None:
         rule = RulePyWl005()
-        ctx = _make_context("target", TaintState.AUDIT_TRAIL)
+        ctx = _make_context("target", TaintState.INTEGRAL)
         rule.set_context(ctx)
 
         source = (
@@ -176,8 +176,8 @@ class TestRule005TaintAware:
 
         assert len(rule.findings) == 1
         f = rule.findings[0]
-        cell = lookup(RuleId.PY_WL_005, TaintState.AUDIT_TRAIL)
-        assert f.taint_state == TaintState.AUDIT_TRAIL
+        cell = lookup(RuleId.PY_WL_005, TaintState.INTEGRAL)
+        assert f.taint_state == TaintState.INTEGRAL
         assert f.severity == cell.severity
 
 
@@ -210,42 +210,42 @@ class TestRule003TaintAware:
 
     def test_audit_trail_uses_matrix(self) -> None:
         rule = RulePyWl003()
-        rule.set_context(_make_context("target", TaintState.AUDIT_TRAIL))
+        rule.set_context(_make_context("target", TaintState.INTEGRAL))
         _parse_and_visit(rule, _SRC_003)
         assert len(rule.findings) >= 1
         f = rule.findings[0]
-        cell = lookup(RuleId.PY_WL_003, TaintState.AUDIT_TRAIL)
-        assert f.taint_state == TaintState.AUDIT_TRAIL
+        cell = lookup(RuleId.PY_WL_003, TaintState.INTEGRAL)
+        assert f.taint_state == TaintState.INTEGRAL
         assert f.severity == cell.severity
 
     def test_pipeline_uses_matrix(self) -> None:
         rule = RulePyWl003()
-        rule.set_context(_make_context("target", TaintState.PIPELINE))
+        rule.set_context(_make_context("target", TaintState.ASSURED))
         _parse_and_visit(rule, _SRC_003)
         assert len(rule.findings) >= 1
         f = rule.findings[0]
-        cell = lookup(RuleId.PY_WL_003, TaintState.PIPELINE)
-        assert f.taint_state == TaintState.PIPELINE
+        cell = lookup(RuleId.PY_WL_003, TaintState.ASSURED)
+        assert f.taint_state == TaintState.ASSURED
         assert f.severity == cell.severity
 
     def test_shape_validated_uses_matrix_without_boundary(self) -> None:
         rule = RulePyWl003()
-        rule.set_context(_make_context("target", TaintState.SHAPE_VALIDATED))
+        rule.set_context(_make_context("target", TaintState.GUARDED))
         _parse_and_visit(rule, _SRC_003)
         assert len(rule.findings) >= 1
         f = rule.findings[0]
-        cell = lookup(RuleId.PY_WL_003, TaintState.SHAPE_VALIDATED)
-        assert f.taint_state == TaintState.SHAPE_VALIDATED
+        cell = lookup(RuleId.PY_WL_003, TaintState.GUARDED)
+        assert f.taint_state == TaintState.GUARDED
         assert f.severity == cell.severity
 
     def test_unknown_sem_validated_uses_matrix(self) -> None:
         rule = RulePyWl003()
-        rule.set_context(_make_context("target", TaintState.UNKNOWN_SEM_VALIDATED))
+        rule.set_context(_make_context("target", TaintState.UNKNOWN_ASSURED))
         _parse_and_visit(rule, _SRC_003)
         assert len(rule.findings) >= 1
         f = rule.findings[0]
-        cell = lookup(RuleId.PY_WL_003, TaintState.UNKNOWN_SEM_VALIDATED)
-        assert f.taint_state == TaintState.UNKNOWN_SEM_VALIDATED
+        cell = lookup(RuleId.PY_WL_003, TaintState.UNKNOWN_ASSURED)
+        assert f.taint_state == TaintState.UNKNOWN_ASSURED
         assert f.severity == cell.severity
 
     def test_shape_validation_boundary_suppresses(self) -> None:
