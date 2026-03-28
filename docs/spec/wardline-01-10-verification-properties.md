@@ -284,9 +284,9 @@ error[WL-001]: Fabricated default masks missing field
   --> src/adapters/partner.py:38:1
    |
 38 | @integral_read
-   | ^^^^^^^^^^^ this annotation declares audit-trail context
+   | ^^^^^^^^^^^ this annotation declares integral context
    |
-   = help: in audit-trail data, member absence is an integrity failure —
+   = help: in integral data, member absence is an integrity failure —
            a fabricated default silently replaces missing evidence
    = note: this finding is UNCONDITIONAL and cannot be excepted
    = see: wardline explain WL-001 INTEGRAL

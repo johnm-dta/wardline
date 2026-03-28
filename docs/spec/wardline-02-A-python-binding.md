@@ -163,7 +163,7 @@ The 17 annotation groups are defined as language-agnostic semantic requirements 
 | 1 | | `@integral_read` | *(none)* | Body bans: `.get()` with defaults, `getattr()` with fallbacks, `hasattr()`, broad `except`. Return tagged TIER_1. |
 | 1 | | `@integral_writer` | *(none)* | Call-site bans: enclosing swallowing `except`. Audit call MUST dominate telemetry on shared execution paths. Violation produces a finding. Fallback paths that bypass the audit call produce a finding. Return tagged TIER_1. |
 | 1 | | `@integral_construction` | *(none)* | Same body restrictions as `@integral_read`. Semantically equivalent to `@integral_writer` but for non-audit authoritative artefacts. Return tagged TIER_1. |
-| 2 | Audit Primacy | `@integrity_critical` | *(none)* | Superset of `@integral_writer` — fallback paths at call sites that skip the audit call produce a finding. |
+| 2 | Integrity Primacy | `@integrity_critical` | *(none)* | Superset of `@integral_writer` — fallback paths at call sites that skip the audit call produce a finding. |
 | 3 | Plugin Contract | `@system_plugin` | *(none)* | Body bans top-level broad `except`. Allows narrower `except` for external calls and row-value operations. "Wrap your external calls; let your own bugs crash." |
 | 4 | Data Provenance | `@int_data` | *(none)* | Tier 1 body restrictions. Return value is UNKNOWN_RAW unless composed with `@restoration_boundary`. Allow-list/deny-list on call targets. |
 | 5 | Schema Contracts | `@all_fields_mapped(source=Class)` | `source`: the class whose fields are verified to all appear in the body | Verifies every field on `source` appears as attribute access on the parameter. |
