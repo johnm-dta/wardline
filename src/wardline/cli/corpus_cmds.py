@@ -752,26 +752,39 @@ def publish(
     run_props = run.get("properties", {})
     implemented_rules = set(run_props.get("wardline.implementedRules", []))
 
-    # Count unexcepted findings for implemented rules.
-    # SUPPRESS-severity findings (SARIF level "note") are excluded from the
-    # pass/fail count — the severity matrix declares them as intentionally
-    # silent at that taint state.  They're tracked as a separate diagnostic
-    # counter for tool-quality visibility.
-    unexcepted = 0
+    # Count unexcepted ERROR findings for implemented rules.
+    #
+    # The gate uses a three-tier signal model:
+    # - SUPPRESS (SARIF "note"): Matrix says this pattern is expected at this
+    #   taint state.  Excluded from gate; tracked as diagnostic counter.
+    # - WARNING (SARIF "warning"): Pattern is worth reviewing but does not
+    #   block.  Excluded from gate; tracked as separate counter.
+    # - ERROR (SARIF "error"): Pattern violates the tier's integrity contract.
+    #   Blocks the gate unless governed by an exception.
+    #
+    # This creates an economic incentive: promoting data to a higher tier
+    # (via validation boundaries) removes findings.  Leaving raw data in
+    # hot code paths is expensive.
+    unexcepted_errors = 0
+    warning_findings = 0
     suppressed_cell_findings = 0
     for result in run.get("results", []):
         rule_id = result.get("ruleId", "")
         if rule_id not in implemented_rules:
             continue
-        if result.get("level") == "note":
+        level = result.get("level", "error")
+        if level == "note":
             suppressed_cell_findings += 1
+            continue
+        if level == "warning":
+            warning_findings += 1
             continue
         props = result.get("properties", {})
         if "wardline.exceptionId" in props:
             continue
-        unexcepted += 1
+        unexcepted_errors += 1
 
-    self_hosting_verdict = "PASS" if unexcepted == 0 else "FAIL"
+    self_hosting_verdict = "PASS" if unexcepted_errors == 0 else "FAIL"
 
     # --- Compute corpus hash ---
     corpus_hash = _compute_corpus_hash(corpus_path)
@@ -782,7 +795,7 @@ def publish(
         failing = corpus_report["summary"]["failing_cells"]
         gaps.append(f"{failing} corpus cell(s) below floor")
     if self_hosting_verdict == "FAIL":
-        gaps.append(f"{unexcepted} unexcepted self-hosting finding(s)")
+        gaps.append(f"{unexcepted_errors} unexcepted self-hosting ERROR finding(s)")
     # Adversarial corpus floor: per-rule AFP/AFN + aggregate suppression/taint-flow
     # Per-rule check applies to PY-WL-* analysis rules from the SARIF implementedRules.
     adversarial_shortfalls: list[str] = []
@@ -829,7 +842,8 @@ def publish(
             c for c in corpus_report["cells"]
             if c["cell_verdict"] == "FAIL"
         ],
-        "self_hosting_unexcepted_findings": unexcepted,
+        "self_hosting_unexcepted_errors": unexcepted_errors,
+        "self_hosting_warning_findings": warning_findings,
         "self_hosting_suppressed_cell_findings": suppressed_cell_findings,
     }
 

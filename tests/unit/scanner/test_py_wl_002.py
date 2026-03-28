@@ -35,7 +35,7 @@ class TestGetattrWithDefault:
 
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_002
-        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].severity == Severity.WARNING
 
     def test_getattr_3arg_none_default_fires(self) -> None:
         rule = _run_rule('getattr(obj, "name", None)\n')

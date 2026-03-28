@@ -67,7 +67,7 @@ class TestInOperator:
 
         assert len(rule.findings) == 1
         assert rule.findings[0].rule_id == RuleId.PY_WL_003
-        assert rule.findings[0].severity == Severity.ERROR
+        assert rule.findings[0].severity == Severity.SUPPRESS
         assert "'in' operator" in rule.findings[0].message
 
     def test_key_in_dict_keys_fires(self) -> None:
