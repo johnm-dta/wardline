@@ -30,10 +30,8 @@ logger = logging.getLogger(__name__)
 
 def _parse_location(location: str) -> tuple[str, str | None]:
     """Parse 'file_path::qualname' into (file_path, qualname)."""
-    if "::" in location:
-        parts = location.split("::", 1)
-        return parts[0], parts[1]
-    return location, None
+    file_path, sep, qualname = location.partition("::")
+    return (file_path, qualname) if sep else (location, None)
 
 
 def apply_exceptions(
