@@ -10,7 +10,7 @@ from wardline.core.severity import Exceptionability, RuleId, Severity
 if TYPE_CHECKING:
     from pathlib import Path
 from wardline.scanner.context import Finding
-from wardline.scanner.sarif import SarifReport
+from wardline.scanner.sarif import SarifReport, compute_control_law
 
 
 def _make_finding(
@@ -529,3 +529,123 @@ class TestSarifGovernanceMetadata:
         assert report.manifest_hash is None
         assert report.scan_timestamp is None
         assert report.commit_ref is None
+
+
+# ---------------------------------------------------------------------------
+# TestComputeControlLaw
+# ---------------------------------------------------------------------------
+
+
+class TestComputeControlLaw:
+    """Tests for §9.5 control law computation."""
+
+    def test_normal_when_no_degradation(self) -> None:
+        law, degradations = compute_control_law(
+            ratification_overdue=False,
+            conformance_gaps=(),
+            rules_disabled=(),
+            stale_exception_count=0,
+        )
+        assert law == "normal"
+        assert degradations == ()
+
+    def test_alternate_when_ratification_overdue(self) -> None:
+        law, degradations = compute_control_law(
+            ratification_overdue=True,
+            conformance_gaps=(),
+            rules_disabled=(),
+            stale_exception_count=0,
+        )
+        assert law == "alternate"
+        assert "ratification_overdue" in degradations
+
+    def test_alternate_when_conformance_gaps(self) -> None:
+        law, degradations = compute_control_law(
+            ratification_overdue=False,
+            conformance_gaps=("SARIF-run-level-incomplete",),
+            rules_disabled=(),
+            stale_exception_count=0,
+        )
+        assert law == "alternate"
+        assert "conformance_gaps_present" in degradations
+
+    def test_alternate_when_rules_disabled(self) -> None:
+        law, degradations = compute_control_law(
+            ratification_overdue=False,
+            conformance_gaps=(),
+            rules_disabled=("PY-WL-006", "PY-WL-007"),
+            stale_exception_count=0,
+        )
+        assert law == "alternate"
+        assert "rules_disabled" in degradations
+
+    def test_alternate_when_stale_exceptions(self) -> None:
+        law, degradations = compute_control_law(
+            ratification_overdue=False,
+            conformance_gaps=(),
+            rules_disabled=(),
+            stale_exception_count=3,
+        )
+        assert law == "alternate"
+        assert "stale_exceptions_present" in degradations
+
+    def test_multiple_degradations_all_reported(self) -> None:
+        law, degradations = compute_control_law(
+            ratification_overdue=True,
+            conformance_gaps=("gap-1",),
+            rules_disabled=("PY-WL-006",),
+            stale_exception_count=1,
+        )
+        assert law == "alternate"
+        assert len(degradations) == 4
+
+    def test_degradations_are_sorted(self) -> None:
+        """Deterministic output for verification mode."""
+        law, degradations = compute_control_law(
+            ratification_overdue=True,
+            conformance_gaps=("gap-1",),
+            rules_disabled=(),
+            stale_exception_count=0,
+        )
+        assert degradations == tuple(sorted(degradations))
+
+    def test_compute_and_report_integration(self) -> None:
+        """Verify compute_control_law output feeds SarifReport correctly."""
+        law, degradations = compute_control_law(
+            ratification_overdue=True,
+            stale_exception_count=2,
+        )
+        report = SarifReport(
+            findings=[],
+            control_law=law,
+            control_law_degradations=degradations,
+        )
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.controlLaw"] == "alternate"
+        assert "ratification_overdue" in props["wardline.controlLawDegradations"]
+        assert "stale_exceptions_present" in props["wardline.controlLawDegradations"]
+
+
+# ---------------------------------------------------------------------------
+# TestControlLawDegradationsEmission
+# ---------------------------------------------------------------------------
+
+
+class TestControlLawDegradationsEmission:
+    """SARIF emission of wardline.controlLawDegradations."""
+
+    def test_degradations_omitted_when_normal(self) -> None:
+        report = SarifReport(findings=[], control_law="normal")
+        props = report.to_dict()["runs"][0]["properties"]
+        assert "wardline.controlLawDegradations" not in props
+
+    def test_degradations_emitted_when_alternate(self) -> None:
+        report = SarifReport(
+            findings=[],
+            control_law="alternate",
+            control_law_degradations=("ratification_overdue", "stale_exceptions_present"),
+        )
+        props = report.to_dict()["runs"][0]["properties"]
+        assert props["wardline.controlLawDegradations"] == [
+            "ratification_overdue", "stale_exceptions_present"
+        ]

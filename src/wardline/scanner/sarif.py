@@ -102,6 +102,35 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
 )
 
 
+def compute_control_law(
+    *,
+    ratification_overdue: bool = False,
+    conformance_gaps: tuple[str, ...] = (),
+    rules_disabled: tuple[str, ...] = (),
+    stale_exception_count: int = 0,
+) -> tuple[str, tuple[str, ...]]:
+    """Compute the enforcement control law state per spec §9.5.
+
+    Returns (law, degradations) where law is "normal" or "alternate"
+    and degradations is a sorted tuple of degradation condition names.
+    Direct law is not computable by the tool itself — if we are running,
+    we are not in direct law.
+    """
+    degradations: list[str] = []
+    if ratification_overdue:
+        degradations.append("ratification_overdue")
+    if conformance_gaps:
+        degradations.append("conformance_gaps_present")
+    if rules_disabled:
+        degradations.append("rules_disabled")
+    if stale_exception_count > 0:
+        degradations.append("stale_exceptions_present")
+
+    degradations.sort()
+    law = "alternate" if degradations else "normal"
+    return law, tuple(degradations)
+
+
 def _severity_rank(severity: Severity) -> int:
     """Return a numeric rank for severity (higher = worse)."""
     return {Severity.SUPPRESS: 0, Severity.WARNING: 1, Severity.ERROR: 2}.get(
@@ -221,6 +250,7 @@ class SarifReport:
     governance_profile: str = "lite"
     # WP 2.4: Governance metadata
     control_law: str = "normal"
+    control_law_degradations: tuple[str, ...] = ()
     analysis_level: int = 1
     manifest_hash: str | None = None
     scan_timestamp: str | None = None
@@ -283,6 +313,8 @@ class SarifReport:
                    else {}),
                 "wardline.conformanceGaps": list(self.conformance_gaps),
                 "wardline.controlLaw": self.control_law,
+                **({"wardline.controlLawDegradations": list(self.control_law_degradations)}
+                   if self.control_law_degradations else {}),
                 **({"wardline.coverageRatio": round(self.coverage_ratio, 4)}
                    if self.coverage_ratio is not None else {}),
                 "wardline.governanceProfile": self.governance_profile,
