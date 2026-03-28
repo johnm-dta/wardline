@@ -5,6 +5,7 @@ structural gate:
 
 - ``"key" in d`` / ``key in d.keys()`` — ``in`` operator on containers
 - ``"key" not in d`` — ``not in`` is still an existence check
+- ``d.get(key) is None`` / ``is not None`` — existence check via ``.get()``
 - ``hasattr(obj, "name")`` — existence check on attributes
 - ``match/case`` with ``MatchMapping`` — structural pattern on mappings
 - ``match/case`` with ``MatchClass`` — structural pattern on classes
@@ -307,7 +308,13 @@ class RulePyWl003(RuleBase):
         taint: TaintState,
         known_set_names: frozenset[str] = frozenset(),
     ) -> None:
-        """Check a Compare node for ``in`` / ``not in`` operators."""
+        """Check a Compare node for existence-check patterns.
+
+        Detects:
+        - ``key in d`` / ``key not in d``
+        - ``d.get(key) is None`` / ``d.get(key) is not None``
+        - ``d.get(key) == None`` / ``d.get(key) != None``
+        """
         for op, comparator in zip(compare.ops, compare.comparators, strict=False):
             if (
                 isinstance(op, (ast.In, ast.NotIn))
@@ -321,6 +328,75 @@ class RulePyWl003(RuleBase):
                     taint,
                 )
                 return
+
+        # d.get(key) is None / is not None / == None / != None
+        # This is semantically identical to "key in d" — an existence check
+        # spelled via .get() to dodge the 'in' operator detection.
+        if self._is_get_none_check(compare):
+            get_call = self._extract_get_call_from_compare(compare)
+            if get_call is not None and not self._get_call_on_suppressed_receiver(get_call):
+                self._emit_finding(
+                    compare,
+                    enclosing_func,
+                    "Existence check as structural gate — "
+                    ".get() result compared to None for key presence check",
+                    taint,
+                )
+                return
+
+    @staticmethod
+    def _is_get_none_check(compare: ast.Compare) -> bool:
+        """Return True for ``d.get(key) is/== None`` patterns.
+
+        Matches: .get(key) is None, .get(key) is not None,
+        .get(key) == None, .get(key) != None.
+        Only fires for .get() with exactly 1 arg (no default).
+        """
+        if len(compare.ops) != 1:
+            return False
+        op = compare.ops[0]
+        if not isinstance(op, (ast.Is, ast.IsNot, ast.Eq, ast.NotEq)):
+            return False
+
+        # Check if either side is None and the other is a .get() call
+        left, right = compare.left, compare.comparators[0]
+        for call_side, none_side in [(left, right), (right, left)]:
+            if (
+                isinstance(none_side, ast.Constant)
+                and none_side.value is None
+                and isinstance(call_side, ast.Call)
+                and isinstance(call_side.func, ast.Attribute)
+                and call_side.func.attr == "get"
+                and len(call_side.args) == 1
+                and not call_side.keywords
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _extract_get_call_from_compare(compare: ast.Compare) -> ast.Call | None:
+        """Extract the .get() Call node from a get-None comparison."""
+        left, right = compare.left, compare.comparators[0]
+        for side in (left, right):
+            if (
+                isinstance(side, ast.Call)
+                and isinstance(side.func, ast.Attribute)
+                and side.func.attr == "get"
+            ):
+                return side
+        return None
+
+    @staticmethod
+    def _get_call_on_suppressed_receiver(call: ast.Call) -> bool:
+        """Return True if .get() is called on obj.attr (suppressed receiver)."""
+        func = call.func
+        if not isinstance(func, ast.Attribute):
+            return False
+        receiver = func.value
+        # self.cache.get(key) — receiver is self.cache (Attribute on self)
+        if isinstance(receiver, ast.Attribute) and isinstance(receiver.value, ast.Name):
+            return True
+        return False
 
     def _looks_like_existence_check(
         self,

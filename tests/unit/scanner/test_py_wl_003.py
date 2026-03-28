@@ -434,3 +434,44 @@ class TestIntermediateSetVariable:
             '        found = True\n'
         )
         assert len(rule.findings) == 1
+
+
+# ── .get(key) is None — existence check via .get() ────────────
+
+
+class TestGetIsNone:
+    """.get(key) is None / is not None is an existence check."""
+
+    def test_get_is_none_fires(self) -> None:
+        rule = _run_rule('if d.get("key") is None:\n    pass\n')
+        assert len(rule.findings) == 1
+        assert rule.findings[0].rule_id == RuleId.PY_WL_003
+
+    def test_get_is_not_none_fires(self) -> None:
+        rule = _run_rule('if d.get("key") is not None:\n    pass\n')
+        assert len(rule.findings) == 1
+
+    def test_get_eq_none_fires(self) -> None:
+        rule = _run_rule('if d.get("key") == None:\n    pass\n')
+        assert len(rule.findings) == 1
+
+    def test_get_with_default_not_detected_here(self) -> None:
+        """d.get(key, default) is PY-WL-001's domain, not PY-WL-003."""
+        rule = _run_rule('if d.get("key", "") is not None:\n    pass\n')
+        assert len(rule.findings) == 0
+
+    def test_get_result_compared_to_value_silent(self) -> None:
+        """d.get(key) == 42 is value comparison, not existence check."""
+        rule = _run_rule('if d.get("key") == 42:\n    pass\n')
+        assert len(rule.findings) == 0
+
+    def test_get_on_self_attr_silent(self) -> None:
+        """self.cache.get(key) is None — obj.attr suppression applies."""
+        rule = _run_rule('if self.cache.get("key") is None:\n    pass\n')
+        assert len(rule.findings) == 0
+
+    def test_shape_validation_boundary_suppresses_get(self) -> None:
+        rule = _run_rule_with_boundary(
+            'if d.get("key") is None:\n    pass\n',
+        )
+        assert len(rule.findings) == 0
