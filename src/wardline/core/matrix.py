@@ -18,9 +18,10 @@ Severity scales with the *consequence* of the pattern at that tier:
   need fallback defaults; if it does, that's suspicious but exceptionable.
 - **T3 (GUARDED/GUARDED):** WARNING is the default — partially validated
   data may legitimately use defensive access; flag for review, don't block.
-  Exception: PY-WL-003 (existence-checking) is ERROR/STANDARD at T3 because
-  shape-validated data has known structure — existence checks are suspicious
-  when field presence is guaranteed by the T4→T3 boundary.
+  Exceptions: PY-WL-003 (existence-checking), PY-WL-006 (audit-critical
+  writes), PY-WL-008 (no rejection path), and PY-WL-009 (semantic without
+  shape) are ERROR at T3 — these patterns are suspicious or unsafe
+  regardless of partial validation.
 - **T4 (EXTERNAL_RAW):** SUPPRESS or WARNING — this IS boundary code;
   the enforcement happens when data crosses upward, not at the access site.
 
