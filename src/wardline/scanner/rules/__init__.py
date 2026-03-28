@@ -23,6 +23,7 @@ def make_rules() -> tuple[RuleBase, ...]:
     from wardline.scanner.rules.py_wl_008 import RulePyWl008
     from wardline.scanner.rules.py_wl_009 import RulePyWl009
     from wardline.scanner.rules.scn_021 import RuleScn021
+    from wardline.scanner.rules.scn_022 import RuleScn022
     from wardline.scanner.rules.sup_001 import RuleSup001
 
     return (
@@ -36,5 +37,6 @@ def make_rules() -> tuple[RuleBase, ...]:
         RulePyWl008(),
         RulePyWl009(),
         RuleScn021(),
+        RuleScn022(),
         RuleSup001(),
     )
