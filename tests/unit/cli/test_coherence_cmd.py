@@ -43,6 +43,7 @@ def _write_minimal_manifest(
     with_overlay: bool = False,
     overlay_function: str = "do_thing",
     tier_ids: list[tuple[str, int]] | None = None,
+    governance_profile: str = "lite",
 ) -> Path:
     """Write a minimal valid wardline.yaml and return its path.
 
@@ -64,6 +65,7 @@ def _write_minimal_manifest(
         '$id: "https://wardline.dev/schemas/0.1/wardline"\n'
         "metadata:\n"
         "  organisation: test\n"
+        f'governance_profile: "{governance_profile}"\n'
         "tiers:\n"
         f"{tiers_block}\n"
         "module_tiers:\n"
@@ -367,3 +369,65 @@ class TestCoherenceRestorationEvidenceGate:
         )
         assert result.exit_code == 1, f"Expected exit 1, got {result.exit_code}. Output: {result.output}"
         assert "insufficient_restoration_evidence" in result.output
+
+
+class TestAssuranceProfileAutoGate:
+    """Assurance profile forces gating without --gate flag."""
+
+    def test_assurance_profile_forces_gate(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Coherence failures with assurance profile exit non-zero even without --gate."""
+        manifest_yaml = _write_minimal_manifest(
+            tmp_path,
+            taint="EXTERNAL_RAW",
+            tier_ids=[("ASSURED", 1), ("EXTERNAL_RAW", 4)],
+            governance_profile="assurance",
+        )
+        (tmp_path / "wardline.manifest.baseline.json").write_text(
+            json.dumps({
+                "tiers": [
+                    {"id": "ASSURED", "tier": 1, "description": "strict"},
+                    {"id": "EXTERNAL_RAW", "tier": 4, "description": "lax"},
+                ],
+                "module_tiers": [
+                    {"path": "src/", "default_taint": "ASSURED"},
+                ],
+            })
+        )
+        (tmp_path / "wardline.perimeter.baseline.json").write_text(
+            '{"version":"1","module_paths":["src/"]}\n'
+        )
+        src_dir = tmp_path / "src"
+        src_dir.mkdir(exist_ok=True)
+        (src_dir / "__init__.py").write_text("")
+
+        # No --gate flag, but assurance profile should force it
+        result = _invoke(
+            runner,
+            manifest=str(manifest_yaml),
+            path=str(src_dir),
+        )
+        assert result.exit_code == 1, (
+            f"Expected exit 1 (assurance auto-gate), got {result.exit_code}. "
+            f"Output: {result.output}"
+        )
+
+    def test_lite_profile_no_auto_gate(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Coherence failures with lite profile exit 0 without --gate."""
+        manifest_yaml = _write_tier_downgrade_fixture(tmp_path)
+        (tmp_path / "wardline.perimeter.baseline.json").write_text(
+            '{"version":"1","module_paths":["src/"]}\n'
+        )
+        src_dir = tmp_path / "src"
+        src_dir.mkdir(exist_ok=True)
+        (src_dir / "__init__.py").write_text("")
+
+        # No --gate flag, lite profile -> exit 0 even with errors
+        result = _invoke(
+            runner,
+            manifest=str(manifest_yaml),
+            path=str(src_dir),
+        )
+        assert result.exit_code == 0, (
+            f"Expected exit 0 (lite no auto-gate), got {result.exit_code}. "
+            f"Output: {result.output}"
+        )

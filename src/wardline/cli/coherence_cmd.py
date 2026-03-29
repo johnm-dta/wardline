@@ -91,6 +91,7 @@ def coherence(
         check_validation_scope_presence,
         check_restoration_evidence,
         check_restoration_evidence_consistency,
+        should_gate_on_profile,
     )
     from wardline.manifest.exceptions import load_exceptions
     from wardline.manifest.loader import (
@@ -209,7 +210,9 @@ def coherence(
         _format_text(all_issues)
 
     # --- Gate logic ---
-    if gate:
+    # Assurance profile forces gating regardless of --gate flag.
+    effective_gate = gate or should_gate_on_profile(manifest_model.governance_profile)
+    if effective_gate:
         has_errors = any(
             SEVERITY_MAP.get(issue.kind) == "ERROR" for issue in all_issues
         )

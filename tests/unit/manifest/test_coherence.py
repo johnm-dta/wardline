@@ -26,6 +26,7 @@ from wardline.manifest.coherence import (
     check_unmatched_contracts,
     check_validation_scope_presence,
     check_restoration_evidence,
+    should_gate_on_profile,
 )
 from wardline.manifest.models import (
     BoundaryEntry,
@@ -1676,3 +1677,19 @@ class TestExceptionVolume:
         """Return type is tuple for immutability."""
         result = check_exception_volume(())
         assert isinstance(result, tuple)
+
+
+class TestProfileGating:
+    """Tests for should_gate_on_profile."""
+
+    def test_should_gate_on_assurance(self) -> None:
+        assert should_gate_on_profile("assurance") is True
+
+    def test_should_not_gate_on_lite(self) -> None:
+        assert should_gate_on_profile("lite") is False
+
+    def test_should_not_gate_on_empty(self) -> None:
+        assert should_gate_on_profile("") is False
+
+    def test_should_not_gate_on_unknown(self) -> None:
+        assert should_gate_on_profile("custom") is False

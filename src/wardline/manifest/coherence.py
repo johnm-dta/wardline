@@ -889,6 +889,16 @@ def check_exception_volume(
     return ()
 
 
+def should_gate_on_profile(governance_profile: str) -> bool:
+    """Return True if the governance profile requires automatic gating.
+
+    Assurance profile requires automatic enforcement gating — coherence
+    failures are hard errors, not warnings. Lite profile allows
+    opt-in gating via --gate flag.
+    """
+    return governance_profile == "assurance"
+
+
 def check_restoration_evidence_consistency(
     boundaries: tuple[BoundaryEntry, ...],
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
