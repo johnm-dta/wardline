@@ -108,7 +108,7 @@
       "properties": {
         "default_authority": {
           "type": "string",
-          "enum": ["NONE", "RELAXED", "STANDARD", "UNCONDITIONAL"]
+          "enum": ["NONE", "RELAXED", "STANDARD"]
         },
         "grants": {
           "type": "array",
@@ -118,7 +118,7 @@
               "path": { "type": "string" },
               "authority": {
                 "type": "string",
-                "enum": ["NONE", "RELAXED", "STANDARD", "UNCONDITIONAL"]
+                "enum": ["NONE", "RELAXED", "STANDARD"]
               }
             },
             "required": ["path", "authority"],
@@ -146,6 +146,39 @@
           }
         },
         "required": ["path", "default_taint"],
+        "additionalProperties": false
+      }
+    },
+    "dependency_taint": {
+      "type": "array",
+      "description": "Taint declarations for third-party dependency return values.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "package": {
+            "type": "string",
+            "description": "Package identifier with optional version constraint."
+          },
+          "function": {
+            "type": "string",
+            "description": "Fully-qualified function name (e.g. 'requests.get')."
+          },
+          "returns_taint": {
+            "type": "string",
+            "enum": [
+              "INTEGRAL", "ASSURED", "GUARDED",
+              "EXTERNAL_RAW", "UNKNOWN_RAW",
+              "UNKNOWN_GUARDED", "UNKNOWN_ASSURED",
+              "MIXED_RAW"
+            ],
+            "description": "Taint state of the function's return value."
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Governance justification for this taint assignment."
+          }
+        },
+        "required": ["package", "function", "returns_taint", "rationale"],
         "additionalProperties": false
       }
     },

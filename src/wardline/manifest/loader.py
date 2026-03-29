@@ -20,6 +20,7 @@ from wardline.manifest.models import (
     ContractBinding,
     DelegationConfig,
     DelegationGrant,
+    DependencyTaintEntry,
     ManifestMetadata,
     OptionalFieldEntry,
     TemporalSeparation,
@@ -216,6 +217,16 @@ def _build_manifest(data: dict[str, Any]) -> WardlineManifest:
         for m in data.get("module_tiers", [])
     )
 
+    dependency_taint = tuple(
+        DependencyTaintEntry(
+            package=d["package"],
+            function=d["function"],
+            returns_taint=d["returns_taint"],
+            rationale=d["rationale"],
+        )
+        for d in data.get("dependency_taint", [])
+    )
+
     raw_delegation = data.get("delegation", {})
     delegation = DelegationConfig(
         default_authority=raw_delegation.get("default_authority", "RELAXED"),
@@ -275,6 +286,7 @@ def _build_manifest(data: dict[str, Any]) -> WardlineManifest:
         rules=rules,
         delegation=delegation,
         module_tiers=module_tiers,
+        dependency_taint=dependency_taint,
         metadata=metadata,
     )
 

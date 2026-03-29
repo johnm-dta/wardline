@@ -749,3 +749,81 @@ class TestTemporalSeparationLoading:
         )
         with pytest.raises(ManifestLoadError, match="must not be present"):
             load_manifest(manifest)
+
+
+# ── Dependency Taint Loading ─────────────────────────────────────
+
+
+class TestDependencyTaintLoading:
+    def test_dependency_taint_loads(self, tmp_path: Path) -> None:
+        """Manifest with dependency_taint entries loads all fields correctly."""
+        f = tmp_path / "wardline.yaml"
+        f.write_text("""\
+dependency_taint:
+  - package: "requests>=2.28"
+    function: "requests.get"
+    returns_taint: "EXTERNAL_RAW"
+    rationale: "HTTP responses are untrusted external data"
+  - package: "cryptography"
+    function: "cryptography.fernet.Fernet.decrypt"
+    returns_taint: "GUARDED"
+    rationale: "Authenticated decryption provides integrity guarantee"
+""")
+        manifest = load_manifest(f)
+        assert len(manifest.dependency_taint) == 2
+
+        first = manifest.dependency_taint[0]
+        assert first.package == "requests>=2.28"
+        assert first.function == "requests.get"
+        assert first.returns_taint == "EXTERNAL_RAW"
+        assert first.rationale == "HTTP responses are untrusted external data"
+
+        second = manifest.dependency_taint[1]
+        assert second.package == "cryptography"
+        assert second.function == "cryptography.fernet.Fernet.decrypt"
+        assert second.returns_taint == "GUARDED"
+        assert second.rationale == "Authenticated decryption provides integrity guarantee"
+
+    def test_empty_dependency_taint(self, tmp_path: Path) -> None:
+        """Manifest without dependency_taint section yields empty tuple."""
+        f = tmp_path / "wardline.yaml"
+        f.write_text("{}\n")
+        manifest = load_manifest(f)
+        assert manifest.dependency_taint == ()
+
+    def test_dependency_taint_missing_required_field(self, tmp_path: Path) -> None:
+        """Missing required field (returns_taint) raises ManifestLoadError."""
+        f = tmp_path / "wardline.yaml"
+        f.write_text("""\
+dependency_taint:
+  - package: "requests"
+    function: "requests.get"
+    rationale: "Missing returns_taint"
+""")
+        with pytest.raises(ManifestLoadError, match="Schema validation"):
+            load_manifest(f)
+
+    def test_dependency_taint_missing_rationale(self, tmp_path: Path) -> None:
+        """Missing required field (rationale) raises ManifestLoadError."""
+        f = tmp_path / "wardline.yaml"
+        f.write_text("""\
+dependency_taint:
+  - package: "requests"
+    function: "requests.get"
+    returns_taint: "EXTERNAL_RAW"
+""")
+        with pytest.raises(ManifestLoadError, match="Schema validation"):
+            load_manifest(f)
+
+    def test_dependency_taint_invalid_taint_state(self, tmp_path: Path) -> None:
+        """Invalid taint state value raises ManifestLoadError."""
+        f = tmp_path / "wardline.yaml"
+        f.write_text("""\
+dependency_taint:
+  - package: "requests"
+    function: "requests.get"
+    returns_taint: "NOT_A_REAL_TAINT"
+    rationale: "Should fail validation"
+""")
+        with pytest.raises(ManifestLoadError, match="Schema validation"):
+            load_manifest(f)

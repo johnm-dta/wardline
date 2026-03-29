@@ -93,6 +93,16 @@ class ModuleTierEntry:
 
 
 @dataclass(frozen=True)
+class DependencyTaintEntry:
+    """A dependency taint declaration for a third-party function."""
+
+    package: str
+    function: str
+    returns_taint: str
+    rationale: str
+
+
+@dataclass(frozen=True)
 class DelegationGrant:
     """A delegation grant for exception authority."""
 
@@ -208,6 +218,7 @@ class WardlineManifest:
     rules: RulesConfig = field(default_factory=RulesConfig)
     delegation: DelegationConfig = field(default_factory=DelegationConfig)
     module_tiers: tuple[ModuleTierEntry, ...] = ()
+    dependency_taint: tuple[DependencyTaintEntry, ...] = ()
     metadata: ManifestMetadata = field(default_factory=ManifestMetadata)
 
 
