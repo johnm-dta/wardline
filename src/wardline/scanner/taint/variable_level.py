@@ -32,6 +32,9 @@ def compute_variable_taints(
     func_node: ast.FunctionDef | ast.AsyncFunctionDef,
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
+    *,
+    dependency_dotted_map: dict[str, TaintState] | None = None,
+    dependency_local_prefixes: frozenset[str] = frozenset(),
 ) -> dict[str, TaintState]:
     """Compute per-variable taint for a function body.
 
@@ -42,18 +45,25 @@ def compute_variable_taints(
             taint (what calling that function returns). For decorator-
             anchored validators this is the OUTPUT tier (return taint);
             for all other functions it is the L3-refined body taint.
+        dependency_dotted_map: Maps dotted local names (e.g. ``req.get``)
+            to declared dependency taint states.
+        dependency_local_prefixes: Local names that alias declared
+            dependency packages (for UNKNOWN_RAW fallback on undeclared
+            functions).
 
     Returns:
         Dict mapping variable name to ``TaintState`` for every assigned
         variable in the function body, including parameters.
     """
     var_taints: dict[str, TaintState] = {}
+    dep_dotted = dependency_dotted_map
+    dep_prefixes = dependency_local_prefixes
 
     # Parameters inherit the function's own taint (callers' data flows in).
     _seed_parameters(func_node, function_taint, var_taints)
 
     # Walk the body.
-    _walk_body(func_node.body, function_taint, taint_map, var_taints)
+    _walk_body(func_node.body, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     return var_taints
 
@@ -88,6 +98,8 @@ def _resolve_expr(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> TaintState:
     """Resolve the taint of an expression node.
 
@@ -107,21 +119,21 @@ def _resolve_expr(
         return var_taints.get(node.id, function_taint)
 
     if isinstance(node, ast.Call):
-        return _resolve_call(node, function_taint, taint_map, var_taints)
+        return _resolve_call(node, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     if isinstance(node, ast.BinOp):
-        left = _resolve_expr(node.left, function_taint, taint_map, var_taints)
-        right = _resolve_expr(node.right, function_taint, taint_map, var_taints)
+        left = _resolve_expr(node.left, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
+        right = _resolve_expr(node.right, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
         return taint_join(left, right)
 
     if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
         if not node.elts:
             return TaintState.INTEGRAL
-        result = _resolve_expr(node.elts[0], function_taint, taint_map, var_taints)
+        result = _resolve_expr(node.elts[0], function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
         for elt in node.elts[1:]:
             result = taint_join(
                 result,
-                _resolve_expr(elt, function_taint, taint_map, var_taints),
+                _resolve_expr(elt, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes),
             )
         return result
 
@@ -132,7 +144,7 @@ def _resolve_expr(
         for v in node.values:
             if v is not None:
                 parts.append(
-                    _resolve_expr(v, function_taint, taint_map, var_taints)
+                    _resolve_expr(v, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
                 )
         if not parts:
             return TaintState.INTEGRAL
@@ -142,18 +154,18 @@ def _resolve_expr(
         return result
 
     if isinstance(node, ast.NamedExpr):
-        taint = _resolve_expr(node.value, function_taint, taint_map, var_taints)
+        taint = _resolve_expr(node.value, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
         if isinstance(node.target, ast.Name):
             var_taints[node.target.id] = taint
         return taint
 
     if isinstance(node, ast.IfExp):
-        true_t = _resolve_expr(node.body, function_taint, taint_map, var_taints)
-        false_t = _resolve_expr(node.orelse, function_taint, taint_map, var_taints)
+        true_t = _resolve_expr(node.body, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
+        false_t = _resolve_expr(node.orelse, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
         return taint_join(true_t, false_t)
 
     if isinstance(node, ast.UnaryOp):
-        return _resolve_expr(node.operand, function_taint, taint_map, var_taints)
+        return _resolve_expr(node.operand, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     # Fallback: attribute access, subscript, etc. — use function taint.
     return function_taint
@@ -191,18 +203,36 @@ def _resolve_call(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> TaintState:
     """Resolve taint for a function call expression.
 
+    Resolution order for dotted calls (``obj.method()``):
+    1. Serialisation sinks (§5.2) → UNKNOWN_RAW
+    2. Exact match in taint_map (pre-resolved bare dependency imports)
+    3. Exact match in dep_dotted (module-import dotted names)
+    4. §5.5 fallback: undeclared function in a declared package → UNKNOWN_RAW
+
     Simple name calls (``foo()``) look up in taint_map.
-    Dotted calls to serialisation sinks (§5.2) → UNKNOWN_RAW.
-    Everything else (method calls, complex expressions) → function_taint.
+    Everything else → function_taint.
     """
-    # Dotted calls: check serialisation sinks before fallback.
     if isinstance(node.func, ast.Attribute):
         dotted = _dotted_name(node.func)
-        if dotted is not None and dotted in _SERIALISATION_SINKS:
-            return TaintState.UNKNOWN_RAW
+        if dotted is not None:
+            # 1. Serialisation sinks always shed to UNKNOWN_RAW
+            if dotted in _SERIALISATION_SINKS:
+                return TaintState.UNKNOWN_RAW
+            # 2. Exact match in taint_map (pre-resolved dependency entries)
+            if dotted in taint_map:
+                return taint_map[dotted]
+            # 3. Exact match in dep_dotted (module-import dotted names)
+            if dep_dotted and dotted in dep_dotted:
+                return dep_dotted[dotted]
+            # 4. §5.5 fallback: undeclared function in a declared package
+            prefix = dotted.split(".", 1)[0]
+            if prefix in dep_prefixes:
+                return TaintState.UNKNOWN_RAW
 
     if isinstance(node.func, ast.Name):
         callee_name = node.func.id
@@ -221,10 +251,12 @@ def _walk_body(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> None:
     """Walk a list of statements, updating var_taints in place."""
     for stmt in stmts:
-        _process_stmt(stmt, function_taint, taint_map, var_taints)
+        _process_stmt(stmt, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
 
 def _process_stmt(
@@ -232,39 +264,41 @@ def _process_stmt(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> None:
     """Process a single statement, dispatching by type."""
 
     if isinstance(stmt, ast.Assign):
-        _handle_assign(stmt, function_taint, taint_map, var_taints)
+        _handle_assign(stmt, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     elif isinstance(stmt, ast.AugAssign):
-        _handle_augassign(stmt, function_taint, taint_map, var_taints)
+        _handle_augassign(stmt, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     elif isinstance(stmt, ast.AnnAssign) and stmt.value is not None:
         # x: int = expr
-        taint = _resolve_expr(stmt.value, function_taint, taint_map, var_taints)
+        taint = _resolve_expr(stmt.value, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
         if isinstance(stmt.target, ast.Name):
             var_taints[stmt.target.id] = taint
 
     elif isinstance(stmt, ast.For):
-        _handle_for(stmt, function_taint, taint_map, var_taints)
+        _handle_for(stmt, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     elif isinstance(stmt, ast.While):
-        _handle_while(stmt, function_taint, taint_map, var_taints)
+        _handle_while(stmt, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     elif isinstance(stmt, ast.If):
-        _handle_if(stmt, function_taint, taint_map, var_taints)
+        _handle_if(stmt, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     elif isinstance(stmt, (ast.With, ast.AsyncWith)):
-        _handle_with(stmt, function_taint, taint_map, var_taints)
+        _handle_with(stmt, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     elif isinstance(stmt, ast.Try):
-        _handle_try(stmt, function_taint, taint_map, var_taints)
+        _handle_try(stmt, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     elif isinstance(stmt, ast.Expr):
         # Expression statement — walk for side-effects (walrus operators).
-        _resolve_expr(stmt.value, function_taint, taint_map, var_taints)
+        _resolve_expr(stmt.value, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
         # Nested function — don't descend (separate scope).
@@ -277,7 +311,7 @@ def _process_stmt(
     else:
         # Return, Raise, Import, Pass, Break, Continue, etc.
         # Walk child expressions for walrus operators.
-        _walk_exprs_for_walrus(stmt, function_taint, taint_map, var_taints)
+        _walk_exprs_for_walrus(stmt, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
 
 def _walk_exprs_for_walrus(
@@ -285,12 +319,15 @@ def _walk_exprs_for_walrus(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> None:
     """Walk all child expressions to catch walrus operators."""
     for child in ast.walk(node):
         if isinstance(child, ast.NamedExpr):
             taint = _resolve_expr(
-                child.value, function_taint, taint_map, var_taints
+                child.value, function_taint, taint_map, var_taints,
+                dep_dotted, dep_prefixes,
             )
             if isinstance(child.target, ast.Name):
                 var_taints[child.target.id] = taint
@@ -304,20 +341,24 @@ def _handle_assign(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> None:
     """Handle ``x = expr`` and ``a, b = expr1, expr2``."""
     for target in stmt.targets:
         if isinstance(target, ast.Name):
             # Simple: x = expr
             taint = _resolve_expr(
-                stmt.value, function_taint, taint_map, var_taints
+                stmt.value, function_taint, taint_map, var_taints,
+                dep_dotted, dep_prefixes,
             )
             var_taints[target.id] = taint
 
         elif isinstance(target, (ast.Tuple, ast.List)):
             # Tuple unpacking: a, b = ...
             _handle_unpack(
-                target, stmt.value, function_taint, taint_map, var_taints
+                target, stmt.value, function_taint, taint_map, var_taints,
+                dep_dotted, dep_prefixes,
             )
         # Ignore attribute/subscript targets (obj.x = ..., d[k] = ...)
 
@@ -328,6 +369,8 @@ def _handle_unpack(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> None:
     """Handle tuple/list unpacking assignment."""
     # If value is a Tuple/List with matching length, do element-wise.
@@ -337,15 +380,17 @@ def _handle_unpack(
         for tgt, val in zip(target.elts, value.elts, strict=False):
             if isinstance(tgt, ast.Name):
                 taint = _resolve_expr(
-                    val, function_taint, taint_map, var_taints
+                    val, function_taint, taint_map, var_taints,
+                    dep_dotted, dep_prefixes,
                 )
                 var_taints[tgt.id] = taint
             elif isinstance(tgt, (ast.Tuple, ast.List)):
-                _handle_unpack(tgt, val, function_taint, taint_map, var_taints)
+                _handle_unpack(tgt, val, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
     else:
         # RHS is not a matching literal tuple — all targets get RHS taint.
         rhs_taint = _resolve_expr(
-            value, function_taint, taint_map, var_taints
+            value, function_taint, taint_map, var_taints,
+            dep_dotted, dep_prefixes,
         )
         for tgt in target.elts:
             if isinstance(tgt, ast.Name):
@@ -361,10 +406,13 @@ def _handle_augassign(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> None:
     """Handle ``x += expr`` — join existing taint with new value."""
     rhs_taint = _resolve_expr(
-        stmt.value, function_taint, taint_map, var_taints
+        stmt.value, function_taint, taint_map, var_taints,
+        dep_dotted, dep_prefixes,
     )
     if isinstance(stmt.target, ast.Name):
         existing = var_taints.get(stmt.target.id, function_taint)
@@ -379,22 +427,24 @@ def _handle_if(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> None:
     """Handle if/elif/else — merge variable taints from branches."""
     # Resolve test expression (may contain walrus).
-    _resolve_expr(stmt.test, function_taint, taint_map, var_taints)
+    _resolve_expr(stmt.test, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     # Snapshot before branches.
     pre_if = dict(var_taints)
 
     # Walk the if-body.
     if_taints = dict(var_taints)
-    _walk_body(stmt.body, function_taint, taint_map, if_taints)
+    _walk_body(stmt.body, function_taint, taint_map, if_taints, dep_dotted, dep_prefixes)
 
     if stmt.orelse:
         # Walk the else-body.
         else_taints = dict(var_taints)
-        _walk_body(stmt.orelse, function_taint, taint_map, else_taints)
+        _walk_body(stmt.orelse, function_taint, taint_map, else_taints, dep_dotted, dep_prefixes)
     else:
         # No else — the "else" branch is the pre-if state.
         else_taints = pre_if
@@ -423,10 +473,13 @@ def _handle_for(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> None:
     """Handle for loops — target gets iterable taint, body merges."""
     iter_taint = _resolve_expr(
-        stmt.iter, function_taint, taint_map, var_taints
+        stmt.iter, function_taint, taint_map, var_taints,
+        dep_dotted, dep_prefixes,
     )
 
     # Assign the loop variable.
@@ -436,7 +489,7 @@ def _handle_for(
     pre_loop = dict(var_taints)
 
     # Walk body.
-    _walk_body(stmt.body, function_taint, taint_map, var_taints)
+    _walk_body(stmt.body, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     # Merge body state with pre-loop (loop may not execute, or
     # body assignments may differ across iterations).
@@ -450,7 +503,7 @@ def _handle_for(
 
     # Walk orelse (runs after normal loop completion).
     if stmt.orelse:
-        _walk_body(stmt.orelse, function_taint, taint_map, var_taints)
+        _walk_body(stmt.orelse, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
 
 def _handle_while(
@@ -458,13 +511,15 @@ def _handle_while(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> None:
     """Handle while loops — body merges with pre-loop state."""
-    _resolve_expr(stmt.test, function_taint, taint_map, var_taints)
+    _resolve_expr(stmt.test, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     pre_loop = dict(var_taints)
 
-    _walk_body(stmt.body, function_taint, taint_map, var_taints)
+    _walk_body(stmt.body, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
     # Merge body state with pre-loop.
     for var in set(var_taints) | set(pre_loop):
@@ -476,7 +531,7 @@ def _handle_while(
             _taint_val = None  # var only in one side of merge — no join needed
 
     if stmt.orelse:
-        _walk_body(stmt.orelse, function_taint, taint_map, var_taints)
+        _walk_body(stmt.orelse, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
 
 def _handle_with(
@@ -484,16 +539,19 @@ def _handle_with(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> None:
     """Handle with/async-with statements."""
     for item in stmt.items:
         expr_taint = _resolve_expr(
-            item.context_expr, function_taint, taint_map, var_taints
+            item.context_expr, function_taint, taint_map, var_taints,
+            dep_dotted, dep_prefixes,
         )
         if item.optional_vars is not None:
             _assign_target(item.optional_vars, expr_taint, var_taints)
 
-    _walk_body(stmt.body, function_taint, taint_map, var_taints)
+    _walk_body(stmt.body, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
 
 def _handle_try(
@@ -501,13 +559,15 @@ def _handle_try(
     function_taint: TaintState,
     taint_map: dict[str, TaintState],
     var_taints: dict[str, TaintState],
+    dep_dotted: dict[str, TaintState] | None,
+    dep_prefixes: frozenset[str],
 ) -> None:
     """Handle try/except/else/finally — snapshot-branch-join pattern."""
     pre_try = dict(var_taints)
 
     # Walk try body on a copy.
     try_taints = dict(pre_try)
-    _walk_body(stmt.body, function_taint, taint_map, try_taints)
+    _walk_body(stmt.body, function_taint, taint_map, try_taints, dep_dotted, dep_prefixes)
 
     # Walk each handler on separate copies (mutually exclusive with try body).
     handler_branches: list[dict[str, TaintState]] = [try_taints]  # try-success is one branch
@@ -515,12 +575,12 @@ def _handle_try(
         handler_taints = dict(pre_try)
         if handler.name:
             handler_taints[handler.name] = function_taint
-        _walk_body(handler.body, function_taint, taint_map, handler_taints)
+        _walk_body(handler.body, function_taint, taint_map, handler_taints, dep_dotted, dep_prefixes)
         handler_branches.append(handler_taints)
 
     # Walk orelse on try-success branch (runs only if no exception).
     if stmt.orelse:
-        _walk_body(stmt.orelse, function_taint, taint_map, try_taints)
+        _walk_body(stmt.orelse, function_taint, taint_map, try_taints, dep_dotted, dep_prefixes)
 
     # Merge all branches.
     all_vars: set[str] = set()
@@ -546,7 +606,7 @@ def _handle_try(
 
     # finalbody runs unconditionally after merge.
     if stmt.finalbody:
-        _walk_body(stmt.finalbody, function_taint, taint_map, var_taints)
+        _walk_body(stmt.finalbody, function_taint, taint_map, var_taints, dep_dotted, dep_prefixes)
 
 
 # ── Helpers ──────────────────────────────────────────────────────

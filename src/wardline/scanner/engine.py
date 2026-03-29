@@ -675,6 +675,44 @@ class ScanEngine:
             if src == "decorator" and qn in return_taint_map:
                 callee_taint_map[qn] = return_taint_map[qn]
 
+        # ── Dependency taint resolution ─────────────────────────────
+        # Build FQN → TaintState from manifest dependency_taint entries,
+        # then resolve via import aliases to local/dotted names.
+        resolved_dep_dotted: dict[str, TaintState] = {}
+        dep_local_prefixes: frozenset[str] = frozenset()
+
+        if self._manifest and self._manifest.dependency_taint:
+            dep_fqn_map: dict[str, TaintState] = {}
+            dep_packages: set[str] = set()
+            for entry in self._manifest.dependency_taint:
+                fqn = f"{entry.package}.{entry.function}"
+                dep_fqn_map[fqn] = TaintState(entry.returns_taint)
+                dep_packages.add(entry.package)
+
+            import_aliases = build_import_alias_map(tree)
+            _dep_local_prefixes: set[str] = set()
+
+            for local_name, resolved_fqn in import_aliases.items():
+                # Bare imports: from requests import get → get → requests.get
+                if resolved_fqn in dep_fqn_map:
+                    callee_taint_map.setdefault(
+                        local_name, dep_fqn_map[resolved_fqn]
+                    )
+
+                # Module imports: import requests → requests → requests
+                # Check if any dep FQN starts with resolved_fqn + "."
+                for dep_fqn, dep_taint in dep_fqn_map.items():
+                    if dep_fqn.startswith(resolved_fqn + "."):
+                        suffix = dep_fqn[len(resolved_fqn) + 1 :]
+                        dotted_local = f"{local_name}.{suffix}"
+                        resolved_dep_dotted[dotted_local] = dep_taint
+
+                # Track local names that map to declared packages
+                if resolved_fqn in dep_packages:
+                    _dep_local_prefixes.add(local_name)
+
+            dep_local_prefixes = frozenset(_dep_local_prefixes)
+
         var_map: dict[str, dict[str, TaintState]] = {}
         qualname_map = self._build_qualname_map(tree)
         try:
@@ -684,7 +722,11 @@ class ScanEngine:
                     if qualname is not None and qualname in taint_map:
                         func_taint = taint_map[qualname]
                         var_taints = compute_variable_taints(
-                            node, func_taint, callee_taint_map
+                            node,
+                            func_taint,
+                            callee_taint_map,
+                            dependency_dotted_map=resolved_dep_dotted,
+                            dependency_local_prefixes=dep_local_prefixes,
                         )
                         var_map[qualname] = var_taints
         except Exception as exc:

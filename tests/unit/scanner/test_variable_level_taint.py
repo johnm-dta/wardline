@@ -461,3 +461,90 @@ class TestSerialisationShedding:
         """)
         result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
         assert result["x"] == TaintState.UNKNOWN_RAW
+
+
+# ── Dependency taint resolution ─────────────────────────────────
+
+
+class TestDependencyTaint:
+    """§5.5 dependency taint: dotted calls resolved via dep_dotted + dep_prefixes."""
+
+    def test_dotted_call_resolved_via_taint_map(self) -> None:
+        """pd.read_csv() with 'pd.read_csv' in dep_dotted -> declared taint."""
+        func = _parse_func("""
+            def f():
+                x = pd.read_csv("data.csv")
+        """)
+        result = compute_variable_taints(
+            func,
+            TaintState.INTEGRAL,
+            {},
+            dependency_dotted_map={"pd.read_csv": TaintState.EXTERNAL_RAW},
+            dependency_local_prefixes=frozenset({"pd"}),
+        )
+        assert result["x"] == TaintState.EXTERNAL_RAW
+
+    def test_undeclared_function_in_declared_package_unknown_raw(self) -> None:
+        """pd.merge() when only pd.read_csv declared -> UNKNOWN_RAW."""
+        func = _parse_func("""
+            def f():
+                x = pd.merge(left, right)
+        """)
+        result = compute_variable_taints(
+            func,
+            TaintState.INTEGRAL,
+            {},
+            dependency_dotted_map={"pd.read_csv": TaintState.EXTERNAL_RAW},
+            dependency_local_prefixes=frozenset({"pd"}),
+        )
+        assert result["x"] == TaintState.UNKNOWN_RAW
+
+    def test_non_dependency_dotted_call_inherits_function_taint(self) -> None:
+        """self.process() is not a dependency -> inherits function_taint."""
+        func = _parse_func("""
+            def f(self):
+                x = self.process()
+        """)
+        result = compute_variable_taints(
+            func,
+            TaintState.ASSURED,
+            {},
+            dependency_dotted_map={},
+            dependency_local_prefixes=frozenset(),
+        )
+        assert result["x"] == TaintState.ASSURED
+
+    def test_serialisation_sinks_still_take_priority(self) -> None:
+        """json.dumps still -> UNKNOWN_RAW even if json is in dep_dotted."""
+        func = _parse_func("""
+            def f():
+                x = json.dumps(data)
+        """)
+        result = compute_variable_taints(
+            func,
+            TaintState.INTEGRAL,
+            {},
+            dependency_dotted_map={"json.dumps": TaintState.INTEGRAL},
+            dependency_local_prefixes=frozenset({"json"}),
+        )
+        assert result["x"] == TaintState.UNKNOWN_RAW
+
+    def test_declared_taint_overrides_function_taint(self) -> None:
+        """Multiple declared entries with different taints work correctly."""
+        func = _parse_func("""
+            def f():
+                x = pd.read_csv("data.csv")
+                y = pd.read_parquet("data.parquet")
+        """)
+        result = compute_variable_taints(
+            func,
+            TaintState.INTEGRAL,
+            {},
+            dependency_dotted_map={
+                "pd.read_csv": TaintState.EXTERNAL_RAW,
+                "pd.read_parquet": TaintState.UNKNOWN_RAW,
+            },
+            dependency_local_prefixes=frozenset({"pd"}),
+        )
+        assert result["x"] == TaintState.EXTERNAL_RAW
+        assert result["y"] == TaintState.UNKNOWN_RAW
