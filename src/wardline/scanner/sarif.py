@@ -105,6 +105,15 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
 )
 
 
+@dataclass(frozen=True)
+class GovernanceEvent:
+    """A discrete governance event for audit trail (§9)."""
+
+    event_type: str
+    message: str
+    timestamp: str | None = None  # ISO 8601, None in verification mode
+
+
 def compute_control_law(
     *,
     manifest_unavailable: bool = False,
@@ -275,6 +284,8 @@ class SarifReport:
     conformance_gaps: tuple[str, ...] = ()
     retroactive_scan: bool = False
     retroactive_scan_range: str | None = None
+    # GOV-005: Structured governance audit events (§9)
+    governance_events: tuple[GovernanceEvent, ...] = ()
 
     def _implemented_rules(self) -> list[str]:
         """Return sorted list of canonical rule ID values (excludes pseudo-IDs).
@@ -370,6 +381,11 @@ class SarifReport:
                 "wardline.activeExceptionCount": self.active_exception_count,
                 "wardline.staleExceptionCount": self.stale_exception_count,
                 "wardline.expeditedExceptionRatio": round(self.expedited_exception_ratio, 3),
+                **({"wardline.governanceEvents": [
+                    {"eventType": e.event_type, "message": e.message,
+                     **({"timestamp": e.timestamp} if e.timestamp else {})}
+                    for e in self.governance_events
+                ]} if self.governance_events else {}),
             },
             "results": results,
             "tool": {

@@ -770,6 +770,49 @@ def scan(
 
     import wardline as _wardline_pkg
 
+    # --- Collect governance audit events (§9 / GOV-005) ---
+    from wardline.scanner.sarif import GovernanceEvent
+
+    _gov_events: list[GovernanceEvent] = []
+
+    # exception_expired — from stale exceptions detected during apply_exceptions
+    _expired_findings = [
+        gf for gf in governance_findings
+        if gf.rule_id == RuleId.GOVERNANCE_STALE_EXCEPTION
+    ]
+    for _ef in _expired_findings:
+        _gov_events.append(GovernanceEvent(
+            event_type="exception_expired",
+            message=_ef.message,
+        ))
+
+    # exception_escalated — from recurring exceptions (recurrence_count >= 2)
+    _escalated_findings = [
+        gf for gf in governance_findings
+        if gf.rule_id == RuleId.GOVERNANCE_RECURRING_EXCEPTION
+    ]
+    for _esf in _escalated_findings:
+        _gov_events.append(GovernanceEvent(
+            event_type="exception_escalated",
+            message=_esf.message,
+        ))
+
+    # control_law_transition — when control law is not "normal"
+    if control_law != "normal":
+        _gov_events.append(GovernanceEvent(
+            event_type="control_law_transition",
+            message=f"Control law is '{control_law}' due to: {', '.join(control_law_degradations)}",
+        ))
+
+    # ratification_renewed — when ratification is overdue
+    if manifest_metrics.ratification_overdue:
+        _gov_events.append(GovernanceEvent(
+            event_type="ratification_renewed",
+            message="Manifest ratification is overdue",
+        ))
+
+    governance_events = tuple(_gov_events)
+
     sarif_report = SarifReport(
         findings=all_findings,
         tool_version=_wardline_pkg.__version__,
@@ -796,6 +839,7 @@ def scan(
         control_law_degradations=control_law_degradations,
         retroactive_scan=bool(retrospective),
         retroactive_scan_range=retrospective,
+        governance_events=governance_events,
     )
 
     sarif_text = sarif_report.to_json_string() + "\n"

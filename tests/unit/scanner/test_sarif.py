@@ -10,7 +10,7 @@ from wardline.core.severity import Exceptionability, RuleId, Severity
 if TYPE_CHECKING:
     from pathlib import Path
 from wardline.scanner.context import Finding
-from wardline.scanner.sarif import SarifReport, compute_control_law
+from wardline.scanner.sarif import GovernanceEvent, SarifReport, compute_control_law
 
 
 def _make_finding(
@@ -715,3 +715,86 @@ class TestRetrospectiveScan:
         report = SarifReport(findings=[finding])
         result = report.to_dict()["runs"][0]["results"][0]
         assert "wardline.retroactiveScan" not in result["properties"]
+
+
+# ---------------------------------------------------------------------------
+# TestGovernanceEvents
+# ---------------------------------------------------------------------------
+
+
+class TestGovernanceEvents:
+    """Tests for §9 governance audit event logging in SARIF (GOV-005)."""
+
+    def test_no_events_omitted_from_sarif(self) -> None:
+        """Empty governance_events -> no wardline.governanceEvents in SARIF."""
+        report = SarifReport(findings=[], governance_events=())
+        props = report.to_dict()["runs"][0]["properties"]
+        assert "wardline.governanceEvents" not in props
+
+    def test_events_emitted_in_sarif(self) -> None:
+        """GovernanceEvent objects appear as structured array in run properties."""
+        events = (
+            GovernanceEvent(
+                event_type="exception_expired",
+                message="Exception 'EX-001' has stale AST fingerprint",
+                timestamp="2026-03-29T10:00:00Z",
+            ),
+            GovernanceEvent(
+                event_type="control_law_transition",
+                message="Control law is 'alternate' due to: stale_exceptions_present",
+            ),
+        )
+        report = SarifReport(findings=[], governance_events=events)
+        props = report.to_dict()["runs"][0]["properties"]
+        assert "wardline.governanceEvents" in props
+        gov_events = props["wardline.governanceEvents"]
+        assert len(gov_events) == 2
+        assert gov_events[0]["eventType"] == "exception_expired"
+        assert gov_events[0]["message"] == "Exception 'EX-001' has stale AST fingerprint"
+        assert gov_events[0]["timestamp"] == "2026-03-29T10:00:00Z"
+        assert gov_events[1]["eventType"] == "control_law_transition"
+        assert gov_events[1]["message"] == "Control law is 'alternate' due to: stale_exceptions_present"
+
+    def test_event_timestamp_omitted_when_none(self) -> None:
+        """Events without timestamp don't include the timestamp key."""
+        events = (
+            GovernanceEvent(
+                event_type="ratification_renewed",
+                message="Manifest ratification is overdue",
+            ),
+        )
+        report = SarifReport(findings=[], governance_events=events)
+        props = report.to_dict()["runs"][0]["properties"]
+        gov_events = props["wardline.governanceEvents"]
+        assert len(gov_events) == 1
+        assert "timestamp" not in gov_events[0]
+        assert gov_events[0]["eventType"] == "ratification_renewed"
+
+    def test_all_seven_event_types_accepted(self) -> None:
+        """All 7 governance event types can be represented."""
+        event_types = [
+            "exception_created",
+            "exception_expired",
+            "exception_escalated",
+            "tier_change",
+            "ratification_renewed",
+            "fingerprint_changed",
+            "control_law_transition",
+        ]
+        events = tuple(
+            GovernanceEvent(event_type=et, message=f"Test {et}")
+            for et in event_types
+        )
+        report = SarifReport(findings=[], governance_events=events)
+        props = report.to_dict()["runs"][0]["properties"]
+        gov_events = props["wardline.governanceEvents"]
+        assert len(gov_events) == 7
+        emitted_types = [e["eventType"] for e in gov_events]
+        assert emitted_types == event_types
+
+    def test_governance_event_frozen(self) -> None:
+        """GovernanceEvent is frozen — attributes cannot be mutated."""
+        event = GovernanceEvent(event_type="tier_change", message="test")
+        import pytest
+        with pytest.raises(AttributeError):
+            event.event_type = "other"  # type: ignore[misc]
