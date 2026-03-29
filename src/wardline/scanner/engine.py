@@ -223,6 +223,41 @@ class ScanEngine:
                 continue
         return False
 
+    def _file_module_tier(self, file_path: Path) -> int:
+        """Return the authority tier for *file_path*'s module, or 4 if unresolved.
+
+        Uses the same longest-prefix matching strategy as the taint
+        assignment pass in ``function_level._resolve_module_default``.
+        """
+        if self._manifest is None:
+            return 4
+
+        from pathlib import PurePath
+
+        from wardline.core.tiers import TAINT_TO_TIER
+
+        file_p = PurePath(file_path)
+        root = Path(self._project_root).resolve() if self._project_root is not None else None
+
+        best_tier = 4
+        best_length = -1
+
+        for entry in self._manifest.module_tiers:
+            entry_p = PurePath(root / entry.path) if root is not None else PurePath(entry.path)
+            try:
+                file_p.relative_to(entry_p)
+            except ValueError:
+                continue
+            if len(entry.path) > best_length:
+                try:
+                    taint = TaintState(entry.default_taint)
+                    best_tier = TAINT_TO_TIER[taint].value
+                except (ValueError, KeyError):
+                    pass
+                best_length = len(entry.path)
+
+        return best_tier
+
     def _scan_file(self, file_path: Path, result: ScanResult) -> None:
         """Parse a single file and run all rules against its AST."""
         try:
@@ -249,6 +284,8 @@ class ScanEngine:
             logger.warning("Syntax error in %s: %s", file_path, exc)
             result.files_skipped += 1
             result.errors.append(f"Syntax error in {file_path}: {exc}")
+            file_tier = self._file_module_tier(file_path)
+            syntax_severity = Severity.ERROR if file_tier <= 1 else Severity.WARNING
             result.findings.append(
                 Finding(
                     rule_id=RuleId.GOVERNANCE_FILE_SKIPPED,
@@ -258,7 +295,7 @@ class ScanEngine:
                     end_line=None,
                     end_col=None,
                     message=f"File skipped due to syntax error: {exc}",
-                    severity=Severity.WARNING,
+                    severity=syntax_severity,
                     exceptionability=Exceptionability.UNCONDITIONAL,
                     taint_state=None,
                     analysis_level=1,

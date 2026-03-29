@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 import pytest
 
 from wardline.core.severity import RuleId, Severity
-from wardline.manifest.models import BoundaryEntry
+from wardline.manifest.models import BoundaryEntry, ModuleTierEntry, WardlineManifest
 from wardline.scanner.context import ScanContext
 from wardline.scanner.engine import ScanEngine
 from wardline.scanner.rules.base import RuleBase
@@ -571,3 +571,101 @@ class TestScanResultFileTracking:
         result = engine.scan()
         assert result.scanned_file_paths == []
         assert result.files_skipped == 1
+
+
+# ── Tier-aware syntax error escalation (PY-011) ────────────────
+
+
+class TestSyntaxErrorEscalation:
+    """Syntax errors in Tier 1 modules escalate to ERROR severity."""
+
+    def test_syntax_error_in_tier1_module_is_error(self, tmp_path: Path) -> None:
+        """Syntax error in a Tier 1 (INTEGRAL) module -> ERROR severity."""
+        src = tmp_path / "src" / "core"
+        src.mkdir(parents=True)
+        (src / "bad.py").write_text("def f(\n", encoding="utf-8")
+
+        manifest = WardlineManifest(
+            module_tiers=(ModuleTierEntry(path="src/core", default_taint="INTEGRAL"),),
+        )
+        engine = ScanEngine(
+            manifest=manifest,
+            target_paths=(src,),
+            project_root=tmp_path,
+        )
+        result = engine.scan()
+
+        syntax_findings = [f for f in result.findings if "syntax" in f.message.lower()]
+        assert len(syntax_findings) == 1
+        assert syntax_findings[0].severity == Severity.ERROR
+
+    def test_syntax_error_in_tier2_module_is_warning(self, tmp_path: Path) -> None:
+        """Syntax error in a Tier 2 (ASSURED) module -> WARNING severity."""
+        src = tmp_path / "src" / "scanner"
+        src.mkdir(parents=True)
+        (src / "bad.py").write_text("def f(\n", encoding="utf-8")
+
+        manifest = WardlineManifest(
+            module_tiers=(ModuleTierEntry(path="src/scanner", default_taint="ASSURED"),),
+        )
+        engine = ScanEngine(
+            manifest=manifest,
+            target_paths=(src,),
+            project_root=tmp_path,
+        )
+        result = engine.scan()
+
+        syntax_findings = [f for f in result.findings if "syntax" in f.message.lower()]
+        assert len(syntax_findings) == 1
+        assert syntax_findings[0].severity == Severity.WARNING
+
+    def test_syntax_error_in_tier4_module_is_warning(self, tmp_path: Path) -> None:
+        """Syntax error in a Tier 4 (EXTERNAL_RAW) module -> WARNING severity."""
+        src = tmp_path / "src" / "cli"
+        src.mkdir(parents=True)
+        (src / "bad.py").write_text("def f(\n", encoding="utf-8")
+
+        manifest = WardlineManifest(
+            module_tiers=(ModuleTierEntry(path="src/cli", default_taint="EXTERNAL_RAW"),),
+        )
+        engine = ScanEngine(
+            manifest=manifest,
+            target_paths=(src,),
+            project_root=tmp_path,
+        )
+        result = engine.scan()
+
+        syntax_findings = [f for f in result.findings if "syntax" in f.message.lower()]
+        assert len(syntax_findings) == 1
+        assert syntax_findings[0].severity == Severity.WARNING
+
+    def test_syntax_error_in_unassigned_module_is_warning(self, tmp_path: Path) -> None:
+        """Syntax error in a module with no tier assignment -> WARNING."""
+        src = tmp_path / "unknown"
+        src.mkdir()
+        (src / "bad.py").write_text("def f(\n", encoding="utf-8")
+
+        manifest = WardlineManifest()
+        engine = ScanEngine(
+            manifest=manifest,
+            target_paths=(src,),
+            project_root=tmp_path,
+        )
+        result = engine.scan()
+
+        syntax_findings = [f for f in result.findings if "syntax" in f.message.lower()]
+        assert len(syntax_findings) == 1
+        assert syntax_findings[0].severity == Severity.WARNING
+
+    def test_syntax_error_no_manifest_is_warning(self, tmp_path: Path) -> None:
+        """Syntax error with no manifest at all -> WARNING."""
+        src = tmp_path / "pkg"
+        src.mkdir()
+        (src / "bad.py").write_text("def f(\n", encoding="utf-8")
+
+        engine = ScanEngine(target_paths=(src,))
+        result = engine.scan()
+
+        syntax_findings = [f for f in result.findings if "syntax" in f.message.lower()]
+        assert len(syntax_findings) == 1
+        assert syntax_findings[0].severity == Severity.WARNING
