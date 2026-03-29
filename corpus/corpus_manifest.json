@@ -1,5 +1,7 @@
 {
   "version": "1.0",
+  "spec_version": "0.1",
+  "corpus_hash": "sha256:2bfe7bafe6dab648e6470d6cd1a4c632a533bced785ad589647447972e5b90be",
   "generated": "2026-03-28",
   "specimen_count": 244,
   "specimens": [

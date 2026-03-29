@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -71,3 +72,44 @@ class TestCorpusSkeleton:
         assert "version" in data
         assert "specimens" in data
         assert len(data["specimens"]) > 0
+
+    def test_corpus_manifest_has_spec_version(self) -> None:
+        manifest_path = CORPUS_ROOT / "corpus_manifest.json"
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert "spec_version" in data, "corpus_manifest.json missing spec_version"
+        assert data["spec_version"] == "0.1"
+
+    def test_corpus_manifest_has_corpus_hash(self) -> None:
+        manifest_path = CORPUS_ROOT / "corpus_manifest.json"
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert "corpus_hash" in data, "corpus_manifest.json missing corpus_hash"
+        assert data["corpus_hash"].startswith("sha256:")
+
+    def test_corpus_hash_matches_fresh_computation(self) -> None:
+        """Verify recorded corpus_hash matches a fresh hash-of-hashes."""
+        manifest_path = CORPUS_ROOT / "corpus_manifest.json"
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        recorded = data["corpus_hash"]
+
+        # Recompute using the same algorithm as _compute_corpus_hash
+        specimens_dir = CORPUS_ROOT / "specimens"
+        all_files = sorted(
+            list(specimens_dir.glob("**/*.yaml"))
+            + list(specimens_dir.glob("**/*.yml"))
+            + list(specimens_dir.glob("**/*.json"))
+        )
+        records: list[str] = []
+        for fp in all_files:
+            resolved = fp.resolve()
+            rel = resolved.relative_to(specimens_dir.resolve())
+            normalized = rel.as_posix()
+            digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+            records.append(f"{normalized}\x00{digest}")
+        records.sort()
+        combined = "".join(r + "\n" for r in records)
+        fresh = "sha256:" + hashlib.sha256(combined.encode("utf-8")).hexdigest()
+
+        assert recorded == fresh, (
+            f"corpus_hash drift: manifest has {recorded[:20]}... "
+            f"but fresh computation gives {fresh[:20]}..."
+        )

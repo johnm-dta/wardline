@@ -380,6 +380,9 @@ def write_manifest(manifest: dict[str, dict]) -> None:
     """
     # Scan disk for all YAML specimens (authoritative source)
     import glob
+    from pathlib import Path
+
+    from wardline.cli.corpus_cmds import _compute_corpus_hash
 
     disk_entries = []
     for yaml_path in sorted(glob.glob(f"{BASE}/**/*.yaml", recursive=True)):
@@ -402,6 +405,8 @@ def write_manifest(manifest: dict[str, dict]) -> None:
 
     out = {
         "version": "1.0",
+        "spec_version": "0.1",
+        "corpus_hash": _compute_corpus_hash(Path(BASE)),
         "generated": __import__("datetime").date.today().isoformat(),
         "specimen_count": len(disk_entries),
         "specimens": disk_entries,

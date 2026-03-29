@@ -519,7 +519,30 @@ def corpus() -> None:
 )
 def verify(corpus_dir: str, analysis_level: int, output_json: bool) -> None:
     """Verify corpus specimens against scanner rules."""
+    import json as json_mod
+
+    from wardline.manifest.loader import EXPECTED_SCHEMA_VERSION
+
     corpus_path = Path(corpus_dir)
+
+    # Check spec_version in corpus_manifest.json if present
+    manifest_path = corpus_path / "corpus_manifest.json"
+    if manifest_path.is_file():
+        try:
+            manifest_data = json_mod.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest_spec = manifest_data.get("spec_version")
+            if manifest_spec and manifest_spec != EXPECTED_SCHEMA_VERSION:
+                click.echo(
+                    f"warning: corpus_manifest.json spec_version "
+                    f"{manifest_spec!r} != expected {EXPECTED_SCHEMA_VERSION!r}",
+                    err=True,
+                )
+        except (OSError, json_mod.JSONDecodeError) as exc:
+            click.echo(
+                f"warning: could not read corpus_manifest.json: {exc}",
+                err=True,
+            )
+
     # Keep the two glob results concatenated before sorting so `.yaml` and
     # `.yml` files share one deterministic ordering regardless of extension.
     specimens = sorted(
