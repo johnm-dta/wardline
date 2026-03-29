@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from wardline.manifest.coherence import (
     check_agent_originated_exceptions,
+    check_direct_law_exclusion,
     check_expired_exceptions,
     check_first_scan_perimeter,
     check_orphaned_annotations,
@@ -1404,3 +1405,63 @@ class TestRestorationEvidenceConsistency:
             })],
         }
         assert check_restoration_evidence_consistency((boundary,), annotations) == []
+
+
+# ── Direct-law artefact exclusion tests ─────────────────────────
+
+
+class TestDirectLawExclusion:
+    """Tests for check_direct_law_exclusion."""
+
+    def test_no_warnings_when_normal(self) -> None:
+        """Normal control law produces no warnings."""
+        result = check_direct_law_exclusion("normal")
+        assert result == ()
+
+    def test_no_warnings_when_alternate(self) -> None:
+        """Alternate control law produces no warnings."""
+        result = check_direct_law_exclusion("alternate")
+        assert result == ()
+
+    def test_general_warning_when_direct_no_paths(self) -> None:
+        """Direct law with no governance paths emits a general warning."""
+        result = check_direct_law_exclusion("direct")
+        assert len(result) == 1
+        assert "direct" in result[0]
+        assert "\u00a79.5" in result[0]
+
+    def test_per_path_warnings_when_direct_with_paths(self) -> None:
+        """Direct law with governance paths emits per-path warnings."""
+        result = check_direct_law_exclusion(
+            "direct",
+            governance_paths=("wardline.yaml", "wardline.exceptions.json"),
+        )
+        assert len(result) == 2
+        assert "wardline.yaml" in result[0]
+        assert "wardline.exceptions.json" in result[1]
+        assert "\u00a79.5" in result[0]
+        assert "\u00a79.5" in result[1]
+
+    def test_empty_governance_paths_treated_as_no_paths(self) -> None:
+        """Direct law with empty tuple emits the general warning."""
+        result = check_direct_law_exclusion("direct", governance_paths=())
+        assert len(result) == 1
+        assert "governance artefact changes" in result[0]
+
+    def test_single_governance_path(self) -> None:
+        """Direct law with a single governance path emits one warning."""
+        result = check_direct_law_exclusion(
+            "direct",
+            governance_paths=("overlays/api/wardline.overlay.yaml",),
+        )
+        assert len(result) == 1
+        assert "overlays/api/wardline.overlay.yaml" in result[0]
+
+    def test_returns_tuple_not_list(self) -> None:
+        """Return type is tuple for immutability."""
+        result = check_direct_law_exclusion("direct")
+        assert isinstance(result, tuple)
+        result_with_paths = check_direct_law_exclusion(
+            "direct", governance_paths=("wardline.yaml",)
+        )
+        assert isinstance(result_with_paths, tuple)

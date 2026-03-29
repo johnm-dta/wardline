@@ -791,6 +791,33 @@ def check_restoration_evidence(
     return issues
 
 
+def check_direct_law_exclusion(
+    control_law: str,
+    governance_paths: tuple[str, ...] = (),
+) -> tuple[str, ...]:
+    """Check that governance artefacts were not modified during direct law.
+
+    Returns a tuple of warning messages. Empty if control law is not
+    "direct" or no governance paths are provided.
+
+    Governance artefacts include: wardline.yaml, overlay files, exception
+    register, fingerprint baseline. Under direct law, these MUST NOT be
+    modified (§9.5).
+    """
+    if control_law != "direct":
+        return ()
+    if not governance_paths:
+        return (
+            "Control law is 'direct' — governance artefact changes MUST NOT "
+            "proceed without enforcement-unavailable governance (§9.5).",
+        )
+    return tuple(
+        f"Control law is 'direct' — modification of governance artefact "
+        f"'{path}' is prohibited without enforcement-unavailable governance (§9.5)"
+        for path in governance_paths
+    )
+
+
 def check_restoration_evidence_consistency(
     boundaries: tuple[BoundaryEntry, ...],
     annotations: dict[tuple[str, str], list[WardlineAnnotation]],
