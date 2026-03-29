@@ -107,6 +107,7 @@ _PSEUDO_RULE_IDS: frozenset[RuleId] = frozenset(
 
 def compute_control_law(
     *,
+    manifest_unavailable: bool = False,
     ratification_overdue: bool = False,
     conformance_gaps: tuple[str, ...] = (),
     rules_disabled: tuple[str, ...] = (),
@@ -114,11 +115,17 @@ def compute_control_law(
 ) -> tuple[str, tuple[str, ...]]:
     """Compute the enforcement control law state per spec §9.5.
 
-    Returns (law, degradations) where law is "normal" or "alternate"
-    and degradations is a sorted tuple of degradation condition names.
-    Direct law is not computable by the tool itself — if we are running,
-    we are not in direct law.
+    Returns (law, degradations) where law is "normal", "alternate", or
+    "direct" and degradations is a sorted tuple of degradation condition
+    names.
+
+    Direct law means no meaningful enforcement output: manifest unavailable
+    or trust topology cannot be established. Alternate law means degraded
+    but running. Normal law means full enforcement capability.
     """
+    if manifest_unavailable:
+        return "direct", ("manifest_unavailable",)
+
     degradations: list[str] = []
     if ratification_overdue:
         degradations.append("ratification_overdue")

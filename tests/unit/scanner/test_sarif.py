@@ -627,6 +627,33 @@ class TestComputeControlLaw:
         assert "ratification_overdue" in props["wardline.controlLawDegradations"]
         assert "stale_exceptions_present" in props["wardline.controlLawDegradations"]
 
+    def test_direct_when_manifest_unavailable(self) -> None:
+        """manifest_unavailable=True -> direct law."""
+        law, degradations = compute_control_law(manifest_unavailable=True)
+        assert law == "direct"
+        assert degradations == ("manifest_unavailable",)
+
+    def test_direct_overrides_other_degradations(self) -> None:
+        """Direct law takes precedence over alternate-law conditions."""
+        law, _degradations = compute_control_law(
+            manifest_unavailable=True,
+            ratification_overdue=True,
+            rules_disabled=("PY-WL-001",),
+        )
+        assert law == "direct"
+
+    def test_direct_law_emitted_in_sarif(self) -> None:
+        """SARIF run properties include 'direct' when control law is direct."""
+        report = SarifReport(
+            findings=[],
+            control_law="direct",
+            control_law_degradations=("manifest_unavailable",),
+        )
+        sarif = report.to_dict()
+        run_props = sarif["runs"][0]["properties"]
+        assert run_props["wardline.controlLaw"] == "direct"
+        assert run_props["wardline.controlLawDegradations"] == ["manifest_unavailable"]
+
 
 # ---------------------------------------------------------------------------
 # TestControlLawDegradationsEmission
