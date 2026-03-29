@@ -186,9 +186,9 @@ The 17 annotation groups are defined as language-agnostic semantic requirements 
 | 11 | | `@declassifies(from_level=str, to_level=str)` | `from_level`, `to_level`: classification levels | Absence of rejection path in body produces a finding. CODEOWNERS-protected. |
 | 12 | Determinism | `@deterministic` | *(none)* | Body ban on non-deterministic stdlib calls (random, uuid4, datetime.now, set iteration). |
 | 12 | | `@time_dependent` | *(none)* | Suppresses `@deterministic`-style findings. |
-| 13 | Concurrency/Ordering | `@thread_safe` | *(none)* | Body that does not protect shared mutable state and is not pure produces a finding. |
-| 13 | | `@ordered_after(name)` | `name`: function name that is verified to precede | At call sites where both functions appear, the named function not lexically preceding produces a finding. |
-| 13 | | `@not_reentrant` | *(none)* | Call graph cycle detection through the decorated function. |
+| 13 | Concurrency/Ordering | `@thread_safe` | *(none)* | Body that does not protect shared mutable state and is not pure produces a finding. **v1.0: not enforced** — advisory declaration only. |
+| 13 | | `@ordered_after(name)` | `name`: function name that is verified to precede | At call sites where both functions appear, the named function not lexically preceding produces a finding. **v1.0: enforced** via SUP-001. |
+| 13 | | `@not_reentrant` | *(none)* | Call graph cycle detection through the decorated function. **v1.0: enforced** via SUP-001. |
 | 14 | Access/Attribution | `@requires_identity` | *(none)* | Absence of identity-typed parameter in `@integral_writer`/`@integrity_critical` call within body produces a finding. |
 | 14 | | `@privileged_operation` | *(none)* | State-modifying call not preceded by authorisation check produces a finding. |
 | 15 | Lifecycle/Scope | `@test_only` | *(none)* | Import of this symbol from a production module produces a finding. |
@@ -673,5 +673,160 @@ Adoption follows a phased model. Each phase is independently valuable.
 | wardline CLI itself unavailable | Direct | No regime orchestration, SARIF aggregation, or control-law reporting |
 
 The distinction between alternate and direct law follows Part I §9.5: alternate means degraded but running; direct means no meaningful enforcement output. Changes to wardline policy artefacts MUST NOT proceed under direct-law bypass.
+
+---
+
+#### A.11 Conformance criteria mapping
+
+*This section is non-normative. It maps the ten conformance criteria from Part I §14 to the Python binding's implementation artefacts.*
+
+| # | Criterion (§14) | Implementation | Evidence / CLI |
+|---|---|---|---|
+| 1 | Annotation vocabulary covers 17 groups | `wardline-decorators` package: 16/17 groups enforced; Group 16 `@data_flow` declared advisory-only | §A.4.2 decorator table; `wardline.toml` group configuration |
+| 2 | Pattern rules WL-001–WL-006 detected | PY-WL-001 through PY-WL-007 (WL-001 splits into two) | `wardline scan`; SARIF `implementedRules`; corpus specimens |
+| 3 | Structural verification WL-007/WL-008 | PY-WL-008 (rejection path), PY-WL-009 (validation ordering) | `wardline corpus verify`; engine L3 integration tests |
+| 4 | Taint-flow tracking (direct + two-hop) | Three-level taint: L1 function, L2 variable, L3 callgraph with SCC fixed-point | `wardline scan`; `wardline.analysisLevel` in SARIF |
+| 5 | Precision/recall measured per cell | `wardline corpus publish` computes TP/FP/TN/FN per (rule × taint) cell | `wardline corpus verify --json`; 72-cell coverage |
+| 6 | Golden corpus maintained | 244 specimens across PY-WL-001–009 + adversarial + suppression-interaction | `corpus/`; `corpus_manifest.json`; `wardline corpus verify` |
+| 7 | Self-hosting gate | `test_self_hosting_scan.py` runs scanner against `src/wardline/`; per-rule baseline regression | `uv run pytest -k self_hosting`; CI self-hosting-scan job |
+| 8 | Deterministic SARIF v2.1.0 with property bags | `sarif.py` emits v2.1.0; `--verification-mode` for byte-identical output | `wardline scan --verification-mode`; `test_determinism.py` |
+| 9 | Governance model (protected files, temporal separation, fingerprint) | CODEOWNERS protects all governance artefacts; `wardline.yaml` declares `temporal_separation`; `wardline fingerprint` provides baseline tracking | `wardline fingerprint diff`; `wardline regime status` |
+| 10 | Manifest consumed and schema-validated | `loader.py` validates against JSON Schema before producing findings; exit code 2 on invalid manifest | `wardline manifest validate`; `wardline scan` (validates first) |
+
+**Regime composition.** The following table maps each criterion to the enforcement tool(s) that address it:
+
+| Criterion | wardline-scanner | wardline-ruff (advisory) | wardline-mypy (optional) | wardline-cli |
+|---|---|---|---|---|
+| 1 (vocabulary) | Discovery + enforcement | Partial (5 rules) | Type annotations | — |
+| 2 (pattern rules) | All 9 rules | 5 of 9 (advisory) | — | — |
+| 3 (structural verification) | PY-WL-008, PY-WL-009 | — | — | — |
+| 4 (taint tracking) | L1–L3 | — | — | — |
+| 5 (precision/recall) | — | — | — | `corpus publish` |
+| 6 (corpus) | — | — | — | `corpus verify` |
+| 7 (self-hosting) | Self-scan in CI | — | — | — |
+| 8 (SARIF output) | Producer | — | — | Consumer/aggregator |
+| 9 (governance) | — | — | — | All governance commands |
+| 10 (manifest) | Consumer | — | — | `manifest validate` |
+
+---
+
+#### A.12 Branch protection and CI gating
+
+*This section is non-normative. It documents adopter responsibilities for CI enforcement.*
+
+The reference scanner runs as a CI job (`self-hosting-scan` in `ci.yml`). However, configuring this job as a **required status check** is an adopter-side GitHub (or equivalent) setting — not something the tool itself can enforce.
+
+Adopters SHOULD:
+
+1. Enable the `self-hosting-scan` workflow as a required status check on the default branch.
+2. Configure branch protection rules to require the scan to pass before merging.
+3. Add `wardline.yaml`, overlay files, the exception register, and fingerprint baselines to CODEOWNERS.
+
+The wardline toolchain provides the enforcement mechanisms; the adopter provides the branch protection configuration that gates merges on those mechanisms.
+
+---
+
+#### A.13 Provenance justification guidelines
+
+*This section is non-normative. It documents expected provenance fields for trust escalation.*
+
+When declaring trust escalation in `wardline.yaml` boundary entries, the `provenance` field accepts a freeform dictionary. For assessor clarity, the following fields are RECOMMENDED:
+
+| Field | Type | Purpose |
+|---|---|---|
+| `rationale` | string | Why this escalation is justified (1–2 sentences) |
+| `evidence_type` | string | One of: `structural`, `semantic`, `institutional`, `restoration` |
+| `reviewer` | string | Identity of the person who approved the escalation |
+| `date` | string (ISO 8601) | Date the escalation was approved |
+| `ticket` | string | Link to the review ticket or PR |
+
+Example:
+
+```yaml
+boundaries:
+  - function: "validate_partner_record"
+    transition: "TRUST_ELEVATION"
+    from_tier: 4
+    to_tier: 2
+    provenance:
+      rationale: "Combined shape + semantic validation with rejection path"
+      evidence_type: "structural"
+      reviewer: "John"
+      date: "2026-03-27"
+      ticket: "wardline#142"
+```
+
+The scanner checks that `provenance` is present for escalations but does not enforce field completeness. Assessors evaluating governance quality SHOULD verify that provenance entries contain sufficient rationale for the claimed escalation.
+
+---
+
+#### A.14 Governance profile graduation guide
+
+*This section is non-normative. It documents the path from Lite to Assurance governance profile.*
+
+**Prerequisites for Assurance.** A deployment currently at `governance_profile: "lite"` can graduate to Assurance when all five conditions are met:
+
+| # | Condition | How to verify |
+|---|---|---|
+| 1 | Golden corpus expanded to 126+ specimens | `wardline corpus verify --json` → `total_specimens >= 126` |
+| 2 | Fingerprint baseline established with at least one review cycle | `wardline fingerprint diff` shows a prior baseline |
+| 3 | Temporal separation operational (different-actor review, no alternatives) | Remove `temporal_separation.alternative` from `wardline.yaml` |
+| 4 | Expedited ratio threshold declared | Add `expedited_ratio_threshold` to `wardline.yaml` metadata |
+| 5 | All Lite-era exceptions reviewed under Assurance governance | `wardline exception list --needs-review` returns empty |
+
+**Steps:**
+
+1. Expand the corpus to meet the 126-specimen floor, with per-rule AFP and AFN specimens.
+2. Run `wardline fingerprint update` to establish the baseline. Complete one full review cycle.
+3. Configure temporal separation: ensure all governance artefact changes are reviewed by a different actor. Remove the `same-actor-with-retrospective` alternative from the manifest.
+4. Add `expedited_ratio_threshold` to the manifest metadata section.
+5. Review all existing exceptions: confirm reviewer identity, validate rationale against current context, update expiry dates.
+6. Change `governance_profile: "lite"` to `governance_profile: "assurance"` in `wardline.yaml`.
+7. Run `wardline coherence` to validate the new profile.
+
+---
+
+#### A.15 Dependency taint (§5.5)
+
+*This section is non-normative. It documents the Python binding's approach to third-party dependency taint.*
+
+**Manifest declaration.** Third-party library function return taints are declared in the root manifest under `dependency_taint`:
+
+```yaml
+dependency_taint:
+  - package: "requests>=2.0,<3.0"
+    function: "requests.get"
+    returns_taint: "EXTERNAL_RAW"
+    rationale: "HTTP response is untrusted external data"
+  - package: "requests>=2.0,<3.0"
+    function: "requests.post"
+    returns_taint: "EXTERNAL_RAW"
+    rationale: "HTTP response is untrusted external data"
+```
+
+Each entry has four required fields: `package` (identifier with optional version constraint), `function` (fully-qualified name), `returns_taint` (one of the eight canonical taint states), and `rationale` (governance justification for the declaration).
+
+**Resolution.** At scan time, the engine resolves declarations against each file's import statements:
+
+| Import Form | Call Syntax | Resolution |
+|---|---|---|
+| `import requests` | `requests.get(url)` | `requests.get` → FQN match → declared taint |
+| `import requests as req` | `req.get(url)` | `req` → alias for `requests` → `requests.get` → declared taint |
+| `from requests import get` | `get(url)` | `get` → FQN `requests.get` → declared taint |
+
+**UNKNOWN_RAW fallback (§5.5 MUST).** When a call targets a function in a package that has `dependency_taint` declarations, but the specific function is not declared, the return taint is `UNKNOWN_RAW`. This prevents undeclared library functions from inheriting the caller's taint — a conservative default that surfaces as a finding if the return value reaches a high-tier code path.
+
+**Compound patterns.** The following compound patterns fall back to `UNKNOWN_RAW` in v1.0:
+
+| Pattern | Example | v1.0 Behaviour |
+|---|---|---|
+| Method chaining | `df.groupby("x").agg({"y": "sum"})` | UNKNOWN_RAW (intermediate not tracked) |
+| Generator iteration | `for row in cursor.fetchall()` | Inherits iterable taint via `for` target |
+| Context managers | `with db.connect() as conn` | Inherits context expr taint via `with` target |
+| Async variants | `async for item in stream()` | Same as sync equivalents |
+
+Method chaining beyond the first call is not resolved. Declare the root function; downstream method results that are assigned to variables inherit through the variable taint system.
+
+**Dependency taint is not a boundary declaration.** The manifest declares what data *is* when it arrives from ungoverned code. The application's own annotated boundaries declare what happens to it next.
 
 ---

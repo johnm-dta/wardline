@@ -149,6 +149,15 @@ SEVERITY_MATRIX: MappingProxyType[tuple[RuleId, TaintState], SeverityCell] = (
 del _severity_matrix_builder
 
 
+def has_unconditional_cells(rule: RuleId) -> bool:
+    """Return True if *rule* has any UNCONDITIONAL cells in the matrix."""
+    return any(
+        cell.exceptionability == Exceptionability.UNCONDITIONAL
+        for (r, _t), cell in SEVERITY_MATRIX.items()
+        if r == rule
+    )
+
+
 def lookup(rule: RuleId, taint: TaintState) -> SeverityCell:
     """Look up the severity cell for a (rule, taint) pair.
 

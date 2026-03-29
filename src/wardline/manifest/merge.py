@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from wardline.core.matrix import has_unconditional_cells
+from wardline.core.severity import RuleId
 from wardline.manifest.models import (
     BoundaryEntry,
     ModuleTierEntry,
@@ -114,6 +116,23 @@ def merge(
             )
         base_severity = base_ovr.get("severity")
         overlay_severity = ovr.get("severity")
+        # Guard: severity=OFF must not suppress rules with UNCONDITIONAL cells.
+        # This check runs before the general narrowing check so the error
+        # message explains the stronger constraint.
+        effective_severity = overlay_severity if overlay_severity is not None else base_severity
+        if effective_severity is not None and str(effective_severity).upper() == "OFF":
+            try:
+                parsed_rule = RuleId(rule_id)
+            except ValueError:
+                pass
+            else:
+                if has_unconditional_cells(parsed_rule):
+                    raise ManifestWidenError(
+                        overlay_name=overlay.overlay_for,
+                        field_name="severity",
+                        base_value=base_severity,
+                        attempted_value="OFF (rule has UNCONDITIONAL cells)",
+                    )
         if (
             base_severity is not None
             and overlay_severity is not None

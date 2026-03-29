@@ -5,6 +5,8 @@
 
 $id: "https://wardline.dev/schemas/0.1/wardline.schema.json"
 
+governance_profile: "lite"
+
 metadata:
   organisation: "wardline"
   ratified_by:

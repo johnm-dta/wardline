@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING
 
 from wardline.core.severity import RuleId
 from wardline.scanner.rules.base import (
-    RuleBase,
     _AST_TRY_STAR,
+    RuleBase,
     call_name,
     decorator_name,
     receiver_name,

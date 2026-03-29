@@ -21,8 +21,8 @@ Three-phase process:
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 

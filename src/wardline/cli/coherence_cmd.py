@@ -13,9 +13,8 @@ from typing import Any
 
 import click
 
-from wardline.cli._helpers import cli_error
-
 from wardline.cli._helpers import COHERENCE_SEVERITY_MAP as SEVERITY_MAP
+from wardline.cli._helpers import cli_error
 from wardline.cli.scan import EXIT_CONFIG_ERROR
 
 CATEGORY_MAP = {
@@ -81,6 +80,8 @@ def coherence(
         check_expired_exceptions,
         check_first_scan_perimeter,
         check_orphaned_annotations,
+        check_restoration_evidence,
+        check_restoration_evidence_consistency,
         check_stale_contract_bindings,
         check_tier_distribution,
         check_tier_downgrades,
@@ -89,8 +90,6 @@ def coherence(
         check_undeclared_boundaries,
         check_unmatched_contracts,
         check_validation_scope_presence,
-        check_restoration_evidence,
-        check_restoration_evidence_consistency,
         should_gate_on_profile,
     )
     from wardline.manifest.exceptions import load_exceptions

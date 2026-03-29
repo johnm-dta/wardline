@@ -932,7 +932,7 @@ class RuleSup001(RuleBase):
                 end_col=getattr(node, "end_col_offset", None),
                 message=message,
                 severity=severity,
-                exceptionability=Exceptionability.UNCONDITIONAL,
+                exceptionability=Exceptionability.STANDARD,
                 taint_state=None,
                 analysis_level=1,
                 source_snippet=None,

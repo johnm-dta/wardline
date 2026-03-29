@@ -1,12 +1,11 @@
 """wardline.decorators — Decorator library for wardline annotations."""
 
 from wardline.decorators.access import privileged_operation, requires_identity
-from wardline.decorators.integrity import integrity_critical
 from wardline.decorators.authority import (
-    integral_writer,
-    integral_construction,
     external_boundary,
+    integral_construction,
     integral_read,
+    integral_writer,
     validates_external,
     validates_semantic,
     validates_shape,
@@ -14,6 +13,7 @@ from wardline.decorators.authority import (
 from wardline.decorators.boundaries import tier_transition, trust_boundary
 from wardline.decorators.concurrency import not_reentrant, ordered_after, thread_safe
 from wardline.decorators.determinism import deterministic, time_dependent
+from wardline.decorators.integrity import integrity_critical
 from wardline.decorators.lifecycle import deprecated_by, feature_gated, test_only
 from wardline.decorators.operations import (
     atomic,
