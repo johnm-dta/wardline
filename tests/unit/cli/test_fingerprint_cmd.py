@@ -677,6 +677,234 @@ def test_fingerprint_diff_malformed_baseline(
     assert result.exit_code == 2
 
 
+# ── Test: --since filter ─────────────────────────────────────────
+
+
+def test_fingerprint_diff_since_filters_old_changes(
+    runner: CliRunner, tmp_path: Path
+) -> None:
+    """--since excludes changes with last_changed before the cutoff."""
+    manifest_path = _write_manifest(tmp_path)
+    src_dir = _write_source(tmp_path)
+
+    real_hashes = _compute_real_hashes(src_dir)
+    # Baseline: one function has old hash (MODIFIED), one extra (REMOVED)
+    # Use different last_changed dates so we can filter
+    _write_baseline(tmp_path, [
+        {
+            "qualified_name": "fetch_data",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["external_boundary"],
+            "annotation_hash": "deadbeefdeadbeef",  # wrong hash -> MODIFIED
+            "tier_context": 1,
+            "boundary_transition": "ingress",
+            "last_changed": "2026-01-15",  # old
+            "artefact_class": "policy",
+        },
+        {
+            "qualified_name": "check_schema",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["validates_shape"],
+            "annotation_hash": "deadbeefdeadbeef",  # wrong hash -> MODIFIED
+            "tier_context": 1,
+            "boundary_transition": "shape_validation",
+            "last_changed": "2026-03-20",  # recent
+            "artefact_class": "policy",
+        },
+        {
+            "qualified_name": "get_config",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["integral_read"],
+            "annotation_hash": real_hashes["get_config"],
+            "tier_context": 1,
+            "boundary_transition": None,
+            "last_changed": "2026-03-01",
+            "artefact_class": "policy",
+        },
+        {
+            "qualified_name": "old_removed",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["integral_read"],
+            "annotation_hash": "aabbccddaabbccdd",
+            "tier_context": 4,
+            "boundary_transition": None,
+            "last_changed": "2026-01-10",  # old
+            "artefact_class": "enforcement",
+        },
+        {
+            "qualified_name": "recent_removed",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["integral_read"],
+            "annotation_hash": "eeff0011eeff0011",
+            "tier_context": 4,
+            "boundary_transition": None,
+            "last_changed": "2026-03-25",  # recent
+            "artefact_class": "enforcement",
+        },
+    ])
+
+    result = runner.invoke(
+        diff,
+        [
+            "--manifest", str(manifest_path),
+            "--path", str(src_dir),
+            "--json",
+            "--since", "2026-03-01",
+        ],
+        catch_exceptions=True,
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+
+    # Both MODIFIED entries use current last_changed (today), which is >= 2026-03-01
+    # so both remain. The key filtering is on REMOVED entries.
+    removed_names = [e["qualified_name"] for e in data["removed"]]
+    # old_removed (2026-01-10) filtered out, recent_removed (2026-03-25) kept
+    assert "recent_removed" in removed_names
+    assert "old_removed" not in removed_names
+
+    # total_changes reflects filtered count
+    assert data["total_changes"] == len(data["added"]) + len(data["removed"]) + len(data["modified"])
+
+
+def test_fingerprint_diff_since_no_filter_without_flag(
+    runner: CliRunner, tmp_path: Path
+) -> None:
+    """Without --since, all changes appear regardless of date."""
+    manifest_path = _write_manifest(tmp_path)
+    src_dir = _write_source(tmp_path)
+
+    real_hashes = _compute_real_hashes(src_dir)
+    _write_baseline(tmp_path, [
+        {
+            "qualified_name": "fetch_data",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["external_boundary"],
+            "annotation_hash": "deadbeefdeadbeef",  # MODIFIED
+            "tier_context": 1,
+            "boundary_transition": "ingress",
+            "last_changed": "2025-01-01",  # very old
+            "artefact_class": "policy",
+        },
+        {
+            "qualified_name": "check_schema",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["validates_shape"],
+            "annotation_hash": real_hashes["check_schema"],
+            "tier_context": 1,
+            "boundary_transition": "shape_validation",
+            "last_changed": "2025-01-01",
+            "artefact_class": "policy",
+        },
+        {
+            "qualified_name": "get_config",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["integral_read"],
+            "annotation_hash": real_hashes["get_config"],
+            "tier_context": 1,
+            "boundary_transition": None,
+            "last_changed": "2025-01-01",
+            "artefact_class": "policy",
+        },
+    ])
+
+    result = runner.invoke(
+        diff,
+        ["--manifest", str(manifest_path), "--path", str(src_dir), "--json"],
+        catch_exceptions=True,
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    # fetch_data should still appear as MODIFIED even with old date
+    modified_names = [e["qualified_name"] for e in data["modified"]]
+    assert "fetch_data" in modified_names
+
+
+def test_fingerprint_diff_since_filters_null_last_changed(
+    runner: CliRunner, tmp_path: Path
+) -> None:
+    """--since drops removed entries with null last_changed."""
+    manifest_path = _write_manifest(tmp_path)
+    src_dir = _write_source(tmp_path)
+
+    real_hashes = _compute_real_hashes(src_dir)
+    # Baseline has two extra functions that don't exist in code (REMOVED).
+    # One has null last_changed, the other has a recent date.
+    _write_baseline(tmp_path, [
+        {
+            "qualified_name": "fetch_data",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["external_boundary"],
+            "annotation_hash": real_hashes["fetch_data"],
+            "tier_context": 1,
+            "boundary_transition": "ingress",
+            "last_changed": "2026-03-01",
+            "artefact_class": "policy",
+        },
+        {
+            "qualified_name": "check_schema",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["validates_shape"],
+            "annotation_hash": real_hashes["check_schema"],
+            "tier_context": 1,
+            "boundary_transition": "shape_validation",
+            "last_changed": "2026-03-01",
+            "artefact_class": "policy",
+        },
+        {
+            "qualified_name": "get_config",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["integral_read"],
+            "annotation_hash": real_hashes["get_config"],
+            "tier_context": 1,
+            "boundary_transition": None,
+            "last_changed": "2026-03-01",
+            "artefact_class": "policy",
+        },
+        {
+            "qualified_name": "removed_no_date",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["integral_read"],
+            "annotation_hash": "aabbccddaabbccdd",
+            "tier_context": 4,
+            "boundary_transition": None,
+            "last_changed": None,  # no date -> filtered out
+            "artefact_class": "enforcement",
+        },
+        {
+            "qualified_name": "removed_with_date",
+            "module": str(src_dir / "example.py"),
+            "decorators": ["integral_read"],
+            "annotation_hash": "eeff0011eeff0011",
+            "tier_context": 4,
+            "boundary_transition": None,
+            "last_changed": "2026-03-20",  # recent -> kept
+            "artefact_class": "enforcement",
+        },
+    ])
+
+    result = runner.invoke(
+        diff,
+        [
+            "--manifest", str(manifest_path),
+            "--path", str(src_dir),
+            "--json",
+            "--since", "2026-03-01",
+        ],
+        catch_exceptions=True,
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    removed_names = [e["qualified_name"] for e in data["removed"]]
+    # null last_changed -> filtered out by --since
+    assert "removed_no_date" not in removed_names
+    # recent date -> kept
+    assert "removed_with_date" in removed_names
+
+
 def test_fingerprint_diff_old_baseline_missing_fields(
     runner: CliRunner, tmp_path: Path
 ) -> None:

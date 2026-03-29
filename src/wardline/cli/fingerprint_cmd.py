@@ -225,11 +225,18 @@ def update(
     is_flag=True,
     help="Exit 1 if tier 1 annotations removed.",
 )
+@click.option(
+    "--since",
+    type=click.STRING,
+    default=None,
+    help="Only show changes after this ISO date (YYYY-MM-DD).",
+)
 def diff(
     manifest_file: str,
     scan_path: str,
     output_json: bool,
     gate: bool,
+    since: str | None = None,
 ) -> None:
     """Compare current annotations against fingerprint baseline."""
     import yaml
@@ -318,6 +325,24 @@ def diff(
                 if version_mismatch and b_hash == c_hash:
                     entry["reason"] = "python_version_mismatch"
                 modified.append(entry)
+
+    # --- Apply --since filter ---
+    if since:
+        from datetime import date as date_cls
+
+        since_date = date_cls.fromisoformat(since)
+        added = [
+            e for e in added
+            if e.get("last_changed") and date_cls.fromisoformat(e["last_changed"]) >= since_date
+        ]
+        modified = [
+            e for e in modified
+            if e.get("last_changed") and date_cls.fromisoformat(e["last_changed"]) >= since_date
+        ]
+        removed = [
+            e for e in removed
+            if e.get("last_changed") and date_cls.fromisoformat(e["last_changed"]) >= since_date
+        ]
 
     total_changes = len(added) + len(removed) + len(modified)
 
