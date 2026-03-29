@@ -548,3 +548,147 @@ class TestDependencyTaint:
         )
         assert result["x"] == TaintState.EXTERNAL_RAW
         assert result["y"] == TaintState.UNKNOWN_RAW
+
+
+# ── Container and two-step taint propagation (SCAN-010) ─────────
+
+
+class TestContainerTaintPropagation:
+    """Isolated container and multi-step taint propagation tests (SCAN-010)."""
+
+    def test_dict_literal_joins_value_taints(self) -> None:
+        """Dict with mixed taint values -> join of all value taints."""
+        func = _parse_func("""
+            def f(untrusted):
+                d = {"safe": 42, "unsafe": untrusted}
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        # 42 is INTEGRAL, untrusted is EXTERNAL_RAW -> join is MIXED_RAW
+        assert result["d"] == TaintState.MIXED_RAW
+
+    def test_list_literal_joins_element_taints(self) -> None:
+        """List with mixed taint elements -> join of all elements."""
+        func = _parse_func("""
+            def f(untrusted):
+                lst = [42, untrusted]
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        assert result["lst"] == TaintState.MIXED_RAW
+
+    def test_tuple_literal_joins_element_taints(self) -> None:
+        """Tuple with mixed elements -> join."""
+        func = _parse_func("""
+            def f(untrusted):
+                t = (42, untrusted)
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        assert result["t"] == TaintState.MIXED_RAW
+
+    def test_set_literal_joins_element_taints(self) -> None:
+        """Set with mixed elements -> join."""
+        func = _parse_func("""
+            def f(untrusted):
+                s = {42, untrusted}
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        assert result["s"] == TaintState.MIXED_RAW
+
+    def test_empty_containers_are_integral(self) -> None:
+        """Empty dict/list/tuple/set -> INTEGRAL (no tainted data)."""
+        func = _parse_func("""
+            def f():
+                d = {}
+                lst = []
+                t = ()
+                s = set()
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        assert result["d"] == TaintState.INTEGRAL
+        assert result["lst"] == TaintState.INTEGRAL
+        assert result["t"] == TaintState.INTEGRAL
+        # set() is a call, not a literal — falls to function_taint
+        # This is expected: set() is ast.Call, not ast.Set
+
+    def test_nested_container_joins_recursively(self) -> None:
+        """Nested containers join through to inner elements."""
+        func = _parse_func("""
+            def f(untrusted):
+                nested = {"inner": [untrusted, 42]}
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        assert result["nested"] == TaintState.MIXED_RAW
+
+    def test_homogeneous_container_preserves_taint(self) -> None:
+        """Container with all-same-taint elements -> that taint."""
+        func = _parse_func("""
+            def f():
+                d = {"a": 1, "b": 2, "c": 3}
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        assert result["d"] == TaintState.INTEGRAL
+
+    def test_call_result_in_container(self) -> None:
+        """Container with call result uses callee taint."""
+        func = _parse_func("""
+            def f():
+                lst = [validate(data)]
+        """)
+        taint_map = {"validate": TaintState.GUARDED}
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, taint_map)
+        assert result["lst"] == TaintState.GUARDED
+
+    def test_two_step_variable_propagation(self) -> None:
+        """Taint flows through intermediate variable assignment."""
+        func = _parse_func("""
+            def f(untrusted):
+                intermediate = untrusted
+                final = intermediate
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        assert result["intermediate"] == TaintState.EXTERNAL_RAW
+        assert result["final"] == TaintState.EXTERNAL_RAW
+
+    def test_augmented_assign_joins_with_existing(self) -> None:
+        """x += untrusted joins existing taint with new value."""
+        func = _parse_func("""
+            def f(untrusted):
+                x = 42
+                x += untrusted
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        # 42 is INTEGRAL, += EXTERNAL_RAW -> MIXED_RAW
+        assert result["x"] == TaintState.MIXED_RAW
+
+    def test_for_loop_target_gets_iterable_taint(self) -> None:
+        """for item in container -- item gets container's taint."""
+        func = _parse_func("""
+            def f(items):
+                for item in items:
+                    pass
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        assert result["item"] == TaintState.EXTERNAL_RAW
+
+    def test_with_as_gets_context_taint(self) -> None:
+        """with open(f) as handle -- handle gets context expr taint."""
+        func = _parse_func("""
+            def f():
+                with get_conn() as conn:
+                    pass
+        """)
+        taint_map = {"get_conn": TaintState.GUARDED}
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, taint_map)
+        assert result["conn"] == TaintState.GUARDED
+
+    def test_if_branch_merges_via_join(self) -> None:
+        """Variable assigned in both branches -> join of both taints."""
+        func = _parse_func("""
+            def f(cond, untrusted):
+                if cond:
+                    x = 42
+                else:
+                    x = untrusted
+        """)
+        result = compute_variable_taints(func, TaintState.EXTERNAL_RAW, {})
+        # INTEGRAL join EXTERNAL_RAW -> MIXED_RAW
+        assert result["x"] == TaintState.MIXED_RAW
