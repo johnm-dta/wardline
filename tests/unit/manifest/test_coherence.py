@@ -9,12 +9,15 @@ from typing import TYPE_CHECKING
 
 from wardline.manifest.coherence import (
     check_agent_originated_exceptions,
+    check_boundary_widening,
     check_direct_law_exclusion,
+    check_exception_volume,
     check_expired_exceptions,
     check_first_scan_perimeter,
     check_orphaned_annotations,
     check_restoration_evidence_consistency,
     check_stale_contract_bindings,
+    check_suppress_overrides,
     check_tier_distribution,
     check_tier_downgrades,
     check_tier_topology_consistency,
@@ -1465,3 +1468,211 @@ class TestDirectLawExclusion:
             "direct", governance_paths=("wardline.yaml",)
         )
         assert isinstance(result_with_paths, tuple)
+
+
+# ── Threat model anomaly vector tests ─────────────────────────────
+
+
+class TestSuppressOverrides:
+    """Tests for check_suppress_overrides."""
+
+    def test_suppress_override_flagged(self) -> None:
+        """severity=SUPPRESS in override produces a warning."""
+        overrides = ({"id": "PY-WL-001", "severity": "SUPPRESS"},)
+        result = check_suppress_overrides(overrides)
+        assert len(result) == 1
+        assert "PY-WL-001" in result[0]
+        assert "SUPPRESS" in result[0]
+        assert "silenced" in result[0]
+
+    def test_off_override_flagged(self) -> None:
+        """severity=OFF in override produces a warning."""
+        overrides = ({"id": "PY-WL-002", "severity": "off"},)
+        result = check_suppress_overrides(overrides)
+        assert len(result) == 1
+        assert "PY-WL-002" in result[0]
+        assert "OFF" in result[0]
+
+    def test_normal_override_not_flagged(self) -> None:
+        """severity=ERROR in override produces no warning."""
+        overrides = ({"id": "PY-WL-001", "severity": "ERROR"},)
+        result = check_suppress_overrides(overrides)
+        assert result == ()
+
+    def test_multiple_overrides_mixed(self) -> None:
+        """Only SUPPRESS/OFF overrides are flagged, others pass."""
+        overrides = (
+            {"id": "PY-WL-001", "severity": "ERROR"},
+            {"id": "PY-WL-002", "severity": "SUPPRESS"},
+            {"id": "PY-WL-003", "severity": "WARNING"},
+            {"id": "PY-WL-004", "severity": "OFF"},
+        )
+        result = check_suppress_overrides(overrides)
+        assert len(result) == 2
+        ids_flagged = {w.split("'")[1] for w in result}
+        assert ids_flagged == {"PY-WL-002", "PY-WL-004"}
+
+    def test_empty_overrides(self) -> None:
+        """No overrides produces no warnings."""
+        result = check_suppress_overrides(())
+        assert result == ()
+
+    def test_mapping_proxy_override(self) -> None:
+        """MappingProxyType overrides are handled correctly."""
+        overrides = (MappingProxyType({"id": "PY-WL-001", "severity": "SUPPRESS"}),)
+        result = check_suppress_overrides(overrides)
+        assert len(result) == 1
+
+    def test_returns_tuple(self) -> None:
+        """Return type is tuple for immutability."""
+        result = check_suppress_overrides(())
+        assert isinstance(result, tuple)
+
+
+class TestBoundaryWidening:
+    """Tests for check_boundary_widening."""
+
+    def test_boundary_widening_flagged(self) -> None:
+        """from_tier=2, to_tier=4 is a widening and is flagged."""
+        boundaries = (
+            BoundaryEntry(
+                function="write_external",
+                transition="EGRESS",
+                from_tier=2,
+                to_tier=4,
+            ),
+        )
+        result = check_boundary_widening(boundaries)
+        assert len(result) == 1
+        assert "write_external" in result[0]
+        assert "from_tier=2" in result[0]
+        assert "to_tier=4" in result[0]
+        assert "less trusted" in result[0]
+
+    def test_boundary_narrowing_not_flagged(self) -> None:
+        """from_tier=4, to_tier=2 is narrowing (normal validation) and is not flagged."""
+        boundaries = (
+            BoundaryEntry(
+                function="validate_input",
+                transition="SHAPE_VALIDATE",
+                from_tier=4,
+                to_tier=2,
+            ),
+        )
+        result = check_boundary_widening(boundaries)
+        assert result == ()
+
+    def test_same_tier_not_flagged(self) -> None:
+        """from_tier == to_tier is not a widening."""
+        boundaries = (
+            BoundaryEntry(
+                function="transform",
+                transition="TRANSFORM",
+                from_tier=3,
+                to_tier=3,
+            ),
+        )
+        result = check_boundary_widening(boundaries)
+        assert result == ()
+
+    def test_none_tiers_not_flagged(self) -> None:
+        """Boundaries with None tiers are skipped."""
+        boundaries = (
+            BoundaryEntry(function="unknown", transition="INGRESS"),
+            BoundaryEntry(function="partial", transition="EGRESS", from_tier=2),
+            BoundaryEntry(function="partial2", transition="EGRESS", to_tier=4),
+        )
+        result = check_boundary_widening(boundaries)
+        assert result == ()
+
+    def test_multiple_boundaries_mixed(self) -> None:
+        """Only widening boundaries are flagged."""
+        boundaries = (
+            BoundaryEntry(function="narrow", transition="VALIDATE", from_tier=4, to_tier=2),
+            BoundaryEntry(function="widen", transition="EGRESS", from_tier=1, to_tier=3),
+            BoundaryEntry(function="same", transition="TRANSFORM", from_tier=2, to_tier=2),
+        )
+        result = check_boundary_widening(boundaries)
+        assert len(result) == 1
+        assert "widen" in result[0]
+
+    def test_returns_tuple(self) -> None:
+        """Return type is tuple for immutability."""
+        result = check_boundary_widening(())
+        assert isinstance(result, tuple)
+
+
+class TestExceptionVolume:
+    """Tests for check_exception_volume."""
+
+    def test_above_threshold_flagged(self) -> None:
+        """60 active exceptions with threshold=50 produces a warning."""
+        exceptions = tuple(
+            _exception(exc_id=f"EXC-{i:03d}") for i in range(60)
+        )
+        result = check_exception_volume(exceptions, threshold=50)
+        assert len(result) == 1
+        assert "60 active exceptions" in result[0]
+        assert "threshold: 50" in result[0]
+        assert "governance fatigue" in result[0]
+
+    def test_below_threshold_not_flagged(self) -> None:
+        """30 active exceptions with threshold=50 produces no warning."""
+        exceptions = tuple(
+            _exception(exc_id=f"EXC-{i:03d}") for i in range(30)
+        )
+        result = check_exception_volume(exceptions, threshold=50)
+        assert result == ()
+
+    def test_at_threshold_not_flagged(self) -> None:
+        """Exactly at threshold produces no warning (must exceed)."""
+        exceptions = tuple(
+            _exception(exc_id=f"EXC-{i:03d}") for i in range(50)
+        )
+        result = check_exception_volume(exceptions, threshold=50)
+        assert result == ()
+
+    def test_expired_exceptions_not_counted(self) -> None:
+        """Expired exceptions don't count toward volume threshold."""
+        today = datetime.date(2026, 3, 29)
+        past = "2025-01-01"
+        future = "2027-01-01"
+        # 20 active (no expiry) + 20 active (future expiry) + 30 expired = 70 total
+        active_no_expiry = tuple(
+            _exception(exc_id=f"EXC-A-{i:03d}") for i in range(20)
+        )
+        active_future = tuple(
+            _exception(exc_id=f"EXC-F-{i:03d}", expires=future) for i in range(20)
+        )
+        expired = tuple(
+            _exception(exc_id=f"EXC-E-{i:03d}", expires=past) for i in range(30)
+        )
+        exceptions = active_no_expiry + active_future + expired
+        # 40 active < 50 threshold
+        result = check_exception_volume(exceptions, threshold=50, now=today)
+        assert result == ()
+
+    def test_expired_excluded_but_active_above_threshold(self) -> None:
+        """Active exceptions above threshold even with expired ones excluded."""
+        today = datetime.date(2026, 3, 29)
+        past = "2025-01-01"
+        active = tuple(
+            _exception(exc_id=f"EXC-A-{i:03d}") for i in range(55)
+        )
+        expired = tuple(
+            _exception(exc_id=f"EXC-E-{i:03d}", expires=past) for i in range(20)
+        )
+        exceptions = active + expired
+        result = check_exception_volume(exceptions, threshold=50, now=today)
+        assert len(result) == 1
+        assert "55 active exceptions" in result[0]
+
+    def test_empty_exceptions(self) -> None:
+        """No exceptions produces no warning."""
+        result = check_exception_volume(())
+        assert result == ()
+
+    def test_returns_tuple(self) -> None:
+        """Return type is tuple for immutability."""
+        result = check_exception_volume(())
+        assert isinstance(result, tuple)

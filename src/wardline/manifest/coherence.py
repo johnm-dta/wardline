@@ -30,6 +30,7 @@ from wardline.core.taints import TaintState
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from types import MappingProxyType
 
     from wardline.manifest.models import (
         BoundaryEntry,
@@ -816,6 +817,76 @@ def check_direct_law_exclusion(
         f"'{path}' is prohibited without enforcement-unavailable governance (§9.5)"
         for path in governance_paths
     )
+
+
+def check_suppress_overrides(
+    overrides: tuple[dict[str, object] | MappingProxyType[str, object], ...],
+) -> tuple[str, ...]:
+    """Flag rule overrides that set severity to SUPPRESS or OFF.
+
+    These silence findings entirely — a governance risk that should be
+    documented and reviewed.
+    """
+    warnings: list[str] = []
+    for ovr in overrides:
+        rule_id = ovr.get("id")
+        severity = ovr.get("severity")
+        if isinstance(severity, str) and severity.upper() in ("SUPPRESS", "OFF"):
+            warnings.append(
+                f"Rule override '{rule_id}' sets severity to {severity.upper()} — "
+                f"findings will be silenced. Review governance justification."
+            )
+    return tuple(warnings)
+
+
+def check_boundary_widening(
+    boundaries: tuple[BoundaryEntry, ...],
+) -> tuple[str, ...]:
+    """Flag boundaries where to_tier > from_tier (data flows to less trusted tier).
+
+    This is not always wrong (e.g., writing to external systems), but it's a
+    governance signal worth reviewing.
+    """
+    warnings: list[str] = []
+    for b in boundaries:
+        if (
+            b.from_tier is not None
+            and b.to_tier is not None
+            and b.to_tier > b.from_tier  # Higher tier number = less trusted
+        ):
+            warnings.append(
+                f"Boundary '{b.function}' declares from_tier={b.from_tier} to "
+                f"to_tier={b.to_tier} — data flows to a less trusted tier. "
+                f"Review governance justification."
+            )
+    return tuple(warnings)
+
+
+def check_exception_volume(
+    exceptions: tuple[ExceptionEntry, ...],
+    *,
+    threshold: int = 50,
+    now: datetime.date | None = None,
+) -> tuple[str, ...]:
+    """Flag when active exception count exceeds threshold.
+
+    A high number of active exceptions may indicate governance fatigue
+    or systematic scanner miscalibration.
+    """
+    if now is None:
+        now = datetime.date.today()
+    active = [
+        e for e in exceptions
+        if e.expires is None or datetime.date.fromisoformat(e.expires) >= now
+    ]
+    if len(active) > threshold:
+        return (
+            f"Exception register has {len(active)} active exceptions "
+            f"(threshold: {threshold}). High volume may indicate governance "
+            f"fatigue — review whether scanner calibration or tier assignments "
+            f"need adjustment.",
+        )
+    return ()
 
 
 def check_restoration_evidence_consistency(
