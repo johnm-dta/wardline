@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-import ast
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from wardline.core.severity import Exceptionability, RuleId, Severity
 from wardline.scanner.context import Finding
 from wardline.scanner.rules.base import RuleBase, decorator_name
+
+if TYPE_CHECKING:
+    import ast
 
 
 @dataclass(frozen=True)

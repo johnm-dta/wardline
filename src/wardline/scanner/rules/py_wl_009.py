@@ -233,7 +233,11 @@ class RulePyWl009(RuleBase):
         for check in semantic_checks:
             check_line = getattr(check, "lineno", 0)
             if not _has_shape_check_before(node.body, stop_line=check_line):
-                self._emit_matrix_finding(check, "Semantic validation without prior shape validation — business logic check on data that has not been structurally validated")
+                self._emit_matrix_finding(
+                    check,
+                    "Semantic validation without prior shape validation"
+                    " — business logic check on data that has not been structurally validated",
+                )
 
     def _is_semantic_boundary(
         self,

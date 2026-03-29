@@ -7,9 +7,12 @@ performs load-time UNCONDITIONAL re-validation against the severity matrix.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
 from datetime import date, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 import jsonschema
 

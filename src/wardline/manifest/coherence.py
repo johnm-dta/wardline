@@ -218,10 +218,9 @@ def check_tier_downgrades(
     issues: list[CoherenceIssue] = []
     for mt in module_tiers:
         try:
-            old_taint = baseline_modules[mt.path]
+            old_taint: str = baseline_modules[mt.path]
         except KeyError:
-            old_taint = None  # module absent from baseline — newly introduced, skip
-            continue
+            continue  # module absent from baseline — newly introduced, skip
         old_tier = baseline_tiers.get(old_taint)
         new_tier = current_tier_map.get(mt.default_taint)
         if old_tier is not None and new_tier is not None and new_tier > old_tier:
@@ -290,10 +289,9 @@ def check_tier_upgrade_without_evidence(
     issues: list[CoherenceIssue] = []
     for mt in module_tiers:
         try:
-            old_taint = baseline_modules[mt.path]
+            old_taint: str = baseline_modules[mt.path]
         except KeyError:
-            old_taint = None  # module absent from baseline — newly introduced, skip
-            continue
+            continue  # module absent from baseline — newly introduced, skip
         old_tier = baseline_tiers.get(old_taint)
         new_tier = current_tier_map.get(mt.default_taint)
         if old_tier is not None and new_tier is not None and new_tier < old_tier:
@@ -488,7 +486,7 @@ def check_unmatched_contracts(
             continue
 
         contracts = boundary.validation_scope.get("contracts")
-        if not contracts:
+        if not contracts or not isinstance(contracts, (list, tuple)):
             continue
 
         if boundary.function not in annotated_functions:
@@ -917,7 +915,7 @@ def check_restoration_evidence_consistency(
 
         # Find matching annotation by function name
         matching_ann = None
-        for (fp, qn), anns in annotations.items():
+        for (_fp, qn), anns in annotations.items():
             for ann in anns:
                 if ann.canonical_name == "restoration_boundary" and qn == boundary.function:
                     matching_ann = ann

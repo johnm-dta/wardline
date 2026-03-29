@@ -16,9 +16,9 @@ from __future__ import annotations
 import ast
 import logging
 import os
+import tokenize
 from dataclasses import dataclass, field
 from pathlib import Path
-import tokenize
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -44,7 +44,6 @@ from wardline.scanner.taint.variable_level import compute_variable_taints
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from wardline.core.taints import TaintState
     from wardline.manifest.models import BoundaryEntry, OptionalFieldEntry, WardlineManifest
     from wardline.scanner.rules.base import RuleBase
     from wardline.scanner.taint.function_level import TaintSource

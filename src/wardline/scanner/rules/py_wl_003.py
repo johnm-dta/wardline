@@ -246,9 +246,8 @@ class RulePyWl003(RuleBase):
                             set_names.add(target.id)
                 # Track assignments from calls that yield set collections
                 # (e.g., sccs = compute_sccs(graph))
-                elif isinstance(child.value, ast.Call):
-                    if _iter_likely_yields_sets(child.value):
-                        for target in child.targets:
+                elif isinstance(child.value, ast.Call) and _iter_likely_yields_sets(child.value):
+                    for target in child.targets:
                             if isinstance(target, ast.Name):
                                 yields_sets_names.add(target.id)
 
@@ -258,7 +257,10 @@ class RulePyWl003(RuleBase):
                 isinstance(child, ast.Expr)
                 and isinstance(child.value, ast.Call)
                 and isinstance(child.value.func, ast.Attribute)
-                and child.value.func.attr in {"add", "discard", "update", "difference_update", "intersection_update", "symmetric_difference_update"}
+                and child.value.func.attr in {
+                    "add", "discard", "update", "difference_update",
+                    "intersection_update", "symmetric_difference_update",
+                }
                 and isinstance(child.value.func.value, ast.Name)
             ):
                 set_names.add(child.value.func.value.id)
@@ -280,9 +282,7 @@ class RulePyWl003(RuleBase):
                 if isinstance(iter_val, ast.Name) and iter_val.id in set_names:
                     pass
                 # Iterating a collection-of-sets (direct call or intermediate variable)
-                elif _iter_likely_yields_sets(iter_val):
-                    set_names.add(child.target.id)
-                elif isinstance(iter_val, ast.Name) and iter_val.id in yields_sets_names:
+                elif _iter_likely_yields_sets(iter_val) or isinstance(iter_val, ast.Name) and iter_val.id in yields_sets_names:
                     set_names.add(child.target.id)
 
         # Second pass: track names assigned from calls to methods whose names
@@ -394,9 +394,7 @@ class RulePyWl003(RuleBase):
             return False
         receiver = func.value
         # self.cache.get(key) — receiver is self.cache (Attribute on self)
-        if isinstance(receiver, ast.Attribute) and isinstance(receiver.value, ast.Name):
-            return True
-        return False
+        return isinstance(receiver, ast.Attribute) and isinstance(receiver.value, ast.Name)
 
     def _looks_like_existence_check(
         self,
@@ -445,9 +443,7 @@ class RulePyWl003(RuleBase):
         # Variable/attribute LHS against an UPPER_CASE name is almost always
         # value-membership:
         #   dto.code not in VALID_CODES  →  value membership (suppress)
-        if self._is_constant_set_name(comparator):
-            return False
-        return True
+        return not self._is_constant_set_name(comparator)
 
     @staticmethod
     def _is_constant_set_name(node: ast.expr) -> bool:

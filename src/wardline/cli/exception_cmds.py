@@ -710,6 +710,7 @@ def _compute_taints(
                 refined, _provenance, _diagnostics = propagate_callgraph_taints(
                     edges, taint_map, taint_sources,
                     resolved, unresolved,
+                    return_taint_map=_return_taint_map,
                 )
                 taint_map = refined
             except (AttributeError, KeyError, TypeError, ValueError) as exc:

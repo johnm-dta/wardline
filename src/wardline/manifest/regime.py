@@ -211,10 +211,7 @@ def collect_manifest_metrics(manifest_path: Path) -> ManifestMetrics:
     temporal_separation_posture: str | None = None
     if meta.temporal_separation is not None:
         alt = meta.temporal_separation.alternative
-        if alt == "enforced":
-            temporal_separation_posture = "enforced"
-        else:
-            temporal_separation_posture = f"alternative:{alt}"
+        temporal_separation_posture = "enforced" if alt == "enforced" else f"alternative:{alt}"
 
     return ManifestMetrics(
         governance_profile=manifest.governance_profile,

@@ -61,9 +61,9 @@ def _check_decorated_methods(cls: type) -> None:
 
         # Check for wardline decorator attributes
         try:
-            groups = value._wardline_groups
+            _groups = value._wardline_groups
         except AttributeError:
-            groups = None  # not a wardline-decorated callable — skip
+            _groups = None  # not a wardline-decorated callable — skip
             continue
 
         # Verify decorated methods use registered decorators

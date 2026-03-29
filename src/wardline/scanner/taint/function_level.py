@@ -175,7 +175,8 @@ def resolve_module_default(
     if manifest is None:
         return None
 
-    from pathlib import Path as _Path, PurePath
+    from pathlib import Path as _Path
+    from pathlib import PurePath
 
     file_p = PurePath(file_path)
     root = _Path(project_root).resolve() if project_root is not None else None
@@ -354,13 +355,12 @@ def _walk_and_assign(
                     # Evidence-derived: body and return taint are the same.
                     ret_taint = restoration_taint
                 else:
-                    ret_taint = taint_from_annotations(
+                    ret_taint_or_none = taint_from_annotations(
                         file_path, qualname, annotations,
                         decorator_map=RETURN_TAINT,
                         conflicts=taint_conflicts,
                     )
-                    if ret_taint is None:
-                        ret_taint = body_taint
+                    ret_taint = ret_taint_or_none if ret_taint_or_none is not None else body_taint
             elif module_default is not None:
                 body_taint = module_default
                 ret_taint = module_default

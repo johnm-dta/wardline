@@ -6,6 +6,7 @@ integration with code-analysis dashboards and CI pipelines.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -186,10 +187,8 @@ def _normalize_artifact_uri(file_path: str, base_path: str | None) -> str:
     path = Path(file_path)
     if base_path is not None:
         base = Path(base_path)
-        try:
+        with contextlib.suppress(ValueError):
             path = path.resolve().relative_to(base.resolve())
-        except ValueError:
-            pass
     return path.as_posix()
 
 

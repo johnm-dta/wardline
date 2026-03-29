@@ -105,7 +105,7 @@ def iter_exception_handlers(node: ast.AST) -> Iterator[ast.ExceptHandler]:
     trystar_ids: set[int] = set()
     for child in walk_skip_nested_defs(node):
         if _AST_TRY_STAR is not None and isinstance(child, _AST_TRY_STAR):
-            for handler in child.handlers:
+            for handler in child.handlers:  # type: ignore[attr-defined]
                 trystar_ids.add(id(handler))
                 yield handler
         elif isinstance(child, ast.ExceptHandler) and id(child) not in trystar_ids:

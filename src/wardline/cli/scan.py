@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 import click
 
@@ -26,6 +26,8 @@ from wardline.scanner.rules import make_rules
 from wardline.scanner.sarif import _PSEUDO_RULE_IDS, SarifReport
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from wardline.manifest.models import BoundaryEntry as _BoundaryEntry
     from wardline.manifest.models import ScannerConfig, WardlineManifest
     from wardline.scanner.rules.base import RuleBase
@@ -551,12 +553,11 @@ def scan(
                 rules=RulesConfig(overrides=resolved_rule_overrides),
             )
     else:
+        from wardline.manifest.loader import ManifestPolicyError as _PolicyError
         from wardline.manifest.resolve import (
             resolve_boundaries,
             resolve_optional_fields,
         )
-
-        from wardline.manifest.loader import ManifestPolicyError as _PolicyError
 
         # manifest_path is threaded from _load_manifest — no re-discovery needed
         try:
@@ -727,18 +728,18 @@ def scan(
     conformance_gaps = _read_conformance_gaps(manifest_path, scan_path=scan_path)
 
     # --- Compute control law (§9.5) ---
-    from wardline.scanner.sarif import compute_control_law
     from wardline.manifest.regime import collect_manifest_metrics
+    from wardline.scanner.sarif import compute_control_law
 
     manifest_metrics = collect_manifest_metrics(manifest_path)
     canonical_rule_ids = frozenset(r for r in RuleId if r not in _PSEUDO_RULE_IDS)
-    disabled_rules = tuple(sorted(
+    disabled_rule_values = tuple(sorted(
         r.value for r in canonical_rule_ids - loaded_rule_ids
     ))
     control_law, control_law_degradations = compute_control_law(
         ratification_overdue=manifest_metrics.ratification_overdue,
         conformance_gaps=conformance_gaps,
-        rules_disabled=disabled_rules,
+        rules_disabled=disabled_rule_values,
         stale_exception_count=stale_exception_count,
     )
 

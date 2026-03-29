@@ -80,7 +80,7 @@ def _reset_enforcement_state() -> None:
         try:
             _ = os.environ["WARDLINE_TESTING"]
         except KeyError:
-            raise RuntimeError("_reset_enforcement_state is for test use only")
+            raise RuntimeError("_reset_enforcement_state is for test use only") from None
     global _enforcement_enabled, _first_check_done  # noqa: PLW0603
     try:
         _enforcement_enabled = os.environ["WARDLINE_ENFORCE"] == "1"
@@ -249,7 +249,7 @@ def check_tier_boundary(
 
     try:
         tier = obj._wardline_tier
-    except AttributeError:
+    except AttributeError as err:
         ctx = f" (context: {context})" if context else ""
         msg = f"{type(obj).__name__} has no _wardline_tier attribute{ctx}"
         logger.warning("Tier boundary violation: %s", msg)
@@ -258,7 +258,7 @@ def check_tier_boundary(
             msg,
             obj=obj,
             expected_tier=expected_min_tier,
-        )
+        ) from err
 
     if not isinstance(tier, int):
         ctx = f" (context: {context})" if context else ""
@@ -454,9 +454,9 @@ def check_subclass_tier_consistency(cls: type) -> list[str]:
             continue
 
         try:
-            groups = value._wardline_groups
+            _groups = value._wardline_groups
         except AttributeError:
-            groups = None  # not a wardline-decorated callable — skip
+            _groups = None  # not a wardline-decorated callable — skip
             continue
 
         # Derive tier from _wardline_tier_source
@@ -468,7 +468,7 @@ def check_subclass_tier_consistency(cls: type) -> list[str]:
             try:
                 tier_val = TAINT_TO_TIER[tier_source]
             except KeyError:
-                tier_val = None  # tier_source not in TAINT_TO_TIER — unrecognised taint
+                pass  # tier_source not in TAINT_TO_TIER — unrecognised taint
             else:
                 _add_tier_method(tier_methods, int(tier_val), name)
 
@@ -482,7 +482,7 @@ def check_subclass_tier_consistency(cls: type) -> list[str]:
             try:
                 tier_val = TAINT_TO_TIER[to_state]
             except KeyError:
-                tier_val = None  # to_state not in TAINT_TO_TIER — unrecognised taint
+                pass  # to_state not in TAINT_TO_TIER — unrecognised taint
             else:
                 _add_tier_method(tier_methods, int(tier_val), name)
 

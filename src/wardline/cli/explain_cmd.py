@@ -6,7 +6,10 @@ import ast
 import json as json_mod
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 import click
 
@@ -312,10 +315,10 @@ def _build_exception_section(
         rule_str = str(rule_id)
         # Find matching exception for this (rule, taint_state, location)
         matched_exc = None
-        for exc in all_exceptions:
-            exc_location = exc.location
-            if exc.rule == rule_str and exc.taint_state == taint_state and exc_location == location_key:
-                matched_exc = exc
+        for exc_entry in all_exceptions:
+            exc_location = exc_entry.location
+            if exc_entry.rule == rule_str and exc_entry.taint_state == taint_state and exc_location == location_key:
+                matched_exc = exc_entry
                 break
 
         if matched_exc is not None:
@@ -361,7 +364,7 @@ def _build_exception_section(
 def _build_overlay_section(
     tree: ast.Module,
     qualname: str,
-    taint_map: dict[str, object],
+    taint_map: Mapping[str, object],
     file_path_str: str,
     root: Path,
     manifest_model: object | None,
@@ -419,8 +422,8 @@ def _build_overlay_section(
         ScanContext(
             file_path=file_path_str,
             function_level_taint_map=taint_map,  # type: ignore[arg-type]
-            boundaries=tuple(boundaries),  # type: ignore[arg-type]
-            optional_fields=tuple(optional_fields),  # type: ignore[arg-type]
+            boundaries=tuple(boundaries),
+            optional_fields=tuple(optional_fields),
         )
     )
     rule.visit(tree)

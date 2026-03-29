@@ -13,7 +13,7 @@ from __future__ import annotations
 import ast
 
 from wardline.core.severity import RuleId
-from wardline.scanner.rules.base import RuleBase, _AST_TRY_STAR, walk_skip_nested_defs
+from wardline.scanner.rules.base import _AST_TRY_STAR, RuleBase, walk_skip_nested_defs
 
 _BROAD_NAMES = frozenset({"Exception", "BaseException"})
 
@@ -41,7 +41,7 @@ class RulePyWl004(RuleBase):
         trystar_handlers: set[int] = set()
         for child in walk_skip_nested_defs(node):
             if _AST_TRY_STAR is not None and isinstance(child, _AST_TRY_STAR):
-                for handler in child.handlers:
+                for handler in child.handlers:  # type: ignore[attr-defined]
                     trystar_handlers.add(id(handler))
                     self._check_handler(handler, node)
             elif isinstance(child, ast.ExceptHandler) and id(child) not in trystar_handlers:

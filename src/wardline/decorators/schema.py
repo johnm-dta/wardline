@@ -10,6 +10,8 @@ Group 5 decorators mark functions with schema-completeness metadata.
 
 from __future__ import annotations
 
+from typing import Any
+
 from wardline.decorators._base import wardline_decorator
 
 __all__ = [
@@ -28,7 +30,7 @@ def schema_default[T](expr: T) -> T:
     return expr
 
 
-def all_fields_mapped(fn=None, *, source: str | None = None):  # type: ignore[no-redef]
+def all_fields_mapped(fn: Any = None, *, source: str | None = None) -> Any:
     """Mark a function as mapping all fields from a source type.
 
     Usage::
@@ -36,7 +38,7 @@ def all_fields_mapped(fn=None, *, source: str | None = None):  # type: ignore[no
         @all_fields_mapped              -- marker only
         @all_fields_mapped(source="DTO") -- with source class for verification
     """
-    def _apply(f):  # type: ignore[no-untyped-def]
+    def _apply(f: Any) -> Any:
         base = wardline_decorator(5, "all_fields_mapped", _wardline_all_fields_mapped=True)
         decorated = base(f)
         decorated._wardline_source = source  # always set (None when bare)

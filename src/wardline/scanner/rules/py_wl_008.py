@@ -9,9 +9,12 @@ early return that clearly represents rejection.
 
 from __future__ import annotations
 
-import ast
+from typing import TYPE_CHECKING
 
 from wardline.core.severity import Exceptionability, RuleId
+
+if TYPE_CHECKING:
+    import ast
 from wardline.manifest.scope import path_within_scope
 from wardline.scanner.import_resolver import resolve_call_fqn
 from wardline.scanner.rejection_path import has_rejection_path as _has_rejection_path

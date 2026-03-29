@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from collections.abc import Iterable
-from typing import Any
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 import jsonschema
 import yaml
-
-from types import MappingProxyType
 
 from wardline.manifest.models import (
     BoundaryEntry,
@@ -24,10 +25,10 @@ from wardline.manifest.models import (
     DelegationGrant,
     DependencyTaintEntry,
     ManifestMetadata,
-    OptionalFieldEntry,
-    TemporalSeparation,
     ModuleTierEntry,
+    OptionalFieldEntry,
     RulesConfig,
+    TemporalSeparation,
     TierEntry,
     WardlineManifest,
     WardlineOverlay,

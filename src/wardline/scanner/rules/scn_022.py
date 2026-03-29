@@ -108,7 +108,7 @@ def _get_source_from_decorators(
         if name != "all_fields_mapped":
             continue
         for kw in dec.keywords:
-            if kw.arg == "source" and isinstance(kw.value, ast.Constant):
+            if kw.arg == "source" and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
                 return kw.value.value
     return None
 

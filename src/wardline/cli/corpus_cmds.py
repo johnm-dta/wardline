@@ -12,7 +12,7 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import click
 import yaml
@@ -360,7 +360,7 @@ def _print_cell_stats(stats: dict[tuple[str, str], _CellStats]) -> None:
 
 def _build_json_report(
     stats: dict[tuple[str, str], _CellStats],
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Build per-cell assessment JSON with verdicts."""
     from wardline.core.matrix import SEVERITY_MATRIX
     from wardline.core.severity import RuleId, Severity

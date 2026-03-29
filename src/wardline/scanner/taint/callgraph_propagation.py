@@ -512,7 +512,7 @@ def compute_sccs(graph: dict[str, set[str]]) -> list[set[str]]:
                 except KeyError:
                     # Unvisited neighbor: save current frame and push child
                     work_stack.append((node, neighbors, False))
-                    work_stack.append((neighbor, iter(sorted(neighbor_edges)), True))
+                    work_stack.append((neighbor, iter(sorted(neighbor_edges or ())), True))
                     pushed_child = True
                     break
                 else:

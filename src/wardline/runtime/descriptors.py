@@ -68,7 +68,7 @@ class AuthoritativeField:
             raise AuthoritativeAccessError(
                 "AuthoritativeField has no name — was it dynamically assigned "
                 "without passing name= to __init__?"
-            )
+            ) from None
         try:
             return obj.__dict__[self.storage_name]
         except KeyError:

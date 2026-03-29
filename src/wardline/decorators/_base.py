@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def _safe_name(obj: object) -> str:
     """Return __name__ if available, otherwise repr."""
     try:
-        return obj.__name__  # type: ignore[union-attr]
+        return obj.__name__  # type: ignore[attr-defined, no-any-return]
     except AttributeError:
         return repr(obj)
 
@@ -127,7 +127,7 @@ def wardline_decorator(
             raise ValueError(
                 f"Unknown attribute '{key}' for decorator '{name}'. "
                 f"Allowed: {sorted(entry.attrs.keys())}"
-            )
+            ) from None
 
     # Compute output tier at construction time from semantic_attrs
     output_tier = _compute_output_tier(semantic_attrs)
@@ -158,7 +158,7 @@ def wardline_decorator(
                     from wardline.runtime.enforcement import is_enabled
                     if is_enabled() and result is not None:
                         try:
-                            current_groups = tuple(sorted(wrapper._wardline_groups))
+                            current_groups = tuple(sorted(wrapper._wardline_groups))  # type: ignore[attr-defined]
                         except AttributeError:
                             current_groups = ()
                         result = _try_stamp_tier(result, output_tier, current_groups, wrapper.__qualname__)
@@ -171,7 +171,7 @@ def wardline_decorator(
                     from wardline.runtime.enforcement import is_enabled
                     if is_enabled() and result is not None:
                         try:
-                            current_groups = tuple(sorted(wrapper._wardline_groups))
+                            current_groups = tuple(sorted(wrapper._wardline_groups))  # type: ignore[attr-defined]
                         except AttributeError:
                             current_groups = ()
                         result = _try_stamp_tier(result, output_tier, current_groups, wrapper.__qualname__)

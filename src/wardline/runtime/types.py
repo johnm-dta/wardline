@@ -44,6 +44,7 @@ class TierMarker:
     """
 
     __slots__ = ("tier",)
+    tier: AuthorityTier
 
     def __init__(self, tier: int) -> None:
         if tier not in (1, 2, 3, 4):

@@ -42,9 +42,7 @@ def _is_ast_qualified_type(node: ast.expr) -> bool:
     """
     if isinstance(node, ast.Attribute):
         return isinstance(node.value, ast.Name) and node.value.id == "ast"
-    if isinstance(node, ast.Name) and node.id.startswith("_AST_"):
-        return True
-    return False
+    return isinstance(node, ast.Name) and node.id.startswith("_AST_")
 
 
 def _isinstance_has_ast_type(call: ast.Call) -> bool:
