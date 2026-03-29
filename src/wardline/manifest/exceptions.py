@@ -7,6 +7,8 @@ performs load-time UNCONDITIONAL re-validation against the severity matrix.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
+from datetime import date, timedelta
 from pathlib import Path
 
 import jsonschema
@@ -105,3 +107,56 @@ def _validate_ast_fingerprint(entry: ExceptionEntry, path: Path) -> None:
             f"Exception '{entry.id}' has blank ast_fingerprint in {path}. "
             f"Run 'wardline exception refresh {entry.id}' to compute one."
         )
+
+
+def _validate_exception_age(
+    entry: ExceptionEntry,
+    age_limits: Mapping[str, int],
+    global_max_days: int,
+) -> list[str]:
+    """Check if exception exceeds its class-specific or global age limit.
+
+    Returns a list of warning messages (not errors -- expired exceptions
+    are governance findings, not load failures).
+    """
+    if not entry.expires:
+        return []
+
+    try:
+        expires_date = date.fromisoformat(entry.expires)
+    except ValueError:
+        return []
+
+    # Check against class-specific limit
+    class_limit = age_limits.get(entry.exceptionability)
+    effective_limit = class_limit if class_limit is not None else global_max_days
+
+    # Compute age from grant: if last_refreshed_at exists, use it; otherwise
+    # approximate from expires - effective_limit (grant date unknown)
+    if entry.last_refreshed_at:
+        try:
+            grant_date = date.fromisoformat(entry.last_refreshed_at)
+        except ValueError:
+            return []
+    else:
+        grant_date = expires_date - timedelta(days=effective_limit)
+
+    age_days = (date.today() - grant_date).days
+    if age_days > effective_limit:
+        return [
+            f"Exception '{entry.id}' ({entry.exceptionability}) is {age_days} days old, "
+            f"exceeding {entry.exceptionability} limit of {effective_limit} days"
+        ]
+    return []
+
+
+def check_exception_ages(
+    entries: tuple[ExceptionEntry, ...],
+    age_limits: Mapping[str, int],
+    global_max_days: int = 365,
+) -> tuple[str, ...]:
+    """Check all exceptions for age limit violations. Returns warning messages."""
+    warnings: list[str] = []
+    for entry in entries:
+        warnings.extend(_validate_exception_age(entry, age_limits, global_max_days))
+    return tuple(warnings)

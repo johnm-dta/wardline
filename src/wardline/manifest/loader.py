@@ -15,6 +15,8 @@ from typing import Any
 import jsonschema
 import yaml
 
+from types import MappingProxyType
+
 from wardline.manifest.models import (
     BoundaryEntry,
     ContractBinding,
@@ -280,6 +282,9 @@ def _build_manifest(data: dict[str, Any]) -> WardlineManifest:
         temporal_separation=temporal_separation,
     )
 
+    raw_age_limits = data.get("exception_age_limits", {})
+    exception_age_limits = MappingProxyType(raw_age_limits) if raw_age_limits else MappingProxyType({})
+
     return WardlineManifest(
         governance_profile=data.get("governance_profile", "lite"),
         tiers=tiers,
@@ -288,6 +293,7 @@ def _build_manifest(data: dict[str, Any]) -> WardlineManifest:
         module_tiers=module_tiers,
         dependency_taint=dependency_taint,
         metadata=metadata,
+        exception_age_limits=exception_age_limits,
     )
 
 

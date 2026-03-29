@@ -191,6 +191,16 @@
       "type": "integer",
       "minimum": 1,
       "description": "Maximum allowed exception duration in days. Default: 365."
+    },
+    "exception_age_limits": {
+      "type": "object",
+      "description": "Per-exceptionability-class maximum exception duration in days.",
+      "properties": {
+        "STANDARD": { "type": "integer", "minimum": 1 },
+        "RELAXED": { "type": "integer", "minimum": 1 },
+        "TRANSPARENT": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

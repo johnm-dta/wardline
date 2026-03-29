@@ -220,6 +220,7 @@ class WardlineManifest:
     module_tiers: tuple[ModuleTierEntry, ...] = ()
     dependency_taint: tuple[DependencyTaintEntry, ...] = ()
     metadata: ManifestMetadata = field(default_factory=ManifestMetadata)
+    exception_age_limits: MappingProxyType[str, int] = field(default_factory=lambda: MappingProxyType({}))
 
 
 @dataclass(frozen=True)
